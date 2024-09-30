@@ -8,9 +8,11 @@ import Sidebar from "./Layout/Sidebar";
 import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
 import CorteDia from "./Reports/CorteDia"
+import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
 import Users from "./Users/Users";
 import Reports from "./Reports/Reports";
+
 
 const Admin = () => {
     const router = useRouter();
@@ -62,6 +64,8 @@ const Admin = () => {
                 return <SalidaVehiculo user={user} />;
             case 'corteDia':
                 return <CorteDia user={user} />;
+            case 'reporteCobros':
+                return <ReporteCobros user={user} />;
             case 'viajes':
                 return <Viajes user={user} />;
             case 'vehiculos':

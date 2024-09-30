@@ -106,6 +106,16 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
             setError('Error al actualizar el vehículo. Por favor, intente nuevamente. Error:');
         }
     };
+    const handleDeleteVehiculo = async () => {
+        try {
+            await firebase.firestore().collection("vehiculos").doc(vehiculo.binNip).delete();
+            setSuccess('Vehículo eliminado con éxito.');
+            onClose(); // Cierra el modal después de la eliminación
+        } catch (error) {
+            console.error("Error al eliminar el vehículo:", error);
+            setError('Error al eliminar el vehículo. Por favor, intente nuevamente.');
+        }
+    };
 
     return (
         <form id="editarAuto" className="relative">
@@ -272,6 +282,13 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     className="btn btn-primary w-1/3"
                 >
                     Actualizar
+                </button>
+                <button
+                    type="button"
+                    onClick={handleDeleteVehiculo}
+                    className="btn btn-danger w-1/3 ml-4"
+                >
+                    Eliminar
                 </button>
             </div>
             {success && <p className="text-green-600 mt-4">{success}</p>}

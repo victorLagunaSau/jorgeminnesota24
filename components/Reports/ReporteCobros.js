@@ -57,24 +57,30 @@ const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago
 ));
 
 // Componente principal de Corte del Día
-const CorteDia = () => {
+const ReporteCobros = () => {
   const [endDate, setEndDate] = useState("");
+  const [iniDate, setIniDate] = useState("");
   const [movementsData, setMovementsData] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const componentRef = useRef(null); // Referencia para ReactToPrint
 
   const handleButtonClick = async () => {
+    if (!iniDate) {
+      setErrorMessage("Por favor, selecciona una fecha Inicial.");
+      return;
+    }
+
     if (!endDate) {
-      setErrorMessage("Por favor, selecciona una fecha.");
+      setErrorMessage("Por favor, selecciona una fecha Final.");
       return;
     }
 
     setErrorMessage("");
-
+    const iniDia = new Date(iniDate);
     const siguienteDia = new Date(endDate);
     siguienteDia.setDate(siguienteDia.getDate() + 1);
 
-    const startTimestamp = new Date(endDate).setHours(0, 0, 0, 0);
+    const startTimestamp = new Date(iniDia).setHours(0, 0, 0, 0);
     const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
 
     // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
@@ -105,7 +111,16 @@ const CorteDia = () => {
       <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
         Reporte de <strong>Movimientos</strong>.
       </h3>
-
+      <div className="mb-4 md:mb-0">
+        <label className="block text-black-500">Fecha: {iniDate} a {endDate}</label>
+        <input
+          type="date"
+          value={iniDate}
+          onChange={(e) => setIniDate(e.target.value)}
+          className="w-full px-4 py-2 border rounded-lg"
+          required
+        />
+      </div>
       <div className="mb-4 md:mb-0">
         <label className="block text-black-500">Fecha Final: {endDate}</label>
         <input
@@ -141,6 +156,7 @@ const CorteDia = () => {
       <ReporteMovimientos
         ref={componentRef}
         endDate={endDate}
+        iniDate={iniDate}
         movementsData={movementsData}
         totalPago={totalPago}
       />
@@ -148,4 +164,4 @@ const CorteDia = () => {
   );
 };
 
-export default CorteDia;
+export default ReporteCobros;

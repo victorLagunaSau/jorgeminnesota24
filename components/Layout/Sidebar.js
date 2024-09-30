@@ -49,6 +49,14 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                 </li>
                                 <li>
                                     <button
+                                        className={getButtonClass('reporteCobros')}
+                                        onClick={() => onSelectModule('reporteCobros')}
+                                    >
+                                        Reporte Ingresos
+                                    </button>
+                                </li>
+                                <li>
+                                    <button
                                         className={getButtonClass('reports')}
                                         onClick={() => onSelectModule('reports')}
                                     >
