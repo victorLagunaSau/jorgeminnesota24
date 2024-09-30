@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from 'react';
-import {firestore} from "../../firebase/firebaseIni";
+import React, { useEffect, useState } from 'react';
+import { firestore } from "../../firebase/firebaseIni";
 
-const EditarViajes = ({viaje}) => {
+const EditarViajes = ({ viaje }) => {
     const [vehiculosNoAsignados, setVehiculosNoAsignados] = useState([]);
     const [vehiculosAsignados, setVehiculosAsignados] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -12,13 +12,14 @@ const EditarViajes = ({viaje}) => {
     const [gastosExtra, setGastosExtra] = useState('');
     const [comentarios, setComentarios] = useState('');
     const [titulo, setTitulo] = useState('');
+    const [totalViaje, setTotalViaje] = useState(0); // Nuevo estado para el total de viaje
 
     useEffect(() => {
         const unsubscribeNoAsignados = firestore()
             .collection('vehiculos')
             .where('asignado', '==', false)
             .onSnapshot(snapshot => {
-                const vehiculosNoAsignados = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                const vehiculosNoAsignados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setVehiculosNoAsignados(vehiculosNoAsignados);
             }, error => {
                 console.error("Error al obtener los vehículos no asignados:", error);
@@ -28,8 +29,16 @@ const EditarViajes = ({viaje}) => {
             .collection('vehiculos')
             .where('idViaje', '==', viaje.id)
             .onSnapshot(snapshot => {
-                const vehiculosAsignados = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                const vehiculosAsignados = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setVehiculosAsignados(vehiculosAsignados);
+                // Calcular el total de viaje cada vez que se actualizan los vehículos asignados
+                const total = vehiculosAsignados.reduce((acc, vehiculo) => {
+                    return acc + (parseFloat(vehiculo.price) || 0) + // Incluir price
+                        (parseFloat(vehiculo.storage) || 0) +
+                        (parseFloat(vehiculo.sobrePeso) || 0) +
+                        (parseFloat(vehiculo.gastosExtra) || 0);
+                }, 0);
+                setTotalViaje(total); // Actualizar el total de viaje
             }, error => {
                 console.error("Error al obtener los vehículos asignados:", error);
             });
@@ -85,7 +94,8 @@ const EditarViajes = ({viaje}) => {
                     sobrePeso: sobrePeso,
                     gastosExtra: gastosExtra,
                     comentariosChofer: comentarios,
-                    titulo: titulo
+                    titulo: titulo,
+                    price: selectedVehiculo.price // Asegúrate de asignar el precio también
                 });
             });
 
@@ -112,27 +122,47 @@ const EditarViajes = ({viaje}) => {
                     sobrePeso: null,
                     gastosExtra: null,
                     comentarios: null,
-                    titulo: null
+                    titulo: null,
+                    price: null // Asegúrate de limpiar el precio si es necesario
                 });
             });
+
+            // Actualizar el total de viaje después de desasignar
+            const updatedVehiculosAsignados = vehiculosAsignados.filter(v => v.id !== vehiculo.id);
+            const total = updatedVehiculosAsignados.reduce((acc, vehiculo) => {
+                return acc + (parseFloat(vehiculo.price) || 0) + // Incluir price
+                    (parseFloat(vehiculo.storage) || 0) +
+                    (parseFloat(vehiculo.sobrePeso) || 0) +
+                    (parseFloat(vehiculo.gastosExtra) || 0);
+            }, 0);
+            setTotalViaje(total); // Actualizar el total de viaje
+
         } catch (error) {
             console.error("Error al desasignar el vehículo:", error);
         }
     };
 
     return (
-        <div className="modal-box" style={{minWidth: '1200px'}}>
+        <div className="modal-box" style={{ minWidth: '1200px' }}>
             <form method="dialog">
                 <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
             </form>
             <div className="flex mb-4 justify-between m-6">
                 <p className="text-m mr-4">Viaje: <strong className="text-2xl">#{viaje.consecutivo}</strong></p>
-                <p className="text-m mr-4">Transportista: <strong
-                    className="text-2xl">{viaje.nombreTransportista}</strong></p>
+                <p className="text-m mr-4">Transportista: <strong className="text-2xl">{viaje.nombreTransportista}</strong></p>
                 <p className="text-m">Traila: <strong className="text-2xl">#{viaje.trailaNumero}</strong></p>
             </div>
+
+            {/* Total de viaje */}
+            <div className="m-4">
+                <p className="text-2xl">
+                    <strong>Total de viaje: </strong>
+                    <strong>${totalViaje.toFixed(2)} DLL</strong>
+                </p>
+            </div>
+
             <div className="m-4 text-black-500 flex">
-                <div className="m-2" style={{flex: 3}}>
+                <div className="m-2" style={{ flex: 3 }}>
                     <h2 className="text-xl font-bold mb-4">Vehículos Asignados</h2>
                     <table className="table-auto table-zebra w-full">
                         <thead>
@@ -158,16 +188,26 @@ const EditarViajes = ({viaje}) => {
                                             &nbsp;| Título: <strong>{vehiculo.titulo || "N/A"}</strong>
                                         </p>
                                         <p>
-
+                                            Precio: <strong>$ {vehiculo.price || "0"} DLL </strong>
+                                            Storage: <strong>$ {vehiculo.storage || "0"} DLL </strong>
+                                            &nbsp;Sobrepeso: <strong>$ {vehiculo.sobrePeso || "0"} DLL </strong>
+                                            &nbsp;Gastos Extra: <strong>$ {vehiculo.gastosExtra || "0"} DLL </strong>
                                         </p>
-                                        <p></p>
-                                        <p>Storage: <strong>{vehiculo.storage || "0"}</strong></p>
-                                        <p>Sobrepeso: <strong>{vehiculo.sobrePeso || "0"}</strong></p>
-                                        <p>Gastos Extra: <strong>{vehiculo.gastosExtra || "0"}</strong></p>
-                                        <p>Comentarios: <strong>{vehiculo.comentarios || " "}</strong></p>
+                                         {/* Cálculo del total */}
+                                        <p className="text-2xl">
+                                            <strong>Total por vehículo: </strong>
+                                            <strong>$
+                                                {(
+                                                    (parseFloat(vehiculo.price) || 0) +
+                                                    (parseFloat(vehiculo.storage) || 0) +
+                                                    (parseFloat(vehiculo.sobrePeso) || 0) +
+                                                    (parseFloat(vehiculo.gastosExtra) || 0)
+                                                ).toFixed(2)} DLL
+                                            </strong>
+                                        </p>
                                     </div>
                                     <button
-                                        className="btn btn-error btn-sm"
+                                        className="btn btn-error btn-sm m-2"
                                         onClick={() => handleDesasignarVehiculo(vehiculo)}
                                     >
                                         No Asignar
@@ -179,7 +219,7 @@ const EditarViajes = ({viaje}) => {
                     </table>
                 </div>
 
-                <div className="mr-4" style={{flex: 1}}>
+                <div className="mr-4" style={{ flex: 1 }}>
                     <h2 className="text-xl font-bold mb-4">Vehículos No Asignados</h2>
                     <input
                         type="text"
@@ -199,8 +239,7 @@ const EditarViajes = ({viaje}) => {
                             <tr key={vehiculo.id}>
                                 <td className="border w-9/12 p-2">
                                     <div>
-                                        <p>Estado: <strong>{vehiculo.estado}</strong> Ciudad: <strong>{vehiculo.ciudad}</strong>
-                                        </p>
+                                        <p>Estado: <strong>{vehiculo.estado}</strong> Ciudad: <strong>{vehiculo.ciudad}</strong></p>
                                         <p>Bin Nip: <strong>{vehiculo.binNip}</strong></p>
                                         <p>Modelo: <strong>{vehiculo.modelo}</strong></p>
                                         <p>Tipo: <strong>{vehiculo.tipoVehiculo}</strong></p>
@@ -268,8 +307,8 @@ const EditarViajes = ({viaje}) => {
                                 className="select select-bordered"
                             >
                                 <option value="">Seleccionar Título</option>
-                                <option value="Título 1">NO</option>
-                                <option value="Título 2">SI</option>
+                                <option value="NO">NO</option>
+                                <option value="SI">SI</option>
                                 {/* Agregar más opciones según sea necesario */}
                             </select>
                         </div>
