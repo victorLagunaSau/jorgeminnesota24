@@ -8,7 +8,7 @@ const Viajes = ({user}) => {
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
             <h3 className="justify-center text-3xl lg:text-3xl font-mediumtext-black-500">
-                <strong>Viajes</strong>.
+                <strong>Pago de viajes</strong>.
             </h3>
             <div className="flex flex-col w-full my-4 ">
                 <motion.h3 className="text-2xl sm:text-3xl lg:text-4xl font-medium text-black-100 mx-auto text-center">
@@ -16,7 +16,7 @@ const Viajes = ({user}) => {
                         className="btn btn-outline btn-error"
                         onClick={() => document.getElementById("viajesModal").showModal()}
                     >
-                        + Iniciar Viaje
+                        + Pagar Viaje
                     </button>
                 </motion.h3>
 

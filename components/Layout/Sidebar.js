@@ -75,7 +75,7 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                             className={getButtonClass('viajes')}
                             onClick={() => onSelectModule('viajes')}
                         >
-                            Viajes
+                            Pago de viajes
                         </button>
                     </li>
                     <li>

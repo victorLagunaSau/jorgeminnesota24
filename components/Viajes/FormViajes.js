@@ -86,7 +86,6 @@ const FormViajes = ({ user }) => {
                 .add({
                     active: true,
                     nombreTransportista: nombreTransportista,
-                    idTransportista: idTransportista, // Añadir idTransportista
                     estatus: "PR",
                     consecutivo: nuevoConsecutivo,
                     usuario: user.nombre,
@@ -96,7 +95,6 @@ const FormViajes = ({ user }) => {
                     trailaNumero: trailaNumero
                 });
             setNombreTransportista('');
-            setIdTransportista(''); // Limpiar idTransportista
             setTrailaNumero('');
             setNotas('');
             setGuardadoExito('Viaje registrado exitosamente');
@@ -107,13 +105,7 @@ const FormViajes = ({ user }) => {
         }
     };
 
-    const handleTransportistaChange = (e) => {
-        const selectedUser = usuarios.find(user => user.id === e.target.value);
-        if (selectedUser) {
-            setNombreTransportista(selectedUser.nombre);
-            setIdTransportista(selectedUser.id);
-        }
-    };
+
 
     return (
         <div className="bg-white-100 py-10 px-4">
@@ -142,19 +134,14 @@ const FormViajes = ({ user }) => {
                         <div className="flex flex-wrap">
                             <div className="w-1/2 p-1">
                                 <label htmlFor="nombreTransportista" className="block text-black-500">* Transportista:</label>
-                                <select
+                                <input
+                                    type="text"
                                     id="nombreTransportista"
-                                    onChange={handleTransportistaChange}
+                                    value={nombreTransportista}
+                                    onChange={(e) => setNombreTransportista(e.target.value)}
                                     className="input input-bordered w-full mt-1 bg-white-100"
-                                    value={idTransportista}
-                                >
-                                    <option value="">Selecciona un transportista</option>
-                                    {usuarios.map(usuario => (
-                                        <option key={usuario.id} value={usuario.id}>
-                                            {usuario.nombre}
-                                        </option>
-                                    ))}
-                                </select>
+                                />
+
                             </div>
                             <div className="w-1/2 p-1">
                                 <label htmlFor="trailaNumero" className="block text-black-500">* Traila:</label>
