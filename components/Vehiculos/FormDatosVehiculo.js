@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import firebase from 'firebase/app';
@@ -22,6 +22,10 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const [estados, setEstados] = useState([]);
     const [ciudades, setCiudades] = useState([]);
     const [almacen, setAlmacen] = useState("");
+    const [storage, setStorage] = useState(0);
+    const [sobrePeso, setSobrePeso] = useState(0);
+    const [gastosExtra, setGastosExtra] = useState(0);
+    const [titulo, setTitulo] = useState('NO');
 
     useEffect(() => {
         let timeoutId;
@@ -104,7 +108,12 @@ const FormDatosVehiculo = ({user, onClose}) => {
                     usuario: user.nombre,
                     idUsuario: user.id,
                     timestamp: timestamp
-                }
+                },
+                storage: storage,
+                sobrePeso: sobrePeso,
+                gastosExtra: gastosExtra,
+                comentariosChofer: null,
+                titulo: titulo,
             });
             await firebase.firestore().collection("movimientos").add({
                 asignado: false,
@@ -125,7 +134,12 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 usuario: user.nombre,
                 idUsuario: user.id,
                 tipoRegistro: "PR",
-                timestamp: timestamp
+                timestamp: timestamp,
+                storage: storage,
+                sobrePeso: sobrePeso,
+                gastosExtra: gastosExtra,
+                comentariosChofer: null,
+                titulo: titulo,
             });
         } catch (error) {
             console.error("Error al agregar vehículo y movimiento:", error);
@@ -145,6 +159,9 @@ const FormDatosVehiculo = ({user, onClose}) => {
         setCliente('');
         setTelefonoCliente('');
         setDescripcion('');
+        setStorage(0);
+        setSobrePeso(0);
+        setGastosExtra(0);
     };
 
     return (
@@ -196,7 +213,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                                 setPrice(selectedCiudad.price);
                             }
                         }}
-                         className="select input-bordered w-full text-black-500 input-sm bg-white-100"
+                        className="select input-bordered w-full text-black-500 input-sm bg-white-100"
                         disabled={estados.length === 0}
                     >
                         <option value="">Seleccione...</option>
@@ -205,10 +222,60 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         ))}
                     </select>
                 </div>
-                <div className="w-1/4 p-1">
+            </div>
+            <div className="flex flex-wrap">
+                <div className="w-1/8  mr-2 p-1">
                     <label htmlFor="precio" className="block text-black-500">Precio:</label>
                     <p className="text-xl">$ {price} Dll</p>
                 </div>
+
+                <div className="w-1/8 p-1">
+                    <label htmlFor="binNip" className="block text-black-500">Storage</label>
+                    <input
+                        type="number"
+                        id="storage"
+                        value={storage}
+                        onChange={(e) => setStorage(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="sobrePeso" className="block text-black-500">Sobre peso</label>
+                    <input
+                        type="number"
+                        id="sobrePeso"
+                        value={sobrePeso}
+                        onChange={(e) => setSobrePeso(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="gastosExtra" className="block text-black-500">Gastos Extras</label>
+                    <input
+                        type="number"
+                        id="gastosExtra"
+                        value={gastosExtra}
+                        onChange={(e) => setGastosExtra(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="titulo"  className="block text-black-500">Título:</label>
+                    <select
+                        value={titulo}
+                        onChange={(e) => setTitulo(e.target.value)}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                    >
+                        <option value="">Seleccionar Título</option>
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                        {/* Agregar más opciones según sea necesario */}
+                    </select>
+                </div>
+
             </div>
             <div className="flex flex-wrap">
                 <div className="w-1/3 p-1">
@@ -245,7 +312,8 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         <option key="Copart" value="Copart">Copart</option>
                         <option key="Adesa" value="Adesa">Adesa</option>
                         <option key="Manheim" value="Manheim">Manheim</option>
-                        <option key="Insurance Auto Auctions" value="Insurance Auto Auctions">Insurance Auto Auctions</option>
+                        <option key="Insurance Auto Auctions" value="Insurance Auto Auctions">Insurance Auto Auctions
+                        </option>
 
                     </select>
                 </div>
@@ -258,7 +326,8 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         value={tipoVehiculo}
                         onChange={(e) => setTipoVehiculo(e.target.value)}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
-                    >   <option key="S" value="">Seleciona</option>
+                    >
+                        <option key="S" value="">Seleciona</option>
                         <option key="A" value="A">A Ligero</option>
                         <option key="B" value="B">B Mediano</option>
                         <option key="C" value="C">C Pesado</option>

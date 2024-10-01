@@ -11,11 +11,13 @@ const SalidaVehiculo = (user) => {
     const [estado, setEstado] = useState("");
     const [vehiculoData, setVehiculoData] = useState([]);
     const [pago, setPago] = useState(0);
-    const [storage, setStorage] = useState(0);
-    const [titulo, setTitulo] = useState("");
     const [showModal, setShowModal] = useState("");
     const [precio, setPrecio] = useState("");
     const [recibo, setRecibo] = useState(0);
+    const [storage, setStorage] = useState(0);
+    const [sobrePeso, setSobrePeso] = useState(0);
+    const [gastosExtra, setGastosExtra] = useState(0);
+    const [titulo, setTitulo] = useState('NO');
 
     const [mensajeError, setMensajeError] = useState("");
     const [cargando, setCargando] = useState(false);
@@ -40,9 +42,11 @@ const SalidaVehiculo = (user) => {
                 setMensajeError("");
                 setVehiculoData(vehiculo);
                 setPrecio(vehiculo.price);
-                setPago(0);
-                setStorage(0);
-                setTitulo("");
+                setStorage(vehiculo.storage);
+                setSobrePeso(vehiculo.sobrePeso);
+                setGastosExtra(vehiculo.gastosExtra);
+                setPago(vehiculo.price);
+                setTitulo(vehiculo.titulo);
 
             }
         } catch (error) {
@@ -78,6 +82,8 @@ const SalidaVehiculo = (user) => {
                 storage: storage,
                 totalPago: totalPago,
                 titulo: titulo,
+                sobrePeso: sobrePeso,
+                gastosExtra: gastosExtra,
             });
             setEstatus("EN");
             await firestore().collection("movimientos").add({
@@ -99,6 +105,8 @@ const SalidaVehiculo = (user) => {
                 pago: pago,
                 storage: storage,
                 totalPago: totalPago,
+                sobrePeso: sobrePeso,
+                gastosExtra: gastosExtra,
                 titulo: titulo,
             });
             setMensajeError("");
@@ -282,7 +290,6 @@ const SalidaVehiculo = (user) => {
                             ) : (
                                 <div>
                                     <div className="p-1">
-                                        <label htmlFor="pago" className="block text-black-500">Pago en Dll:</label>
                                         <div className="flex items-center">
                                             $ <input
                                             type="number"
@@ -307,8 +314,7 @@ const SalidaVehiculo = (user) => {
                                     </div>
 
                                     <div className="p-1">
-                                        <label htmlFor="storage" className="block text-black-500">Pago Extras por
-                                            Storage Overhead:</label>
+                                        <label htmlFor="storage" className="block text-black-500">Storage Overhead:</label>
                                         <div className="flex items-center">
                                             $ <input
                                             type="number"
@@ -331,8 +337,56 @@ const SalidaVehiculo = (user) => {
                                         /> Dll
                                         </div>
                                     </div>
+                                    <div className="p-1">
+                                        <label htmlFor="storage" className="block text-black-500">Pago Sobre Peso:</label>
+                                        <div className="flex items-center">
+                                            $ <input
+                                            type="number"
+                                            id="storage"
+                                            value={sobrePeso}
+                                            onChange={(e) => {
+                                                let value = e.target.value;
+                                                if (value === "" || parseFloat(value) < 0) {
+                                                    setStorage(0);
+                                                } else {
+                                                    if (parseFloat(value) > 0) {
+                                                        value = parseFloat(value).toString();
+                                                    }
+                                                    setSobrePeso(value);
+                                                }
+                                            }}
+                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                            min="0"
+                                            step="any"
+                                        /> Dll
+                                        </div>
+                                    </div>
+                                    <div className="p-1">
+                                        <label htmlFor="storage" className="block text-black-500">Gastos Extras:</label>
+                                        <div className="flex items-center">
+                                            $ <input
+                                            type="number"
+                                            id="storage"
+                                            value={gastosExtra}
+                                            onChange={(e) => {
+                                                let value = e.target.value;
+                                                if (value === "" || parseFloat(value) < 0) {
+                                                    setStorage(0);
+                                                } else {
+                                                    if (parseFloat(value) > 0) {
+                                                        value = parseFloat(value).toString();
+                                                    }
+                                                    setGastosExtra(value);
+                                                }
+                                            }}
+                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                            min="0"
+                                            step="any"
+                                        /> Dll
+                                        </div>
+                                    </div>
 
-                                    <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(storage) + parseFloat(pago)} DLL</strong>
+                                    <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(sobrePeso) + parseFloat(gastosExtra) + parseFloat(storage) + parseFloat(pago)} DLL</strong>
                                     </p>
 
                                     <div className="p-1">
@@ -353,14 +407,14 @@ const SalidaVehiculo = (user) => {
                                                     setRecibo(value);
                                                 }
                                             }}
-                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1 text-4xl"
                                             min="0"
                                             step="any"
                                         /> Dll
                                         </div>
                                     </div>
 
-                                    <p className="mt-4 text-xl">Cambio: <strong>$ {+parseFloat(recibo) - (parseFloat(storage) + parseFloat(pago))} DLL</strong>
+                                    <p className="mt-4 text-xl">Cambio: <strong>$ {+parseFloat(recibo) - ( parseFloat(sobrePeso) + parseFloat(gastosExtra) + parseFloat(storage) + parseFloat(pago))} DLL</strong>
                                     </p>
                                 </div>
 
