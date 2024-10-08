@@ -74,15 +74,16 @@ const CorteDia = () => {
     const siguienteDia = new Date(endDate);
     siguienteDia.setDate(siguienteDia.getDate() + 1);
 
-    const startTimestamp = new Date(endDate).setHours(0, 0, 0, 0);
-    const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
+  const startTimestamp = new Date(siguienteDia).setHours(0, 0, 0, 0);
+  const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
 
     // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
     const movementsSnapshot = await firestore()
       .collection("movimientos")
-      .where("timestamp", ">=", new Date(startTimestamp))
-      .where("timestamp", "<=", new Date(endTimestamp))
+      .where("timestamp", ">", new Date(startTimestamp))
+      .where("timestamp", "<", new Date(endTimestamp))
       .get();
+    console.log(movementsSnapshot)
 
     const movements = movementsSnapshot.docs.map((doc) => ({
       id: doc.id,
