@@ -83,19 +83,15 @@ const CorteDia = () => {
       .where("timestamp", ">", new Date(startTimestamp))
       .where("timestamp", "<", new Date(endTimestamp))
       .get();
-    console.log(movementsSnapshot)
 
     const movements = movementsSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
     }));
 
-    // Filtrar por estatus = "EN"
     const filteredMovements = movements.filter(movement => movement.estatus === "EN");
     setMovementsData(filteredMovements);
   };
-
-  // Calcular el total de pagos
   const totalPago = movementsData.reduce((total, movement) => {
     const pagoValue = parseFloat(movement.pago) || 0;
     return total + pagoValue;
