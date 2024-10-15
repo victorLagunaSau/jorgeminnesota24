@@ -41,11 +41,11 @@ const SalidaVehiculo = (user) => {
                 setEstado(vehiculo.estado);
                 setMensajeError("");
                 setVehiculoData(vehiculo);
-                setPrecio(vehiculo.price);
-                setStorage(vehiculo.storage);
-                setSobrePeso(vehiculo.sobrePeso);
-                setGastosExtra(vehiculo.gastosExtra);
-                setPago(vehiculo.price);
+                setPrecio(vehiculo.price  ? vehiculo.price : 0);
+                setStorage(vehiculo.storage  ? vehiculo.storage : 0);
+                setSobrePeso(vehiculo.sobrePeso  ? vehiculo.sobrePeso : 0);
+                setGastosExtra(vehiculo.gastosExtra  ? vehiculo.gastosExtra : 0);
+                setPago(vehiculo.price  ? vehiculo.price : 0);
                 setTitulo(vehiculo.titulo);
 
             }
@@ -274,7 +274,8 @@ const SalidaVehiculo = (user) => {
                                         <div>
                                             <p>Pago en Dll: <strong>{vehiculoData.pago}</strong></p>
                                             <p>Pago Extras por Storage: <strong>{vehiculoData.storage}</strong></p>
-                                            <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(vehiculoData.storage) + parseFloat(vehiculoData.pago)} DLL</strong>
+                                            <p>Pago sobre peso: <strong>{vehiculoData.sobrePeso}</strong></p>
+                                            <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(vehiculoData.storage) + parseFloat(vehiculoData.sobrePeso) + parseFloat(vehiculoData.pago)} DLL</strong>
                                             </p>
 
                                         </div>
@@ -282,7 +283,8 @@ const SalidaVehiculo = (user) => {
                                         <div>
                                             <p>Pago en Dll: <strong>{pago}</strong></p>
                                             <p>Pago Extras por Storage: <strong>{storage}</strong></p>
-                                            <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(storage) + parseFloat(pago)} DLL</strong>
+                                            <p>Pago sobre peso: <strong>{vehiculoData.sobrePeso}</strong></p>
+                                            <p className="mt-4 text-xl">Total: <strong>$ {parseFloat(vehiculoData.storage) + parseFloat(vehiculoData.sobrePeso) + parseFloat(vehiculoData.pago)} DLL</strong>
                                             </p>
                                         </div>
                                     )}

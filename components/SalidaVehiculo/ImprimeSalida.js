@@ -10,10 +10,10 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
     const montoEnDolaresPago = toWords(montoPago).toUpperCase() + " DLL";
     const montoStorage = storage || vehiculoData.storage;
     const montoEnDolaresStorage = toWords(montoStorage).toUpperCase() + " DLL";
-    const datoTitulo = titulo || vehiculoData.titulo;
+    const datoSobrePeso = titulo || vehiculoData.sobrePeso;
+    const montoEnDolaresSPeso = toWords(datoSobrePeso).toUpperCase() + " DLL";
     const montoTotal = parseFloat(montoPago) + parseFloat(montoStorage);
     const montoEnDolaresTotal = toWords(montoTotal).toUpperCase() + " DLL";
-    console.log(vehiculoData)
     const Recibo = ({title}) => (
         <div className="border-gray-300 p-4">
             <div className="w-full flex justify-between border-t border-gray-300 pt-1">
@@ -68,11 +68,13 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
                         </div>
                     </div>
                 </div>
-                <div className="w-1/3 border-l border-gray-300 p-4">
+                <div className="w-1/3 border-l border-gray-300 ">
                         <p className="text-sm text-black-500">Importe: <strong>$ {montoPago} DLL</strong></p>
                         <p className="text-xs text-black-500">({montoEnDolaresPago})</p>
                         <p className="text-sm text-black-500">Storage: <strong>$ {montoStorage} DLL</strong></p>
                         <p className="text-xs text-black-500">({montoEnDolaresStorage})</p>
+                        <p className="text-xl text-black-500">Total: <strong>$ {datoSobrePeso} DLL</strong></p>
+                        <p className="text-xs text-black-500">({montoEnDolaresSPeso})</p>
                         <p className="text-xl text-black-500">Total: <strong>$ {montoTotal} DLL</strong></p>
                         <p className="text-xs text-black-500">({montoEnDolaresTotal})</p>
                         <p className="w-full pt-2 text-black-500">________________</p>
