@@ -28,7 +28,7 @@ const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago
             <td className="border border-gray-300 px-4 py-2">{movement.cliente}</td>
             <td className="border border-gray-300 px-4 py-2">{movement.modelo}</td>
             <td className="border border-gray-300 px-4 py-2">
-              {parseFloat(movement.pago).toLocaleString('en-US', {
+              {parseFloat(movement.totalPago).toLocaleString('en-US', {
                 style: 'currency',
                 currency: 'USD'
               })}
@@ -93,7 +93,7 @@ const CorteDia = () => {
     setMovementsData(filteredMovements);
   };
   const totalPago = movementsData.reduce((total, movement) => {
-    const pagoValue = parseFloat(movement.pago) || 0;
+    const pagoValue = parseFloat(movement.totalPago) || 0;
     return total + pagoValue;
   }, 0);
 
