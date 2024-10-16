@@ -4,15 +4,26 @@ import {toWords} from 'number-to-words';
 import moment from 'moment';
 
 const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}, ref) => {
+    console.log(vehiculoData)
     const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
-    const montoEnDolares = toWords(vehiculoData.price).toUpperCase() + " DLL";
-    const montoPago = pago || vehiculoData.pago;
+
+    // Función para validar si un valor es un número o convertirlo en 0
+    const parseNumberOrZero = (value) => {
+        const parsedValue = parseFloat(value);
+        return isNaN(parsedValue) ? 0 : parsedValue;
+    };
+    const vehiculoPrice = parseNumberOrZero(vehiculoData.price);
+    const montoPago = parseNumberOrZero(pago || vehiculoData.pago);
+    const montoStorage = parseNumberOrZero(storage || vehiculoData.storage);
+    const datoSobrePeso = parseNumberOrZero(titulo || vehiculoData.sobrePeso);
+
+    const montoTotal = montoPago + montoStorage;
+
+    // Convertir los valores a palabras
+    const montoEnDolares = toWords(vehiculoPrice).toUpperCase() + " DLL";
     const montoEnDolaresPago = toWords(montoPago).toUpperCase() + " DLL";
-    const montoStorage = storage || vehiculoData.storage;
     const montoEnDolaresStorage = toWords(montoStorage).toUpperCase() + " DLL";
-    const datoSobrePeso = titulo || vehiculoData.sobrePeso;
     const montoEnDolaresSPeso = toWords(datoSobrePeso).toUpperCase() + " DLL";
-    const montoTotal = parseFloat(montoPago) + parseFloat(montoStorage);
     const montoEnDolaresTotal = toWords(montoTotal).toUpperCase() + " DLL";
     const Recibo = ({title}) => (
         <div className="border-gray-300 p-4">
@@ -23,20 +34,20 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
             </div>
             <div className="flex">
                 <div className="w-1/3 border-l text-gray-400 p-2">
-                    <p >Procedencia:</p>
-                    <div className="flex">
-                        <div className="">
-                            <p className="text-black-500">Estado:</p>
-                            <h3 className="font-bold text-lg text-black-500">{vehiculoData.estado}</h3>
-                        </div>
-                        <div className="ml-3">
-                            <p className="text-black-500">Ciudad:</p>
-                            <h3 className="font-bold text-lg text-black-500">{vehiculoData.ciudad}</h3>
-                        </div>
-                    </div>
+                    <p>Procedencia:</p>
+                    <p className="text-black-500">Estado: <strong
+                        className="text-lg text-black-500">{vehiculoData.estado}</strong></p>
+                    <p className="text-black-500">Ciudad: <strong
+                        className="text-lg text-black-500">{vehiculoData.ciudad}</strong></p>
                     <div>
                         <p className="text-black-500 text-sm">Fecha de pago:</p>
-                        <h3 className="font-bold text-sm text-black-500">{timestamp}</h3>
+                        <h3 className="font-bold text-sm text-black-500">
+                            {
+                                vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                                    ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                                    : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                            }
+                        </h3>
                     </div>
                     <div>
                         <p className="text-sm text-black-500">Costo: <strong
@@ -45,8 +56,8 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
                     </div>
                 </div>
                 <div className="w-1/3 border-l border-gray-300 p-2">
-                            <p className="text-sm text-black-500">Cliente:</p>
-                            <h3 className="text-sm font-bold text-black-500">{vehiculoData.cliente}</h3>
+                    <p className="text-sm text-black-500">Cliente:</p>
+                    <h3 className="text-sm font-bold text-black-500">{vehiculoData.cliente}</h3>
                     <div className="flex">
                         <div className="">
                             <p className="text-sm text-black-500">Bin Nip:</p>
@@ -69,16 +80,16 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
                     </div>
                 </div>
                 <div className="w-1/3 border-l border-gray-300 ">
-                        <p className="text-sm text-black-500">Importe: <strong>$ {montoPago} DLL</strong></p>
-                        <p className="text-xs text-black-500">({montoEnDolaresPago})</p>
-                        <p className="text-sm text-black-500">Storage: <strong>$ {montoStorage} DLL</strong></p>
-                        <p className="text-xs text-black-500">({montoEnDolaresStorage})</p>
-                        <p className="text-xl text-black-500">Total: <strong>$ {datoSobrePeso} DLL</strong></p>
-                        <p className="text-xs text-black-500">({montoEnDolaresSPeso})</p>
-                        <p className="text-xl text-black-500">Total: <strong>$ {montoTotal} DLL</strong></p>
-                        <p className="text-xs text-black-500">({montoEnDolaresTotal})</p>
-                        <p className="w-full pt-2 text-black-500">________________</p>
-                        <p className="text-sm text-black-500">Nombre y firma del Receptor:</p>
+                    <p className="text-sm text-black-500">Importe: <strong>$ {montoPago} DLL</strong></p>
+                    <p className="text-xs text-black-500">({montoEnDolaresPago})</p>
+                    <p className="text-sm text-black-500">Storage: <strong>$ {montoStorage} DLL</strong></p>
+                    <p className="text-xs text-black-500">({montoEnDolaresStorage})</p>
+                    <p className="text-sm text-black-500">Sobre Peso: <strong>$ {datoSobrePeso} DLL</strong></p>
+                    <p className="text-xs text-black-500">({montoEnDolaresSPeso})</p>
+                    <p className="text-xl text-black-500">Total: <strong>$ {montoTotal} DLL</strong></p>
+                    <p className="text-xs text-black-500">({montoEnDolaresTotal})</p>
+                    <p className="w-full pt-2 text-black-500">________________</p>
+                    <p className="text-sm text-black-500">Nombre y firma del Receptor:</p>
                 </div>
             </div>
 
