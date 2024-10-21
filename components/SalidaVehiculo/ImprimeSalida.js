@@ -91,6 +91,7 @@ const ComponentToPrint = React.forwardRef(({vehiculoData, pago, storage, titulo}
                     <p className="w-full pt-2 text-black-500">________________</p>
                     <p className="text-sm text-black-500">Nombre y firma del Receptor:</p>
                 </div>
+                {comentarioPago}
             </div>
 
 

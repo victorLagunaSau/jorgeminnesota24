@@ -18,6 +18,8 @@ const SalidaVehiculo = (user) => {
     const [sobrePeso, setSobrePeso] = useState(0);
     const [gastosExtra, setGastosExtra] = useState(0);
     const [titulo, setTitulo] = useState('NO');
+    const [subLote, setSubLote] = useState("");
+    const [comentarioPago, setComentarioPago] = useState("");
 
     const [mensajeError, setMensajeError] = useState("");
     const [cargando, setCargando] = useState(false);
@@ -41,13 +43,14 @@ const SalidaVehiculo = (user) => {
                 setEstado(vehiculo.estado);
                 setMensajeError("");
                 setVehiculoData(vehiculo);
-                setPrecio(vehiculo.price  ? vehiculo.price : 0);
-                setStorage(vehiculo.storage  ? vehiculo.storage : 0);
-                setSobrePeso(vehiculo.sobrePeso  ? vehiculo.sobrePeso : 0);
-                setGastosExtra(vehiculo.gastosExtra  ? vehiculo.gastosExtra : 0);
-                setPago(vehiculo.price  ? vehiculo.price : 0);
+                setPrecio(vehiculo.price ? vehiculo.price : 0);
+                setStorage(vehiculo.storage ? vehiculo.storage : 0);
+                setSobrePeso(vehiculo.sobrePeso ? vehiculo.sobrePeso : 0);
+                setGastosExtra(vehiculo.gastosExtra ? vehiculo.gastosExtra : 0);
+                setPago(vehiculo.price ? vehiculo.price : 0);
                 setTitulo(vehiculo.titulo);
-
+                setSubLote(vehiculo.subLote ? vehiculo.subLote : "")
+                setComentarioPago(vehiculo.comentarioPago ? vehiculo.comentarioPago : "")
             }
         } catch (error) {
             setMensajeError("Ocurrió un error al buscar el vehículo");
@@ -84,6 +87,8 @@ const SalidaVehiculo = (user) => {
                 titulo: titulo,
                 sobrePeso: sobrePeso,
                 gastosExtra: gastosExtra,
+                subLote: subLote,
+                comentarioPago: comentarioPago,
             });
             setEstatus("EN");
             await firestore().collection("movimientos").add({
@@ -108,6 +113,8 @@ const SalidaVehiculo = (user) => {
                 sobrePeso: sobrePeso,
                 gastosExtra: gastosExtra,
                 titulo: titulo,
+                subLote: subLote,
+                comentarioPago: comentarioPago,
             });
             setMensajeError("");
         } catch (error) {
@@ -239,15 +246,19 @@ const SalidaVehiculo = (user) => {
                                     <div className="ml-2">
                                         {vehiculoData.pago ? (
                                             <div>
-                                                <p>Título: <strong>{vehiculoData.titulo}</strong></p>
+                                                <p>Título: <strong>{vehiculoData.titulo}</strong> Sub lote: <strong>{subLote}</strong></p>
+
                                             </div>
                                         ) : (
                                             <div>
                                                 <p>Título: <strong>{titulo}</strong></p>
+
                                             </div>
                                         )}
+
                                     </div>
                                 ) : null}
+
                             </div>
 
                             {estatus === "EN" ? null : (
@@ -264,14 +275,27 @@ const SalidaVehiculo = (user) => {
                                             <option key="SI" value="SI">SI</option>
                                         </select>
                                     </div>
+                                    <label htmlFor="titulo" className="block text-black-500">Sub lote: :</label>
+                                    <div className="flex items-center">
+                                        <input
+                                            type="text"
+                                            id="subLote"
+                                            value={subLote}
+                                            onChange={(e) => setSubLote(e.target.value)}
+                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                        />
+                                    </div>
                                 </div>
                             )
                             }
                             <p className="mt-4 text-xl">Precio de transporte: <strong>$ {precio} DLL</strong></p>
                             {estatus === "EN" ? (
                                 <div>
+
+
                                     {vehiculoData.pago ? (
                                         <div>
+
                                             <p>Pago en Dll: <strong>{vehiculoData.pago}</strong></p>
                                             <p>Pago Extras por Storage: <strong>{vehiculoData.storage}</strong></p>
                                             <p>Pago sobre peso: <strong>{vehiculoData.sobrePeso}</strong></p>
@@ -288,6 +312,7 @@ const SalidaVehiculo = (user) => {
                                             </p>
                                         </div>
                                     )}
+                                    <p>Comentarios: <strong>{comentarioPago}</strong></p>
                                 </div>
                             ) : (
                                 <div>
@@ -316,7 +341,8 @@ const SalidaVehiculo = (user) => {
                                     </div>
 
                                     <div className="p-1">
-                                        <label htmlFor="storage" className="block text-black-500">Storage Overhead:</label>
+                                        <label htmlFor="storage" className="block text-black-500">Storage
+                                            Overhead:</label>
                                         <div className="flex items-center">
                                             $ <input
                                             type="number"
@@ -340,7 +366,8 @@ const SalidaVehiculo = (user) => {
                                         </div>
                                     </div>
                                     <div className="p-1">
-                                        <label htmlFor="storage" className="block text-black-500">Pago Sobre Peso:</label>
+                                        <label htmlFor="storage" className="block text-black-500">Pago Sobre
+                                            Peso:</label>
                                         <div className="flex items-center">
                                             $ <input
                                             type="number"
@@ -414,10 +441,21 @@ const SalidaVehiculo = (user) => {
                                             step="any"
                                         /> Dll
                                         </div>
+                                        <div className="flex items-center">
+
+                                        </div>
                                     </div>
 
-                                    <p className="mt-4 text-xl">Cambio: <strong>$ {+parseFloat(recibo) - ( parseFloat(sobrePeso) + parseFloat(gastosExtra) + parseFloat(storage) + parseFloat(pago))} DLL</strong>
+                                    <p className="mt-4 text-xl">Cambio: <strong>$ {+parseFloat(recibo) - (parseFloat(sobrePeso) + parseFloat(gastosExtra) + parseFloat(storage) + parseFloat(pago))} DLL</strong>
                                     </p>
+                                    <label htmlFor="recibo" className="block text-black-500 mt-3">Comentarios:</label>
+                                        <input
+                                            type="text"
+                                            id="comentarioPago"
+                                            value={comentarioPago}
+                                            onChange={(e) => setComentarioPago(e.target.value)}
+                                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                        />
                                 </div>
 
                             )
