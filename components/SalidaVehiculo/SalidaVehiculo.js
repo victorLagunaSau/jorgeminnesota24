@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { firestore } from "../../firebase/firebaseIni";
+import React, {useState} from 'react';
+import {firestore} from "../../firebase/firebaseIni";
 import ImprimeSalida from "./ImprimeSalida";
 
 const SalidaVehiculo = (user) => {
@@ -9,10 +9,10 @@ const SalidaVehiculo = (user) => {
     const [marca, setMarca] = useState("");
     const [ciudad, setCiudad] = useState("");
     const [estado, setEstado] = useState("");
-    const [vehiculoData, setVehiculoData] = useState({});
+    const [vehiculoData, setVehiculoData] = useState([]);
     const [pago, setPago] = useState(0);
-    const [showModal, setShowModal] = useState(false);
-    const [precio, setPrecio] = useState(0);
+    const [showModal, setShowModal] = useState("");
+    const [precio, setPrecio] = useState("");
     const [recibo, setRecibo] = useState(0);
     const [storage, setStorage] = useState(0);
     const [sobrePeso, setSobrePeso] = useState(0);
@@ -39,14 +39,15 @@ const SalidaVehiculo = (user) => {
                 setModelo(vehiculo.modelo);
                 setCiudad(vehiculo.ciudad);
                 setEstado(vehiculo.estado);
-                setVehiculoData(vehiculo);
-                setPrecio(vehiculo.price || 0);
-                setStorage(vehiculo.storage || 0);
-                setSobrePeso(vehiculo.sobrePeso || 0);
-                setGastosExtra(vehiculo.gastosExtra || 0);
-                setPago(vehiculo.price || 0);
-                setTitulo(vehiculo.titulo || 'NO');
                 setMensajeError("");
+                setVehiculoData(vehiculo);
+                setPrecio(vehiculo.price  ? vehiculo.price : 0);
+                setStorage(vehiculo.storage  ? vehiculo.storage : 0);
+                setSobrePeso(vehiculo.sobrePeso  ? vehiculo.sobrePeso : 0);
+                setGastosExtra(vehiculo.gastosExtra  ? vehiculo.gastosExtra : 0);
+                setPago(vehiculo.price  ? vehiculo.price : 0);
+                setTitulo(vehiculo.titulo);
+
             }
         } catch (error) {
             setMensajeError("Ocurrió un error al buscar el vehículo");
@@ -72,7 +73,7 @@ const SalidaVehiculo = (user) => {
         }
 
         try {
-            const totalPago = parseFloat(storage) + parseFloat(pago) + parseFloat(sobrePeso) + parseFloat(gastosExtra);
+            const totalPago = parseFloat(storage) + parseFloat(pago);
             setCargando(true);
             await firestore().collection("vehiculos").doc(binNip).update({
                 estatus: "EN",
@@ -84,8 +85,7 @@ const SalidaVehiculo = (user) => {
                 sobrePeso: sobrePeso,
                 gastosExtra: gastosExtra,
             });
-
-            // Registrar movimiento en la colección "movimientos"
+            setEstatus("EN");
             await firestore().collection("movimientos").add({
                 tipo: "Salida",
                 binNip: binNip,
@@ -109,11 +109,9 @@ const SalidaVehiculo = (user) => {
                 gastosExtra: gastosExtra,
                 titulo: titulo,
             });
-
-            setEstatus("EN");
-            setMensajeError("El vehículo ha salido correctamente.");
+            setMensajeError("");
         } catch (error) {
-            setMensajeError("Ocurrió un error al actualizar el estatus del vehículo y registrar el movimiento");x
+            setMensajeError("Ocurrió un error al actualizar el estatus del vehículo y registrar el movimiento");
         } finally {
             setCargando(false);
         }
@@ -124,7 +122,6 @@ const SalidaVehiculo = (user) => {
     };
 
     return (
-
         <div id="serch">
             {showModal && (
                 <dialog id="modalDatosViaje" className="modal" open>
