@@ -21,7 +21,7 @@ const Vehiculos = ({user}) => {
             try {
                 const unsubscribe = firestore()
                     .collection('vehiculos')
-                    .where('asignado', '==', false)
+                    .where('estatus', '!=', 'EN')
                     .onSnapshot((vehiculosSnapshot) => {
                         const vehiculosNoAsignados = vehiculosSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                         setVehiculosNoAsignados(vehiculosNoAsignados);
@@ -36,7 +36,6 @@ const Vehiculos = ({user}) => {
         obtenerVehiculos();
     }, []);
 
-    console.log(vehiculosNoAsignados)
 
     const filteredVehiculos = vehiculosNoAsignados.filter(vehiculo =>
         vehiculo.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -76,12 +75,29 @@ const Vehiculos = ({user}) => {
         setCurrentPage(newPage);
     };
 
-    const exportToExcel = () => {
-        const worksheet = XLSX.utils.json_to_sheet(filteredVehiculos);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos");
-        XLSX.writeFile(workbook, "vehiculos.xlsx");
-    };
+const exportToExcel = () => {
+    // Preprocesar los datos para convertir las fechas a un formato legible
+    const vehiculosConFecha = filteredVehiculos.map(vehiculo => {
+        // Verificar si el campo de fecha existe y convertirlo a una cadena legible
+        if (vehiculo.registro && vehiculo.registro.timestamp) {
+            const fecha = new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000);
+            vehiculo.fechaRegistro = fecha.toLocaleString(); // Agregar la fecha formateada a un nuevo campo
+        }
+        return vehiculo;
+    });
+
+    // Crear la hoja de Excel
+    const worksheet = XLSX.utils.json_to_sheet(vehiculosConFecha);
+
+    // Crear un nuevo libro de trabajo
+    const workbook = XLSX.utils.book_new();
+
+    // Agregar la hoja de trabajo al libro de trabajo
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos");
+
+    // Exportar el archivo Excel
+    XLSX.writeFile(workbook, "vehiculos.xlsx");
+};
 
     const currentItems = filteredVehiculos.slice(
         (currentPage - 1) * itemsPerPage,
@@ -112,9 +128,6 @@ const Vehiculos = ({user}) => {
 
                 </div>
 
-                <div className="flex justify-end mb-4">
-
-                </div>
 
                 <dialog open={isRegisterModalOpen} className="modal">
                     <div className="modal-box w-11/12 max-w-5xl bg-white-100">
@@ -167,101 +180,114 @@ const Vehiculos = ({user}) => {
                     />
                 </div>
 
-               <table className="table-auto w-full my-4">
-    <thead>
-        <tr>
-            <th className="px-4 py-2">#</th>
-            <th className="px-4 py-2">
-                Estatus:
-                <select
-                    className="ml-2 p-1 border border-gray-300 rounded-md"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                    <option value="">Todos</option>
-                    <option value="PR">Registrado</option>
-                    <option value="IN">Cargando</option>
-                    <option value="TR">En Viaje</option>
-                    <option value="EB">En Brownsville</option>
-                    <option value="DS">Descargado</option>
-                    <option value="EN">Entregado</option>
-                </select>
-            </th>
-            <th className="px-4 py-2">Viaja de:</th>
-            <th className="px-4 py-2">Almacen</th>
-            <th className="px-4 py-2">Vehículo</th>
-            <th className="px-4 py-2">Cliente</th>
-            <th className="px-4 py-2">Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {currentItems
-            .filter((vehiculo) => {
-                if (statusFilter === "") return true;
-                return vehiculo.estatus === statusFilter;
-            })
-            .map((vehiculo, index) => (
-                <tr key={vehiculo.id}>
-                    <td className="border px-4 py-2">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                    <td className="border px-4 py-2">
-                        {vehiculo.estatus === "PR" && <span className="text-black-500 text-xs">Registrado</span>}
-                        {vehiculo.estatus === "IN" && <span className="text-black-500 text-xs">Cargando</span>}
-                        {vehiculo.estatus === "TR" && <span className="text-black-500 text-xs">En Viaje</span>}
-                        {vehiculo.estatus === "EB" && <span className="text-black-500 text-xs">En Brownsville</span>}
-                        {vehiculo.estatus === "DS" && <span className="text-black-500 text-xs">Descargado</span>}
-                        {vehiculo.estatus === "EN" && <span className="text-black-500 text-xs">Entregado</span>}
-                    </td>
-                    <td className="border px-4 py-2">
-                        <div>
-                            <p>Estado: </p>
-                            <strong className="text-black-500 text-xl">{vehiculo.estado}</strong>
-                            <p>Ciudad: </p>
-                            <strong className="text-black-500 text-xl">{vehiculo.ciudad}</strong>
-                            <p>Almacen: <strong className="text-black-500">{vehiculo.almacen}</strong></p>
-                        </div>
-                    </td>
-                    <td className="border px-4 py-2">
-                        <div>
-                            <p>Bin o Lote:</p>
-                            <button
-                                className="btn btn-link btn-sm text-black-500 text-xl"
-                                onClick={() => handleCopiarBin(vehiculo.binNip)}
+                <table className="table-auto w-full my-4">
+                    <thead>
+                    <tr>
+                        <th className="px-4 py-2">#</th>
+                        <th className="px-4 py-2">
+                            Estatus:
+                            <select
+                                className="ml-2 p-1 border border-gray-300 rounded-md"
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
                             >
-                                {vehiculo.binNip}
-                            </button>
-                            <p>Gate Pass/Cliente:</p>
-                            <strong className="text-black-500">{vehiculo.gatePass}</strong>
-                        </div>
-                        <button
-                            className="btn btn-outline btn-accent"
-                            onClick={() => handleCopiarWhats(vehiculo.binNip)}
-                        >
-                            Copiar WhatsApp
-                        </button>
-                    </td>
-                    <td className="border px-4 py-2">
-                        <div>
-                            <p>Modelo: </p>
-                            <strong className="text-black-500">{vehiculo.modelo}</strong>
-                            <p>Tipo: </p>
-                            <strong className="text-black-500">{vehiculo.tipo}</strong>
-                        </div>
-                    </td>
-                    <td className="border px-4 py-2">
-                        <strong>{vehiculo.cliente}</strong>
-                    </td>
-                    <td className="border px-4 py-2">
-                        <button
-                            className="btn btn-outline btn-primary"
-                            onClick={() => handleEditClick(vehiculo)}
-                        >
-                            Editar
-                        </button>
-                    </td>
-                </tr>
-            ))}
-    </tbody>
-</table>
+                                <option value="">Todos</option>
+                                <option value="PR">Registrado</option>
+                                <option value="IN">Cargando</option>
+                                <option value="TR">En Viaje</option>
+                                <option value="EB">En Brownsville</option>
+                                <option value="DS">Descargado</option>
+                                <option value="EN">Entregado</option>
+                            </select>
+                        </th>
+                        <th className="px-4 py-2">Viaja de:</th>
+                        <th className="px-4 py-2">Almacen</th>
+                        <th className="px-4 py-2">Vehículo</th>
+                        <th className="px-4 py-2">Cliente</th>
+                        <th className="px-4 py-2">Acciones</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {currentItems
+                        .filter((vehiculo) => {
+                            if (statusFilter === "") return true;
+                            return vehiculo.estatus === statusFilter;
+                        })
+                        .map((vehiculo, index) => (
+                            <tr key={vehiculo.id}>
+                                <td className="border px-4 py-2">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+
+                                <td className="border px-4 py-2">
+                                    {vehiculo.estatus === "PR" &&
+                                        <span className="text-black-500 text-xs">Estatus: Registrado</span>}
+                                    {vehiculo.estatus === "IN" &&
+                                        <span className="text-black-500 text-xs">Estatus: Cargando</span>}
+                                    {vehiculo.estatus === "TR" &&
+                                        <span className="text-black-500 text-xs">Estatus: En Viaje</span>}
+                                    {vehiculo.estatus === "EB" &&
+                                        <span className="text-black-500 text-xs">Estatus: En Brownsville</span>}
+                                    {vehiculo.estatus === "DS" &&
+                                        <span className="text-black-500 text-xs">Estatus: Descargado</span>}
+                                    {vehiculo.estatus === "EN" &&
+                                        <span className="text-black-500 text-xs">Estatus: Entregado</span>}
+                                     <div className="text-black-500 text-xs"> registrado:<br/>
+                                    {vehiculo.registro.timestamp ?
+                                        new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleString()
+                                        : 'Fecha no asignada'}
+                                </div>
+
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <div>
+                                        <p>Estado: </p>
+                                        <strong className="text-black-500 text-xl">{vehiculo.estado}</strong>
+                                        <p>Ciudad: </p>
+                                        <strong className="text-black-500 text-xl">{vehiculo.ciudad}</strong>
+                                        <p>Almacen: <strong className="text-black-500">{vehiculo.almacen}</strong></p>
+                                    </div>
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <div>
+                                        <p>Bin o Lote:</p>
+                                        <button
+                                            className="btn btn-link btn-sm text-black-500 text-xl"
+                                            onClick={() => handleCopiarBin(vehiculo.binNip)}
+                                        >
+                                            {vehiculo.binNip}
+                                        </button>
+                                        <p>Gate Pass/Cliente:</p>
+                                        <strong className="text-black-500">{vehiculo.gatePass}</strong>
+                                    </div>
+                                    <button
+                                        className="btn btn-outline btn-accent"
+                                        onClick={() => handleCopiarWhats(vehiculo.binNip)}
+                                    >
+                                        Copiar WhatsApp
+                                    </button>
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <div>
+                                        <p>Modelo: </p>
+                                        <strong className="text-black-500">{vehiculo.modelo}</strong>
+                                        <p>Tipo: </p>
+                                        <strong className="text-black-500">{vehiculo.tipo}</strong>
+                                    </div>
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <strong>{vehiculo.cliente}</strong>
+                                </td>
+                                <td className="border px-4 py-2">
+                                    <button
+                                        className="btn btn-outline btn-primary"
+                                        onClick={() => handleEditClick(vehiculo)}
+                                    >
+                                        Editar
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
 
             </div>
             <div className="flex justify-between my-4">
