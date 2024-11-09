@@ -1,29 +1,36 @@
-import React, {useEffect, useState} from "react";
-import {motion} from "framer-motion";
-import {firestore} from "../../firebase/firebaseIni";
+import React, { useEffect, useState } from "react";
+import { firestore } from "../../firebase/firebaseIni";
 import * as XLSX from "xlsx";
 import FormDatosVehiculo from "./FormDatosVehiculo";
 import FormEditarVehiculo from "./FormEditarVehiculo";
 
-const Vehiculos = ({user}) => {
+const Vehiculos = ({ user }) => {
     const [vehiculosNoAsignados, setVehiculosNoAsignados] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState("");
     const [isCopied, setIsCopied] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedVehiculo, setSelectedVehiculo] = useState(null);
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [statusFilter, setStatusFilter] = useState("");
+    const [sortOrder, setSortOrder] = useState("asc");
     const itemsPerPage = 20;
-    const [statusFilter, setStatusFilter] = useState('');
+
+    const handleSortByDate = () => {
+        setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    };
 
     useEffect(() => {
         const obtenerVehiculos = () => {
             try {
                 const unsubscribe = firestore()
-                    .collection('vehiculos')
-                    .where('estatus', '!=', 'EN')
+                    .collection("vehiculos")
+                    .where("estatus", "!=", "EN")
                     .onSnapshot((vehiculosSnapshot) => {
-                        const vehiculosNoAsignados = vehiculosSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                        const vehiculosNoAsignados = vehiculosSnapshot.docs.map((doc) => ({
+                            id: doc.id,
+                            ...doc.data(),
+                        }));
                         setVehiculosNoAsignados(vehiculosNoAsignados);
                     });
 
@@ -36,78 +43,73 @@ const Vehiculos = ({user}) => {
         obtenerVehiculos();
     }, []);
 
-
-    const filteredVehiculos = vehiculosNoAsignados.filter(vehiculo =>
-        vehiculo.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehiculo.ciudad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehiculo.binNip.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehiculo.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vehiculo.cliente.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredVehiculos = vehiculosNoAsignados.filter(
+        (vehiculo) =>
+            vehiculo.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehiculo.ciudad.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehiculo.binNip.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehiculo.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            vehiculo.cliente.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSearchTermChange = event => {
+    const sortedVehiculos = [...filteredVehiculos].sort((a, b) => {
+        const dateA = a.registro?.timestamp
+            ? new Date(a.registro.timestamp.seconds * 1000 + a.registro.timestamp.nanoseconds / 1000000)
+            : new Date(0);
+        const dateB = b.registro?.timestamp
+            ? new Date(b.registro.timestamp.seconds * 1000 + b.registro.timestamp.nanoseconds / 1000000)
+            : new Date(0);
+
+        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    });
+
+    const currentItems = sortedVehiculos.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const handleSearchTermChange = (event) => {
         setSearchTerm(event.target.value);
         setCurrentPage(1);
     };
 
     const handleCopiarWhats = (binNip) => {
-        const textoACopiar =
-            `El id de tu vehículo es ${binNip}:\n` +
-            `Rastrea aquí tu vehículo:\n` +
-            `https://www.jorgeminnesota.com/rastreo#${binNip}\n`;
-
+        const textoACopiar = `El id de tu vehículo es ${binNip}:\nRastrea aquí tu vehículo:\nhttps://www.jorgeminnesota.com/rastreo#${binNip}\n`;
         navigator.clipboard.writeText(textoACopiar);
         setIsCopied(true);
-        setTimeout(() => {
-            setIsCopied(false);
-        }, 2000);
+        setTimeout(() => setIsCopied(false), 2000);
     };
 
     const handleCopiarBin = (binNip) => {
         navigator.clipboard.writeText(binNip);
         setIsCopied(true);
-        setTimeout(() => {
-            setIsCopied(false);
-        }, 2000);
+        setTimeout(() => setIsCopied(false), 2000);
     };
 
     const handlePageChange = (newPage) => {
         setCurrentPage(newPage);
     };
 
-const exportToExcel = () => {
-    // Preprocesar los datos para convertir las fechas a un formato legible
-    const vehiculosConFecha = filteredVehiculos.map(vehiculo => {
-        // Verificar si el campo de fecha existe y convertirlo a una cadena legible
-        if (vehiculo.registro && vehiculo.registro.timestamp) {
-            const fecha = new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000);
-            vehiculo.fechaRegistro = fecha.toLocaleString(); // Agregar la fecha formateada a un nuevo campo
-        }
-        return vehiculo;
-    });
+    const exportToExcel = () => {
+        const vehiculosConFecha = filteredVehiculos.map((vehiculo) => {
+            if (vehiculo.registro && vehiculo.registro.timestamp) {
+                const fecha = new Date(
+                    vehiculo.registro.timestamp.seconds * 1000 +
+                        vehiculo.registro.timestamp.nanoseconds / 1000000
+                );
+                vehiculo.fechaRegistro = fecha.toLocaleString();
+            }
+            return vehiculo;
+        });
 
-    // Crear la hoja de Excel
-    const worksheet = XLSX.utils.json_to_sheet(vehiculosConFecha);
-
-    // Crear un nuevo libro de trabajo
-    const workbook = XLSX.utils.book_new();
-
-    // Agregar la hoja de trabajo al libro de trabajo
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos");
-
-    // Exportar el archivo Excel
-    XLSX.writeFile(workbook, "vehiculos.xlsx");
-};
-
-    const currentItems = filteredVehiculos.slice(
-        (currentPage - 1) * itemsPerPage,
-        currentPage * itemsPerPage
-    );
+        const worksheet = XLSX.utils.json_to_sheet(vehiculosConFecha);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos");
+        XLSX.writeFile(workbook, "vehiculos.xlsx");
+    };
 
     const handleEditClick = (vehiculo) => {
         setSelectedVehiculo(vehiculo);
         setIsEditModalOpen(true);
     };
+
 
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
@@ -184,8 +186,8 @@ const exportToExcel = () => {
                     <thead>
                     <tr>
                         <th className="px-4 py-2">#</th>
-                        <th className="px-4 py-2">
-                            Estatus:
+                        <th className="px-4 py-2 flex items-center">
+                            Est:
                             <select
                                 className="ml-2 p-1 border border-gray-300 rounded-md"
                                 value={statusFilter}
@@ -199,6 +201,12 @@ const exportToExcel = () => {
                                 <option value="DS">Descargado</option>
                                 <option value="EN">Entregado</option>
                             </select>
+                            <button
+                                className="ml-4 p-1 border border-gray-300 rounded-md"
+                                onClick={handleSortByDate}
+                            >
+                                {sortOrder === "asc" ? "Reg ^" : "Reg ˅"}
+                            </button>
                         </th>
                         <th className="px-4 py-2">Viaja de:</th>
                         <th className="px-4 py-2">Almacen</th>
@@ -230,11 +238,11 @@ const exportToExcel = () => {
                                         <span className="text-black-500 text-xs">Estatus: Descargado</span>}
                                     {vehiculo.estatus === "EN" &&
                                         <span className="text-black-500 text-xs">Estatus: Entregado</span>}
-                                     <div className="text-black-500 text-xs"> registrado:<br/>
-                                    {vehiculo.registro.timestamp ?
-                                        new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleString()
-                                        : 'Fecha no asignada'}
-                                </div>
+                                    <div className="text-black-500 text-xs"> registrado:<br/>
+                                        {vehiculo.registro.timestamp ?
+                                            new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleString()
+                                            : 'Fecha no asignada'}
+                                    </div>
 
                                 </td>
                                 <td className="border px-4 py-2">
