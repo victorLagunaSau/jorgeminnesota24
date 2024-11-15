@@ -151,21 +151,22 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     </div>
                 </div>
             )}
-             <div className="w-1/8 p-1">
-                    <label htmlFor="titulo" className="block text-black-500">Estatus:</label>
-                    <select
-                                className="ml-2 p-1 border border-gray-300 rounded-md"
-                                value={estatus}
-                                onChange={(e) => setEstatus(e.target.value)}
-                            >
-                                <option value="">Todos</option>
-                                <option value="PR">Registrado</option>
-                                <option value="IN">Cargando</option>
-                                <option value="TR">En Viaje</option>
-                                <option value="EB">En Brownsville</option>
-                                <option value="DS">Descargado</option>
-                            </select>
-                </div>
+            <div className="w-1/8 p-1">
+                <label htmlFor="titulo" className="block text-black-500">Estatus:</label>
+                <select
+                    className="ml-2 p-1 border border-gray-300 rounded-md"
+                    value={estatus}
+                    onChange={(e) => setEstatus(e.target.value)}
+                >
+                    <option value="">Todos</option>
+                    <option value="PR">Registrado</option>
+                    <option value="IN">Cargando</option>
+                    <option value="TR">En Viaje</option>
+                    <option value="EB">En Brownsville</option>
+                    <option value="DS">Descargado</option>
+                </select>
+
+            </div>
             <div className="flex flex-wrap">
                 <div className="w-1/3 p-1">
                     <label htmlFor="estado" className="block text-black-500">Estado: {estado}</label>
@@ -307,7 +308,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                 </div>
             </div>
             <div className="flex flex-wrap">
-                                <div className="w-1/8 p-1">
+                <div className="w-1/8 p-1">
                     <label htmlFor="binNip" className="block text-black-500">Storage</label>
                     <input
                         type="number"
@@ -354,20 +355,20 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     </select>
                 </div>
             </div>
-            <div className="flex justify-center mt-5">
-                <button
-                    type="button"
-                    onClick={handleSubmit}
-                    className="btn btn-primary w-1/3"
-                >
-                    Actualizar
-                </button>
+            <div className="flex justify-between mt-5">
                 <button
                     type="button"
                     onClick={handleDeleteVehiculo}
-                    className="btn btn-danger w-1/3 ml-4"
+                    className="btn btn-sm btn-danger w-1/6"
                 >
                     Eliminar
+                </button>
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="btn btn-primary text-white-100 w-1/3"
+                >
+                    Actualizar
                 </button>
             </div>
             {success && <p className="text-green-600 mt-4">{success}</p>}
