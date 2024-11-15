@@ -21,6 +21,13 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
     const [ciudades, setCiudades] = useState([]);
     const [almacen, setAlmacen] = useState('');
 
+    const [storage, setStorage] = useState(0);
+    const [sobrePeso, setSobrePeso] = useState(0);
+    const [gastosExtra, setGastosExtra] = useState(0);
+    const [titulo, setTitulo] = useState('NO');
+
+    const [estatus, setEstatus] = useState('');
+
     useEffect(() => {
         let timeoutId;
         if (error) {
@@ -47,7 +54,6 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
         };
         fetchEstados();
     }, []);
-
     useEffect(() => {
         if (vehiculo) {
             setEstado(vehiculo.estado);
@@ -61,6 +67,11 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
             setTelefonoCliente(vehiculo.telefonoCliente);
             setDescripcion(vehiculo.descripcion);
             setAlmacen(vehiculo.almacen);
+            setEstatus(vehiculo.estatus);
+            setStorage(vehiculo.storage !== undefined ? vehiculo.storage : 0);
+            setSobrePeso(vehiculo.sobrePeso !== undefined ? vehiculo.sobrePeso : 0);
+            setGastosExtra(vehiculo.gastosExtra !== undefined ? vehiculo.gastosExtra : 0);
+            setTitulo(vehiculo.titulo !== undefined ? vehiculo.titulo : 'NO');
         }
     }, [vehiculo]);
 
@@ -100,6 +111,11 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                 estado: estado,
                 ciudad: ciudad,
                 price: price,
+                storage: storage,
+                sobrePeso: sobrePeso,
+                gastosExtra: gastosExtra,
+                titulo: titulo,
+                estatus: estatus,
             });
         } catch (error) {
             console.error("Error al actualizar vehículo:", error);
@@ -135,6 +151,21 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     </div>
                 </div>
             )}
+             <div className="w-1/8 p-1">
+                    <label htmlFor="titulo" className="block text-black-500">Estatus:</label>
+                    <select
+                                className="ml-2 p-1 border border-gray-300 rounded-md"
+                                value={estatus}
+                                onChange={(e) => setEstatus(e.target.value)}
+                            >
+                                <option value="">Todos</option>
+                                <option value="PR">Registrado</option>
+                                <option value="IN">Cargando</option>
+                                <option value="TR">En Viaje</option>
+                                <option value="EB">En Brownsville</option>
+                                <option value="DS">Descargado</option>
+                            </select>
+                </div>
             <div className="flex flex-wrap">
                 <div className="w-1/3 p-1">
                     <label htmlFor="estado" className="block text-black-500">Estado: {estado}</label>
@@ -273,6 +304,54 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                         onChange={(e) => setDescripcion(e.target.value)}
                         className="textarea textarea-bordered w-full text-black-500 textarea-sm bg-white-100"
                     />
+                </div>
+            </div>
+            <div className="flex flex-wrap">
+                                <div className="w-1/8 p-1">
+                    <label htmlFor="binNip" className="block text-black-500">Storage</label>
+                    <input
+                        type="number"
+                        id="storage"
+                        value={storage}
+                        onChange={(e) => setStorage(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="sobrePeso" className="block text-black-500">Sobre peso</label>
+                    <input
+                        type="number"
+                        id="sobrePeso"
+                        value={sobrePeso}
+                        onChange={(e) => setSobrePeso(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="gastosExtra" className="block text-black-500">Gastos Extras</label>
+                    <input
+                        type="number"
+                        id="gastosExtra"
+                        value={gastosExtra}
+                        onChange={(e) => setGastosExtra(Math.max(0, e.target.value))}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        min="0"
+                    />
+                </div>
+                <div className="w-1/8 p-1">
+                    <label htmlFor="titulo" className="block text-black-500">Título:</label>
+                    <select
+                        value={titulo}
+                        onChange={(e) => setTitulo(e.target.value)}
+                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                    >
+                        <option value="">Seleccionar Título</option>
+                        <option value="NO">NO</option>
+                        <option value="SI">SI</option>
+                        {/* Agregar más opciones según sea necesario */}
+                    </select>
                 </div>
             </div>
             <div className="flex justify-center mt-5">
