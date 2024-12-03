@@ -3,9 +3,9 @@ import { firestore } from '../../firebase/firebaseIni';
 import ReactToPrint from "react-to-print";
 
 // Componente para mostrar e imprimir la tabla de movimientos
-const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago }, ref) => (
+const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago, totalCaja, totalCC, totalPendientes }, ref) => (
   <div ref={ref} className="m-4" style={{ maxWidth: "90%", marginLeft: "auto", marginRight: "auto" }}>
-          <div className="encabezado-impresion w-full flex justify-between border-t border-gray-300 pt-1 hidden-print">
+    <div className="encabezado-impresion w-full flex justify-between border-t border-gray-300 pt-1 hidden-print">
       <img src="/assets/Logoprint.png" className="w-15 mr-2" alt="Logo" />
       <p className="text-gray-400">Corte de caja</p>
     </div>
@@ -13,39 +13,86 @@ const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago
     <table className="mt-4 w-full border-collapse border border-gray-300">
       <thead>
         <tr>
-          <th className="border border-gray-300 px-4 py-2">Bin/Nip</th>
-          <th className="border border-gray-300 px-4 py-2">Ciudad</th>
+          <th className="border border-gray-300 px-4 py-2">Vehiculo</th>
           <th className="border border-gray-300 px-4 py-2">Cliente</th>
-          <th className="border border-gray-300 px-4 py-2">Modelo</th>
-          <th className="border border-gray-300 px-4 py-2">Pago (USD)</th>
+          <th className="border border-gray-300 px-4 py-2">Venta</th>
+          <th className="border border-gray-300 px-4 py-2">Caja</th>
+          <th className="border border-gray-300 px-4 py-2">CC</th>
+          <th className="border border-gray-300 px-4 py-2">Pendientes</th>
         </tr>
       </thead>
       <tbody>
-        {movementsData.map((movement) => (
-          <tr key={movement.id}>
-            <td className="border border-gray-300 px-4 py-2">{movement.binNip}</td>
-            <td className="border border-gray-300 px-4 py-2">{movement.ciudad}</td>
-            <td className="border border-gray-300 px-4 py-2">{movement.cliente}</td>
-            <td className="border border-gray-300 px-4 py-2">{movement.modelo}</td>
-            <td className="border border-gray-300 px-4 py-2">
-              {parseFloat(movement.totalPago).toLocaleString('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              })}
-            </td>
-          </tr>
-        ))}
+        {movementsData.map((movement) => {
+          const totalPago = parseFloat(movement.totalPago) || 0;
+          const caja = (parseFloat(movement.cajaRecibo) || 0) - (parseFloat(movement.cajaCambio) || 0);
+          const cc = (parseFloat(movement.cajaCC) || 0);
+          const pendientes = (parseFloat(movement.pagoTotalPendiente) || 0);
+          return (
+            <tr key={movement.id}>
+              <td className="border border-gray-300 px-4 py-2">
+                <p>Bin: <strong>{movement.binNip}</strong></p>
+                <p>Modelo: <strong>{movement.modelo}</strong></p>
+              </td>
+              <td className="border border-gray-300 px-4 py-2">
+                <p>Cliente: <strong>{movement.cliente}</strong></p>
+                <p>Ciudad: <strong>{movement.ciudad}</strong></p>
+              </td>
+              <td className="border border-gray-300 px-4 py-2">
+                {totalPago.toLocaleString('en-US', {
+                  style: 'currency',
+                  currency: 'USD'
+                })}
+              </td>
+              <td className="border border-gray-300 px-4 py-2">
+                {caja.toLocaleString('en-US', {
+                  style: 'currency',
+                  currency: 'USD'
+                })}
+              </td>
+              <td className="border border-gray-300 px-4 py-2">
+                {cc.toLocaleString('en-US', {
+                  style: 'currency',
+                  currency: 'USD'
+                })}
+              </td>
+              <td className="border border-gray-300 px-4 py-2">
+                {pendientes.toLocaleString('en-US', {
+                  style: 'currency',
+                  currency: 'USD'
+                })}
+              </td>
+            </tr>
+          );
+        })}
         {movementsData.length === 0 && (
           <tr>
-            <td colSpan="5" className="border border-gray-300 px-4 py-2 text-center">No se encontraron movimientos.</td>
+            <td colSpan="6" className="border border-gray-300 px-4 py-2 text-center">No se encontraron movimientos.</td>
           </tr>
         )}
       </tbody>
       <tfoot>
         <tr>
-          <td colSpan="4" className="border border-gray-300 px-4 py-2 text-right font-semibold">Total:</td>
+          <td colSpan="2" className="border border-gray-300 px-4 py-2 text-right font-semibold">Totales:</td>
           <td className="border border-gray-300 px-4 py-2 font-semibold">
             {totalPago.toLocaleString('en-US', {
+              style: 'currency',
+              currency: 'USD'
+            })}
+          </td>
+          <td className="border border-gray-300 px-4 py-2 font-semibold">
+            {totalCaja.toLocaleString('en-US', {
+              style: 'currency',
+              currency: 'USD'
+            })}
+          </td>
+          <td className="border border-gray-300 px-4 py-2 font-semibold">
+            {totalCC.toLocaleString('en-US', {
+              style: 'currency',
+              currency: 'USD'
+            })}
+          </td>
+          <td className="border border-gray-300 px-4 py-2 font-semibold">
+            {totalPendientes.toLocaleString('en-US', {
               style: 'currency',
               currency: 'USD'
             })}
@@ -74,8 +121,8 @@ const CorteDia = () => {
     const siguienteDia = new Date(endDate);
     siguienteDia.setDate(siguienteDia.getDate() + 1);
 
-  const startTimestamp = new Date(siguienteDia).setHours(0, 0, 0, 0);
-  const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
+    const startTimestamp = new Date(siguienteDia).setHours(0, 0, 0, 0);
+    const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
 
     // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
     const movementsSnapshot = await firestore()
@@ -88,14 +135,17 @@ const CorteDia = () => {
       id: doc.id,
       ...doc.data(),
     }));
-
     const filteredMovements = movements.filter(movement => movement.estatus === "EN");
     setMovementsData(filteredMovements);
   };
-  const totalPago = movementsData.reduce((total, movement) => {
-    const pagoValue = parseFloat(movement.totalPago) || 0;
-    return total + pagoValue;
+
+  const totalPago = movementsData.reduce((total, movement) => total + (parseFloat(movement.totalPago) || 0), 0);
+  const totalCaja = movementsData.reduce((total, movement) => {
+    const caja = (parseFloat(movement.cajaRecibo) || 0) - (parseFloat(movement.cajaCambio) || 0);
+    return total + caja;
   }, 0);
+  const totalCC = movementsData.reduce((total, movement) => total + (parseFloat(movement.cajaCC) || 0), 0);
+  const totalPendientes = movementsData.reduce((total, movement) => total + (parseFloat(movement.pagoTotalPendiente) || 0), 0);
 
   return (
     <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="home">
@@ -140,6 +190,9 @@ const CorteDia = () => {
         endDate={endDate}
         movementsData={movementsData}
         totalPago={totalPago}
+        totalCaja={totalCaja}
+        totalCC={totalCC}
+        totalPendientes={totalPendientes}
       />
     </div>
   );
