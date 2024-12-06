@@ -135,7 +135,10 @@ const CorteDia = () => {
       id: doc.id,
       ...doc.data(),
     }));
-    const filteredMovements = movements.filter(movement => movement.estatus === "EN");
+
+    // Filtramos los movimientos para excluir los de tipo "Pago"
+    const filteredMovements = movements.filter(movement => movement.estatus === "EN" && movement.tipo !== "Pago");
+
     setMovementsData(filteredMovements);
   };
 
@@ -197,5 +200,6 @@ const CorteDia = () => {
     </div>
   );
 };
+
 
 export default CorteDia;
