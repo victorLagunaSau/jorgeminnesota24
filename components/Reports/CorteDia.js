@@ -115,7 +115,6 @@ const CorteDia = ({user} ) => {
       setErrorMessage("Por favor, selecciona una fecha.");
       return;
     }
-
     setErrorMessage("");
 
     const siguienteDia = new Date(endDate);
