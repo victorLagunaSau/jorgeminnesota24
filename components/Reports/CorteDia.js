@@ -3,13 +3,14 @@ import { firestore } from '../../firebase/firebaseIni';
 import ReactToPrint from "react-to-print";
 
 // Componente para mostrar e imprimir la tabla de movimientos
-const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago, totalCaja, totalCC, totalPendientes }, ref) => (
+const ReporteMovimientos = React.forwardRef(({user, endDate, movementsData, totalPago, totalCaja, totalCC, totalPendientes }, ref) => (
+
   <div ref={ref} className="m-4" style={{ maxWidth: "90%", marginLeft: "auto", marginRight: "auto" }}>
     <div className="encabezado-impresion w-full flex justify-between border-t border-gray-300 pt-1 hidden-print">
       <img src="/assets/Logoprint.png" className="w-15 mr-2" alt="Logo" />
-      <p className="text-gray-400">Corte de caja</p>
+      <p className="text-gray-400">Corte de caja {user.nombre}</p>
     </div>
-    <h3 className="mt-8 text-xl font-semibold">Corte del día: {endDate}</h3>
+    <h3 className="mt-8 text-xl font-semibold">Corte del día: {endDate}  {user.nombre}</h3>
     <table className="mt-4 w-full border-collapse border border-gray-300">
       <thead>
         <tr>
@@ -104,12 +105,11 @@ const ReporteMovimientos = React.forwardRef(({ endDate, movementsData, totalPago
 ));
 
 // Componente principal de Corte del Día
-const CorteDia = () => {
+const CorteDia = ({user} ) => {
   const [endDate, setEndDate] = useState("");
   const [movementsData, setMovementsData] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const componentRef = useRef(null); // Referencia para ReactToPrint
-
   const handleButtonClick = async () => {
     if (!endDate) {
       setErrorMessage("Por favor, selecciona una fecha.");
@@ -136,8 +136,11 @@ const CorteDia = () => {
       ...doc.data(),
     }));
 
+    // Filtramos los movimientos para excluir los que no pertenecen al usuario
+    const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
+
     // Filtramos los movimientos para excluir los de tipo "Pago"
-    const filteredMovements = movements.filter(movement => movement.estatus === "EN" && movement.tipo !== "Pago");
+    const filteredMovements = filteredUserID.filter(movement => movement.estatus === "EN" && movement.tipo !== "Pago");
 
     setMovementsData(filteredMovements);
   };
@@ -189,6 +192,7 @@ const CorteDia = () => {
 
       {/* Tabla de movimientos para mostrar e imprimir */}
       <ReporteMovimientos
+        user={user}
         ref={componentRef}
         endDate={endDate}
         movementsData={movementsData}

@@ -7,6 +7,7 @@ import HeaderPanel from "./Layout/HeaderPanel";
 import Sidebar from "./Layout/Sidebar";
 import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
+import SalidaCaja from "./SalidaCaja/SalidaCaja";
 import CorteDia from "./Reports/CorteDia"
 import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
@@ -62,6 +63,8 @@ const Admin = () => {
         switch (selectedModule) {
             case 'salidaVehiculo':
                 return <SalidaVehiculo user={user} />;
+            case 'salidaCaja':
+                return <SalidaCaja user={user} />;
             case 'corteDia':
                 return <CorteDia user={user} />;
             case 'reporteCobros':
@@ -73,7 +76,7 @@ const Admin = () => {
             case 'estadosPrecios':
                 return <EstadosPrecios />;
             case 'reports':
-                return <Reports />;
+                return <Reports user={user} />;
             case 'users':
                 return <Users />;
             default:
