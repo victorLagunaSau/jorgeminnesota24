@@ -47,6 +47,14 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                         Salida Caja
                                     </button>
                                 </li>
+                                 <li>
+                                    <button
+                                        className={getButtonClass('entradaCaja')}
+                                        onClick={() => onSelectModule('entradaCaja')}
+                                    >
+                                        Entrada Caja
+                                    </button>
+                                </li>
                                 <li>
                                     <button
                                         className={getButtonClass('corteDia')}
@@ -55,6 +63,18 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                         Corte del día
                                     </button>
                                 </li>
+                            </ul>
+                        )}
+                    </li>
+                    <li>
+                        <button
+                            className="w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200"
+                            onClick={() => toggleSubMenu('caja')}
+                        >
+                            Reportes
+                        </button>
+                        {openSubMenu.caja && (
+                            <ul className="pl-4">
                                 <li>
                                     <button
                                         className={getButtonClass('reporteCobros')}

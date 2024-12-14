@@ -8,6 +8,7 @@ import Sidebar from "./Layout/Sidebar";
 import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
 import SalidaCaja from "./SalidaCaja/SalidaCaja";
+import EntradaCaja from "./EntradaCaja/EntradaCaja"
 import CorteDia from "./Reports/CorteDia"
 import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
@@ -65,6 +66,8 @@ const Admin = () => {
                 return <SalidaVehiculo user={user} />;
             case 'salidaCaja':
                 return <SalidaCaja user={user} />;
+             case 'entradaCaja':
+                return <EntradaCaja user={user} />;
             case 'corteDia':
                 return <CorteDia user={user} />;
             case 'reporteCobros':
