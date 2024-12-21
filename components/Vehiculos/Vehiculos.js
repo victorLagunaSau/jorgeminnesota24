@@ -3,6 +3,7 @@ import { firestore } from "../../firebase/firebaseIni";
 import * as XLSX from "xlsx";
 import FormDatosVehiculo from "./FormDatosVehiculo";
 import FormEditarVehiculo from "./FormEditarVehiculo";
+import VehiculosTable from "./VehiculosTable"; // Importamos el componente de la tabla
 
 const Vehiculos = ({ user }) => {
     const [vehiculosNoAsignados, setVehiculosNoAsignados] = useState([]);
@@ -52,19 +53,6 @@ const Vehiculos = ({ user }) => {
             vehiculo.cliente.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const sortedVehiculos = [...filteredVehiculos].sort((a, b) => {
-        const dateA = a.registro?.timestamp
-            ? new Date(a.registro.timestamp.seconds * 1000 + a.registro.timestamp.nanoseconds / 1000000)
-            : new Date(0);
-        const dateB = b.registro?.timestamp
-            ? new Date(b.registro.timestamp.seconds * 1000 + b.registro.timestamp.nanoseconds / 1000000)
-            : new Date(0);
-
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
-    });
-
-    const currentItems = sortedVehiculos.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-
     const handleSearchTermChange = (event) => {
         setSearchTerm(event.target.value);
         setCurrentPage(1);
@@ -110,7 +98,6 @@ const Vehiculos = ({ user }) => {
         setIsEditModalOpen(true);
     };
 
-
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
             <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
@@ -127,13 +114,12 @@ const Vehiculos = ({ user }) => {
                     >
                         + Registra Vehículo
                     </button>
-
                 </div>
 
-
+                {/* Modals */}
                 <dialog open={isRegisterModalOpen} className="modal">
                     <div className="modal-box w-11/12 max-w-5xl bg-white-100">
-                        <FormDatosVehiculo user={user} onClose={() => setIsRegisterModalOpen(false)}/>
+                        <FormDatosVehiculo user={user} onClose={() => setIsRegisterModalOpen(false)} />
                     </div>
                 </dialog>
 
@@ -148,156 +134,21 @@ const Vehiculos = ({ user }) => {
                     </div>
                 </dialog>
             </div>
-            {isCopied && (
-                <div className="fixed inset-0 flex items-center justify-center z-50">
-                    <div className="modal modal-open">
-                        <div className="modal-box">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                 className="stroke-current text-green-500 h-6 w-6 mx-auto mb-4" fill="none"
-                                 viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <p className="text-lg font-medium text-center">Copiado con éxito</p>
-                            <div className="modal-action">
-                                <button
-                                    onClick={() => setIsCopied(false)}
-                                    className="btn btn-outline btn-error"
-                                >
-                                    Aceptar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            <div className="flex flex-col w-full my-4">
-                <div className="flex border-2 border-primary rounded-md">
-                    <input
-                        type="text"
-                        placeholder="Buscar por estado, ciudad, BIN, modelo o cliente..."
-                        value={searchTerm}
-                        onChange={handleSearchTermChange}
-                        className="input-lg w-full border-gray-300 rounded-l-md px-4 py-2"
-                    />
-                </div>
 
-                <table className="table-auto w-full my-4">
-                    <thead>
-                    <tr>
-                        <th className="px-4 py-2">#</th>
-                        <th className="px-4 py-2 flex items-center">
-                            Est:
-                            <select
-                                className="ml-2 p-1 border border-gray-300 rounded-md"
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                            >
-                                <option value="">Todos</option>
-                                <option value="PR">Registrado</option>
-                                <option value="IN">Cargando</option>
-                                <option value="TR">En Viaje</option>
-                                <option value="EB">En Brownsville</option>
-                                <option value="DS">Descargado</option>
-                                <option value="EN">Entregado</option>
-                            </select>
-                            <button
-                                className="ml-4 p-1 border border-gray-300 rounded-md"
-                                onClick={handleSortByDate}
-                            >
-                                {sortOrder === "asc" ? "Reg ^" : "Reg ˅"}
-                            </button>
-                        </th>
-                        <th className="px-4 py-2">Viaja de:</th>
-                        <th className="px-4 py-2">Almacen</th>
-                        <th className="px-4 py-2">Vehículo</th>
-                        <th className="px-4 py-2">Cliente</th>
-                        <th className="px-4 py-2">Acciones</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {currentItems
-                        .filter((vehiculo) => {
-                            if (statusFilter === "") return true;
-                            return vehiculo.estatus === statusFilter;
-                        })
-                        .map((vehiculo, index) => (
-                            <tr key={vehiculo.id}>
-                                <td className="border px-4 py-2">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+            {/* Tabla de vehículos */}
+            <VehiculosTable
+                vehiculos={filteredVehiculos}
+                statusFilter={statusFilter}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                handleCopiarBin={handleCopiarBin}
+                handleCopiarWhats={handleCopiarWhats}
+                handleEditClick={handleEditClick}
+                sortOrder={sortOrder}
+                handleSortByDate={handleSortByDate}
+            />
 
-                                <td className="border px-4 py-2">
-                                    {vehiculo.estatus === "PR" &&
-                                        <span className="text-black-500 text-xs">Estatus: Registrado</span>}
-                                    {vehiculo.estatus === "IN" &&
-                                        <span className="text-black-500 text-xs">Estatus: Cargando</span>}
-                                    {vehiculo.estatus === "TR" &&
-                                        <span className="text-black-500 text-xs">Estatus: En Viaje</span>}
-                                    {vehiculo.estatus === "EB" &&
-                                        <span className="text-black-500 text-xs">Estatus: En Brownsville</span>}
-                                    {vehiculo.estatus === "DS" &&
-                                        <span className="text-black-500 text-xs">Estatus: Descargado</span>}
-                                    {vehiculo.estatus === "EN" &&
-                                        <span className="text-black-500 text-xs">Estatus: Entregado</span>}
-                                    <div className="text-black-500 text-xs"> registrado:<br/>
-                                        {vehiculo.registro.timestamp ?
-                                            new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleString()
-                                            : 'Fecha no asignada'}
-                                    </div>
-
-                                </td>
-                                <td className="border px-4 py-2">
-                                    <div>
-                                        <p>Estado: </p>
-                                        <strong className="text-black-500 text-xl">{vehiculo.estado}</strong>
-                                        <p>Ciudad: </p>
-                                        <strong className="text-black-500 text-xl">{vehiculo.ciudad}</strong>
-                                        <p>Almacen: <strong className="text-black-500">{vehiculo.almacen}</strong></p>
-                                    </div>
-                                </td>
-                                <td className="border px-4 py-2">
-                                    <div>
-                                        <p>Bin o Lote:</p>
-                                        <button
-                                            className="btn btn-link btn-sm text-black-500 text-xl"
-                                            onClick={() => handleCopiarBin(vehiculo.binNip)}
-                                        >
-                                            {vehiculo.binNip}
-                                        </button>
-                                        <p>Gate Pass/Cliente:</p>
-                                        <strong className="text-black-500">{vehiculo.gatePass}</strong>
-                                    </div>
-                                    <button
-                                        className="btn btn-outline btn-accent"
-                                        onClick={() => handleCopiarWhats(vehiculo.binNip)}
-                                    >
-                                        Copiar WhatsApp
-                                    </button>
-                                </td>
-                                <td className="border px-4 py-2">
-                                    <div>
-                                        <p>Modelo: </p>
-                                        <strong className="text-black-500">{vehiculo.modelo}</strong>
-                                        <p>Tipo: </p>
-                                        <strong className="text-black-500">{vehiculo.tipo}</strong>
-                                    </div>
-                                </td>
-                                <td className="border px-4 py-2">
-                                    <strong>{vehiculo.cliente}</strong>
-                                </td>
-                                <td className="border px-4 py-2">
-                                    <button
-                                        className="btn btn-outline btn-primary"
-                                        onClick={() => handleEditClick(vehiculo)}
-                                    >
-                                        Editar
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-            </div>
+            {/* Paginación */}
             <div className="flex justify-between my-4">
                 <button
                     className="btn btn-outline btn-secondary"
@@ -309,7 +160,7 @@ const Vehiculos = ({ user }) => {
                 <button
                     className="btn btn-outline btn-secondary"
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage * itemsPerPage >= filteredVehiculos.length}
+                    disabled={currentPage === Math.ceil(filteredVehiculos.length / itemsPerPage)}
                 >
                     Siguiente
                 </button>

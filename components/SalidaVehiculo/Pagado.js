@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import ImprimeSalida from './ImprimeSalida';
 import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes'; // Componente para impresiones sin pagos pendientes
+import moment from 'moment'; // Importamos moment.js
 
 const Pagado = ({ vehiculo }) => {
     // Extraer el primer objeto del arreglo 'vehiculo'
@@ -28,6 +29,7 @@ const Pagado = ({ vehiculo }) => {
         pagos003 = 0,
         pagos004 = 0,
         pagos005 = 0,
+        registro = { seconds: 0, nanoseconds: 0 }, // Campo de fecha de registro
     } = vehiculoData;
 
     const [showModal, setShowModal] = useState(false);
@@ -43,6 +45,15 @@ const Pagado = ({ vehiculo }) => {
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             <div>
+                {/* Fecha de registro */}
+                <p className="text-black-500 text-2xl">
+                    <strong className="mr-3"> Fecha de Registro: </strong> {
+                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                        ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                }
+                </p>
+
                 <label htmlFor="titulo" className="block text-black-500">Procedencia:</label>
                 <div className="flex">
                     <p className="ml-2">Ciudad: <strong>{ciudad}</strong></p>
@@ -78,11 +89,11 @@ const Pagado = ({ vehiculo }) => {
 
                         <p>Pagos Parciales:</p>
                         <ul className="list-disc ml-6">
-                            {vehiculoData.pagos001 > 0 && <li>Pago 1: ${vehiculoData.pagos001}</li>}
-                                {pagos002 > 0 && <li>Pago 2: ${pagos002}</li>}
-                                {pagos003 > 0 && <li>Pago 3: ${pagos003}</li>}
-                                {pagos004 > 0 && <li>Pago 4: ${pagos004}</li>}
-                                {pagos005 > 0 && <li>Pago 5: ${pagos005}</li>}
+                            {pagos001 > 0 && <li>Pago 1: ${pagos001}</li>}
+                            {pagos002 > 0 && <li>Pago 2: ${pagos002}</li>}
+                            {pagos003 > 0 && <li>Pago 3: ${pagos003}</li>}
+                            {pagos004 > 0 && <li>Pago 4: ${pagos004}</li>}
+                            {pagos005 > 0 && <li>Pago 5: ${pagos005}</li>}
                         </ul>
                         <p>Total Pendiente: <strong>${pagoTotalPendiente}</strong></p>
                     </div>
@@ -107,14 +118,13 @@ const Pagado = ({ vehiculo }) => {
                                 titulo={titulo}
                             />
                         ) : (
-                                                        <ImprimeSalida
+                            <ImprimeSalida
                                 onClose={closeModal}
                                 vehiculoData={vehiculoData} // Pasa el objeto completo
                                 pago={pago}
                                 storage={storage}
                                 titulo={titulo}
                             />
-
                         )}
                     </div>
                 </div>

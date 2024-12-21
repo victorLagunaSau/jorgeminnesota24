@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { firestore } from "../../firebase/firebaseIni";
+import React, {useState} from 'react';
+import {firestore} from "../../firebase/firebaseIni";
 import Pagado from './Pagado';  // Importa el componente Pagado
+import moment from 'moment'; // Importamos moment.js
 
-const PagoCaja = ({ vehiculo, user }) => {
+const PagoCaja = ({vehiculo, user}) => {
+    console.log(vehiculo);
     const {
         ciudad,
         estado,
@@ -52,14 +54,14 @@ const PagoCaja = ({ vehiculo, user }) => {
             await firestore().collection("vehiculos").doc(vehiculo[0].binNip).update({
                 estatus: "EN",
                 timestamp: new Date(),
-                pago: parseFloat(pago) || 0 ,
-                storage: parseFloat(storageState) || 0 ,
-                totalPago: parseFloat(totalPago) || 0 ,
-                cajaRecibo: parseFloat(recibo) || 0 ,
-                cajaCC: parseFloat(reciboCC) || 0 ,
-                cajaCambio: parseFloat(cajaCambio) || 0 ,
-                sobrePeso: parseFloat(sobrePesoState) || 0 ,
-                gastosExtra: parseFloat(gastosExtraState) || 0 ,
+                pago: parseFloat(pago) || 0,
+                storage: parseFloat(storageState) || 0,
+                totalPago: parseFloat(totalPago) || 0,
+                cajaRecibo: parseFloat(recibo) || 0,
+                cajaCC: parseFloat(reciboCC) || 0,
+                cajaCambio: parseFloat(cajaCambio) || 0,
+                sobrePeso: parseFloat(sobrePesoState) || 0,
+                gastosExtra: parseFloat(gastosExtraState) || 0,
                 pagosPendientes: false
             });
 
@@ -79,14 +81,14 @@ const PagoCaja = ({ vehiculo, user }) => {
                 usuario: user.nombre,
                 idUsuario: user.id,
                 timestamp: new Date(),
-                pago: parseFloat(pago) || 0 ,
-                storage: parseFloat(storageState) || 0 ,
-                totalPago: parseFloat(totalPago) || 0 ,
-                cajaRecibo: parseFloat(recibo) || 0 ,
-                cajaCambio: parseFloat(cajaCambio) || 0 ,
-                cajaCC: parseFloat(reciboCC) || 0 ,
-                sobrePeso: parseFloat(sobrePesoState) || 0 ,
-                gastosExtra: parseFloat(gastosExtraState) || 0 ,
+                pago: parseFloat(pago) || 0,
+                storage: parseFloat(storageState) || 0,
+                totalPago: parseFloat(totalPago) || 0,
+                cajaRecibo: parseFloat(recibo) || 0,
+                cajaCambio: parseFloat(cajaCambio) || 0,
+                cajaCC: parseFloat(reciboCC) || 0,
+                sobrePeso: parseFloat(sobrePesoState) || 0,
+                gastosExtra: parseFloat(gastosExtraState) || 0,
                 pagosPendientes: false
             });
 
@@ -134,6 +136,13 @@ const PagoCaja = ({ vehiculo, user }) => {
 
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
+            <p className="text-black-500 text-3xl">
+                <strong className="mr-3"> Fecha de Registro: </strong> {
+                vehiculo && vehiculo[0] && vehiculo[0].registro.timestamp && vehiculo[0].registro.timestamp.seconds
+                    ? moment(vehiculo[0].registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                    : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+            }
+            </p>
             {cobrado ? (
                 <Pagado vehiculo={vehiculoActualizado}/>
             ) : (
@@ -284,7 +293,8 @@ const PagoCaja = ({ vehiculo, user }) => {
                             </div>
                         </div>
                         <p className="mt-4 text-4xl">Total: <strong>$ {total} DLL</strong></p>
-                        <p className="mt-4 text-4xl">Cambio: <strong>$ {parseFloat(recibo) + parseFloat(reciboCC) - total} DLL</strong></p>
+                        <p className="mt-4 text-4xl">Cambio: <strong>$ {parseFloat(recibo) + parseFloat(reciboCC) - total} DLL</strong>
+                        </p>
                     </div>
 
                     <div className="mt-4">

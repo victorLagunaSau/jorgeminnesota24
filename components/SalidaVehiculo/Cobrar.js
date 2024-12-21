@@ -12,6 +12,7 @@ const Cobrar = ({ vehiculo, user }) => {
 
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
+
             {/* Botones para elegir tipo de pago */}
             {!tipoPago && (
                 <div className="flex space-x-4 mb-4 justify-center">

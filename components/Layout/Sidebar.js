@@ -1,18 +1,23 @@
 import React, { useState } from "react";
+import { FaCashRegister, FaFileInvoice, FaCar, FaUsers, FaCog, FaDollarSign } from "react-icons/fa"; // Importamos algunos iconos de React Icons
 
 const Sidebar = ({ onSelectModule, selectedModule }) => {
     // Estado para manejar la apertura de los submenús
-    const [openSubMenu, setOpenSubMenu] = useState({ caja: false, vehiculos: false });
+    const [openSubMenu, setOpenSubMenu] = useState({ caja: false, reportes: false, vehiculos: false });
 
     const toggleSubMenu = (menu) => {
         setOpenSubMenu((prevState) => ({
             ...prevState,
+            // Si ya está abierto, lo cerramos; si no, cerramos todos los demás y abrimos el seleccionado
             [menu]: !prevState[menu],
+            caja: menu === 'caja' ? !prevState.caja : false,
+            reportes: menu === 'reportes' ? !prevState.reportes : false,
+            vehiculos: menu === 'vehiculos' ? !prevState.vehiculos : false,
         }));
     };
 
     const getButtonClass = (module) =>
-        `w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200 ${
+        `w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200 flex items-center ${
             selectedModule === module ? "bg-red-100" : ""
         }`;
 
@@ -24,10 +29,10 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                     {/* Submenú Caja */}
                     <li>
                         <button
-                            className="w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200"
+                            className="w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200 flex items-center"
                             onClick={() => toggleSubMenu('caja')}
                         >
-                            Caja
+                            <FaCashRegister className="mr-3" /> Caja
                         </button>
                         {openSubMenu.caja && (
                             <ul className="pl-4">
@@ -47,7 +52,7 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                         Salida Caja
                                     </button>
                                 </li>
-                                 <li>
+                                <li>
                                     <button
                                         className={getButtonClass('entradaCaja')}
                                         onClick={() => onSelectModule('entradaCaja')}
@@ -68,12 +73,22 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                     </li>
                     <li>
                         <button
-                            className="w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200"
-                            onClick={() => toggleSubMenu('caja')}
+                             className={getButtonClass('cobranza')}
+                            onClick={() => onSelectModule('cobranza')}
                         >
-                            Reportes
+                            <FaDollarSign className="mr-3" /> Cobranza
                         </button>
-                        {openSubMenu.caja && (
+                    </li>
+
+                    {/* Submenú Reportes */}
+                    <li>
+                        <button
+                            className="w-full px-4 py-2 bg-white text-black text-left hover:bg-red-200 flex items-center"
+                            onClick={() => toggleSubMenu('reportes')}
+                        >
+                            <FaFileInvoice className="mr-3" /> Reportes
+                        </button>
+                        {openSubMenu.reportes && (
                             <ul className="pl-4">
                                 <li>
                                     <button
@@ -91,11 +106,9 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                         Movimientos
                                     </button>
                                 </li>
-
                             </ul>
                         )}
                     </li>
-
 
                     {/* Submenú Vehículos */}
                     <li>
@@ -103,7 +116,7 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                             className={getButtonClass('viajes')}
                             onClick={() => onSelectModule('viajes')}
                         >
-                            Pago de viajes
+                            <FaCar className="mr-3" />Viajes
                         </button>
                     </li>
                     <li>
@@ -111,7 +124,7 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                             className={getButtonClass('vehiculos')}
                             onClick={() => onSelectModule('vehiculos')}
                         >
-                            Vehículos
+                            <FaCar className="mr-3" /> Vehículos
                         </button>
                     </li>
                     <li>
@@ -119,7 +132,7 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                             className={getButtonClass('estadosPrecios')}
                             onClick={() => onSelectModule('estadosPrecios')}
                         >
-                            Estados y Precios
+                            <FaCog className="mr-3" /> Estados y Precios
                         </button>
                     </li>
                     <li>
@@ -127,9 +140,13 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                             className={getButtonClass('users')}
                             onClick={() => onSelectModule('users')}
                         >
-                            Usuarios
+                            <FaUsers className="mr-3" /> Usuarios
                         </button>
                     </li>
+
+                    {/* Botón de Cobranza */}
+
+
                 </ul>
             </nav>
         </aside>
