@@ -9,7 +9,7 @@ import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
 import SalidaCaja from "./SalidaCaja/SalidaCaja";
 import EntradaCaja from "./EntradaCaja/EntradaCaja"
-import CorteDia from "./Reports/CorteDia"
+import CorteDia from "./CorteDia/CorteDia"
 import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
 import Users from "./Users/Users";
