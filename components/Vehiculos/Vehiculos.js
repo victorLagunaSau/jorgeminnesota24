@@ -134,6 +134,15 @@ const Vehiculos = ({ user }) => {
                     </div>
                 </dialog>
             </div>
+                <div className="flex border-2 border-primary rounded-md">
+                    <input
+                        type="text"
+                        placeholder="Buscar por estado, ciudad, BIN, modelo o cliente..."
+                        value={searchTerm}
+                        onChange={handleSearchTermChange}
+                        className="input-lg w-full border-gray-300 rounded-l-md px-4 py-2"
+                    />
+                </div>
 
             {/* Tabla de vehículos */}
             <VehiculosTable
