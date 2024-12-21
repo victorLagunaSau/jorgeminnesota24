@@ -111,14 +111,15 @@ const CorteDia = ({user}) => {
             ...doc.data(),
         }));
 
+        const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
         // Filtrar los movimientos para vehículos
-        const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
+        const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
 
         // Filtrar los movimientos para entradas
-        const filteredEntradas = movements.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
+        const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
 
         // Filtrar los movimientos para salidas
-        const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
+        const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
 
 
         setVehiculosData(filteredVehiculos);
