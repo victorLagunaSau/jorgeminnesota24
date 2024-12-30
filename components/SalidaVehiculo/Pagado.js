@@ -48,8 +48,8 @@ const Pagado = ({ vehiculo }) => {
                 {/* Fecha de registro */}
                 <p className="text-black-500 text-2xl">
                     <strong className="mr-3"> Fecha de Registro: </strong> {
-                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
-                        ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                    vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
                 </p>

@@ -131,6 +131,12 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 </div>
                 <p></p>
             </div>
+                            <p className="text-black-500">
+                    <strong className="mr-3"> Alta de Vehiculo: </strong> {
+                    vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                }</p>
         </div>
     );
 
