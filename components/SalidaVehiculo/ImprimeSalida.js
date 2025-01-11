@@ -33,8 +33,11 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
             <div className="w-full flex justify-between border-t border-gray-300 pt-1">
                 <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo"/>
                 <p className="text-black-500">
-                    <strong className="mr-3"> RECIBO DE ENTREGA </strong> Fecha: {
-                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                    <strong className="mr-3"> RECIBO DE ENTREGA </strong>
+                    Fecha: {
+                    vehiculoData &&
+                    vehiculoData.timestamp &&
+                    vehiculoData.timestamp.seconds
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
@@ -77,13 +80,13 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
         <div className="border-gray-300 p-4">
             <div className="w-full flex justify-between border-t border-gray-300 pt-1">
                 <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo"/>
-                    <p className="text-black-500">
-                        <strong className="mr-3">  RECIBO DE ENTREGA Y PAGO</strong>  Fecha: {
-                            vehiculoData.timestamp && vehiculoData.timestamp.seconds
-                                ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                                : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
-                        }
-                    </p>
+                <p className="text-black-500">
+                    <strong className="mr-3"> RECIBO DE ENTREGA Y PAGO</strong> Fecha: {
+                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                        ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                }
+                </p>
 
                 <p className="text-gray-400">{title}</p>
             </div>
@@ -99,7 +102,7 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                             className="text-lg text-black-500">$ {vehiculoData.price} DLL</strong></p>
                         <p className="text-sm text-black-500">({montoEnDolares})</p>
                     </div>
-                     <p className="text-black-500">Bin Nip: <strong
+                    <p className="text-black-500">Bin Nip: <strong
                         className="text-lg text-black-500">{vehiculoData.binNip}</strong></p>
                     <p className="text-black-500">Gatepass: <strong
                         className="text-lg text-black-500">{vehiculoData.gatePass}</strong></p>
@@ -108,10 +111,10 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-sm text-black-500">Cliente:</p>
                     <h3 className="text-sm font-bold text-black-500">{vehiculoData.cliente}</h3>
 
-                            <p className="text-sm text-black-500">Modelo:</p>
-                            <h3 className="font-bold text-black-500">{vehiculoData.modelo}</h3>
-                            <p className="text-sm text-black-500">Marca:</p>
-                            <h3 className="font-bold text-black-500">{vehiculoData.marca}</h3>
+                    <p className="text-sm text-black-500">Modelo:</p>
+                    <h3 className="font-bold text-black-500">{vehiculoData.modelo}</h3>
+                    <p className="text-sm text-black-500">Marca:</p>
+                    <h3 className="font-bold text-black-500">{vehiculoData.marca}</h3>
 
                     <p className="w-full pt-2 text-black-500 mt-4">________________</p>
                     <p className="text-sm text-black-500">Nombre y firma del Receptor:</p>
@@ -131,12 +134,12 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 </div>
                 <p></p>
             </div>
-                            <p className="text-black-500">
-                    <strong className="mr-3"> Alta de Vehiculo: </strong> {
-                    vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
-                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
-                }</p>
+            <p className="text-black-500">
+                <strong className="mr-3"> Alta de Vehiculo: </strong> {
+                vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                    ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                    : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+            }</p>
         </div>
     );
 

@@ -151,7 +151,11 @@ const PagoPendiente = ({vehiculo, user}) => {
         <div className="w-full max-w-3xl mx-auto mt-2">
             <p className="text-black-500 text-3xl">
                 <strong className="mr-3"> Fecha de Registro: </strong> {
-                vehiculo && vehiculo[0] && vehiculo[0].registro.timestamp && vehiculo[0].registro.timestamp.seconds
+                vehiculo &&
+                vehiculo[0] &&
+                vehiculo[0].registro &&
+                vehiculo[0].registro.timestamp &&
+                vehiculo[0].registro.timestamp.seconds
                     ? moment(vehiculo[0].registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                     : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
             }

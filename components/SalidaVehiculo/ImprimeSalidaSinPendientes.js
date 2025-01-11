@@ -29,14 +29,16 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo"/>
                 <p className="text-black-500">
                     <strong className="mr-3"> RECIBO DE ENTREGA </strong> Fecha: {
-                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                    vehiculoData &&
+                    vehiculoData.timestamp &&
+                    vehiculoData.timestamp.seconds
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
                 </p>
+
                 <p className="text-gray-400">{title}</p>
             </div>
-
 
 
             <div className="flex">
@@ -137,19 +139,19 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 </div>
                 <p></p>
             </div>
-{/* Fecha de registro */}
-                <p className="text-black-500">
-                    <strong className="mr-3"> Alta de Vehiculo: </strong> {
-                    vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
-                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
-                }</p>
+            {/* Fecha de registro */}
+            <p className="text-black-500">
+                <strong className="mr-3"> Alta de Vehiculo: </strong> {
+                vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                    ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                    : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+            }</p>
         </div>
     );
 
     return (
         <div ref={ref} className="m-4" style={{maxWidth: "90%", marginLeft: "auto", marginRight: "auto"}}>
-            <ReciboSalida title="Copia: Salida" />
+            <ReciboSalida title="Copia: Salida"/>
             <InfoPagos title="Copia: Cliente pendiente de pago"/>
             <InfoPagos title="Copia: Oficina pendiente de pago"/>
 

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import ImprimeSalida from './ImprimeSalida';
 import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes'; // Componente para impresiones sin pagos pendientes
 import moment from 'moment'; // Importamos moment.js
 
-const Pagado = ({ vehiculo }) => {
+const Pagado = ({vehiculo}) => {
     // Extraer el primer objeto del arreglo 'vehiculo'
     const vehiculoData = vehiculo[0] || {};
 
@@ -29,7 +29,7 @@ const Pagado = ({ vehiculo }) => {
         pagos003 = 0,
         pagos004 = 0,
         pagos005 = 0,
-        registro = { seconds: 0, nanoseconds: 0 }, // Campo de fecha de registro
+        registro = {seconds: 0, nanoseconds: 0}, // Campo de fecha de registro
     } = vehiculoData;
 
     const [showModal, setShowModal] = useState(false);
@@ -48,7 +48,10 @@ const Pagado = ({ vehiculo }) => {
                 {/* Fecha de registro */}
                 <p className="text-black-500 text-2xl">
                     <strong className="mr-3"> Fecha de Registro: </strong> {
-                    vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                    vehiculoData &&
+                    vehiculoData.registro &&
+                    vehiculoData.registro.timestamp &&
+                    vehiculoData.registro.timestamp.seconds
                         ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
