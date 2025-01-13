@@ -79,7 +79,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo"/>
                 <p className="text-black-500">
                     <strong className="mr-3"> RECIBO DE ENTREGA </strong> Fecha: {
-                    vehiculoData.timestamp && vehiculoData.timestamp.seconds
+                    vehiculoData &&
+                    vehiculoData.timestamp &&
+                    vehiculoData.timestamp.seconds
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
@@ -142,9 +144,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
             {/* Fecha de registro */}
             <p className="text-black-500">
                 <strong className="mr-3"> Alta de Vehiculo: </strong> {
-                vehiculoData.registro.timestamp && vehiculoData.registro.timestamp.seconds
+                vehiculoData?.registro?.timestamp?.seconds
                     ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                    : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                    : moment().format('DD/MM/YYYY HH:mm:ss') // Fallback to current date
             }</p>
         </div>
     );
