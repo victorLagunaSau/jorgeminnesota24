@@ -134,9 +134,7 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-sm text-black-500 ml-1 ">Extras: <strong>$ {datoGastosExtra} DLL</strong></p>
                     <p className="text-xs text-black-500 ml-1 ">({montoGastosExtra})</p>
                     <p className="text-black-500"><strong>Pago Tardío de Flete:</strong> $ {pagoTardioFlete} DLL</p>
-                    <p className="text-xs text-black-500">({montoEnDolaresFlete})</p>
                     <p className="text-black-500"><strong>Estacionamiento:</strong> $ {estacionamiento} DLL</p>
-                    <p className="text-xs text-black-500">({montoEnDolaresEstacionamiento})</p>
                     <p className="text-xl text-black-500 ml-1 ">Total: <strong>$ {montoTotal} DLL</strong></p>
                     <p className="text-xs text-black-500 ml-1 ">({montoEnDolaresTotal})</p>
 

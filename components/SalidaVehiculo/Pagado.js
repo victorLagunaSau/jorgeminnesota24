@@ -76,8 +76,8 @@ const Pagado = ({vehiculo}) => {
                     <p>Pago Extras por Storage: <strong>{storage}</strong></p>
                     <p>Pago Sobre Peso: <strong>{sobrePeso}</strong></p>
                     <p>Pago Extras: <strong>{gastosExtra}</strong></p>
-                    <p>Pago Tardío Flete: <strong>{pagoTardioFlete}</strong></p>
-                    <p>Estacionamiento: <strong>{estacionamiento}</strong></p>
+                    {pagoTardioFlete && <p>Pago Tardío Flete: <strong>{pagoTardioFlete}</strong></p>}
+                    {estacionamiento && <p>Estacionamiento: <strong>{estacionamiento}</strong></p>}
                     <p className="mt-4 text-xl">Total: <strong>$ {totalPago} DLL</strong></p>
                 </div>
 
