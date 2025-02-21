@@ -16,6 +16,8 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
     const montoStorage = parseNumberOrZero(vehiculoData.storage);
     const datoSobrePeso = parseNumberOrZero(vehiculoData.sobrePeso);
     const datoGastosExtra = parseNumberOrZero(vehiculoData.gastosExtra);
+    const pagoTardioFlete = parseNumberOrZero(vehiculoData.pagoTardioFlete);
+    const estacionamiento = parseNumberOrZero(vehiculoData.estacionamiento);
     const montoTotal = parseNumberOrZero(vehiculoData.totalPago);
 
 
@@ -123,6 +125,8 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-sm text-black-500 ml-1 ">Storage: <strong>$ {montoStorage} DLL</strong></p>
                     <p className="text-sm text-black-500 ml-1 ">Sobre Peso: <strong>$ {datoSobrePeso} DLL</strong></p>
                     <p className="text-sm text-black-500 ml-1 ">Extras: <strong>$ {datoGastosExtra} DLL</strong></p>
+                    <p className="text-black-500"><strong>Pago Tardío de Flete:</strong> $ {pagoTardioFlete} DLL</p>
+                    <p className="text-black-500"><strong>Estacionamiento:</strong> $ {estacionamiento} DLL</p>
                     <p className="text-xl text-black-500 ml-1 ">Total: <strong>$ {montoTotal} DLL</strong></p>
                     {vehiculoData.pagosPendientes && (
                         <div>

@@ -29,7 +29,13 @@ const PagoCaja = ({vehiculo, user}) => {
     const [cobrado, setCobrado] = useState(false);
     const [vehiculoActualizado, setVehiculoActualizado] = useState([]);
 
-    const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago);
+    // Nuevos estados
+    const [pagoTardioFlete, setPagoTardioFlete] = useState(0); // 0 o 50 USD
+    const [estacionamientoDias, setEstacionamientoDias] = useState(0); // Días de estacionamiento
+    const [estacionamientoTotal, setEstacionamientoTotal] = useState(0); // Total de estacionamiento (días * 3 USD)
+
+    // Calcular el total
+    const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
     const cajaCambio = parseFloat(recibo) + parseFloat(reciboCC) - total;
 
     const handleDarSalida = async () => {
@@ -42,12 +48,10 @@ const PagoCaja = ({vehiculo, user}) => {
         if (cargando || movimientoGuardado) {
             return;
         }
-
         setCargando(true);
 
         try {
-            const totalPago = parseFloat(storageState) + parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(pago);
-
+            const totalPago = parseFloat(storageState) + parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
             await new Promise((resolve) => setTimeout(resolve, 2000)); // Simula un delay
 
             // Guardar en la colección de vehículos
@@ -62,7 +66,9 @@ const PagoCaja = ({vehiculo, user}) => {
                 cajaCambio: parseFloat(cajaCambio) || 0,
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
-                pagosPendientes: false
+                pagosPendientes: false,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
             });
 
             // Guardar en la colección de movimientos
@@ -89,7 +95,9 @@ const PagoCaja = ({vehiculo, user}) => {
                 cajaCC: parseFloat(reciboCC) || 0,
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
-                pagosPendientes: false
+                pagosPendientes: false,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
             });
 
             // Actualizamos los datos del vehículo
@@ -115,23 +123,31 @@ const PagoCaja = ({vehiculo, user}) => {
                 cajaRecibo: recibo,
                 cajaCambio: cajaCambio,
                 cajaCC: reciboCC,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
             }]);
-
             setMovimientoGuardado(true);
             setMensajeError("");
-
             setPago(0);
             setStorage(0);
             setSobrePeso(0);
             setGastosExtra(0);
             setRecibo(0);
-
+            setPagoTardioFlete(0); // Reiniciar el pago tardío
+            setEstacionamientoDias(0); // Reiniciar los días de estacionamiento
+            setEstacionamientoTotal(0); // Reiniciar el total de estacionamiento
             setCobrado(true);
         } catch (error) {
             setMensajeError("Ocurrió un error al actualizar el estatus del vehículo y registrar el movimiento");
         } finally {
             setCargando(false);
         }
+    };
+
+    const handleEstacionamientoChange = (e) => {
+        const dias = parseInt(e.target.value) || 0;
+        setEstacionamientoDias(dias);
+        setEstacionamientoTotal(dias * 3); // 3 USD por día
     };
 
     return (
@@ -156,15 +172,12 @@ const PagoCaja = ({vehiculo, user}) => {
                         <p className="ml-2">Ciudad: <strong>{ciudad}</strong></p>
                         <p className="ml-2">Estado: <strong>{estado}</strong></p>
                     </div>
-
                     <label htmlFor="titulo" className="block text-black-500">Vehículo:</label>
                     <div className="flex">
                         <p className="ml-2">Modelo: <strong>{modelo}</strong></p>
                         <p className="ml-2">Marca: <strong>{marca}</strong></p>
                     </div>
-
                     <p className="mt-4 text-xl">Precio de transporte: <strong>$ {price} DLL</strong></p>
-
                     <div>
                         <div className="p-1">
                             <div className="flex items-center">
@@ -186,7 +199,6 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
-
                         <div className="p-1">
                             <label htmlFor="storage" className="block text-black-500">Storage Overhead:</label>
                             <div className="flex items-center">
@@ -208,7 +220,6 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
-
                         <div className="p-1">
                             <label htmlFor="sobrePeso" className="block text-black-500">Pago Sobre Peso:</label>
                             <div className="flex items-center">
@@ -230,7 +241,6 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
-
                         <div className="p-1">
                             <label htmlFor="gastosExtra" className="block text-black-500">Gastos Extras:</label>
                             <div className="flex items-center">
@@ -252,7 +262,6 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
-
                         <div className="p-1">
                             <label htmlFor="recibo" className="block text-black-500">Recibo Efectivo:</label>
                             <div className="flex items-center">
@@ -274,7 +283,6 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
-
                         <div className="p-1">
                             <label htmlFor="recibo" className="block text-black-500">Recibo CC:</label>
                             <div className="flex items-center">
@@ -296,11 +304,36 @@ const PagoCaja = ({vehiculo, user}) => {
                             /> Dll
                             </div>
                         </div>
+                        <div className="p-1">
+                            <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de Flete:</label>
+                            <select
+                                id="pagoTardioFlete"
+                                value={pagoTardioFlete}
+                                onChange={(e) => setPagoTardioFlete(parseFloat(e.target.value))}
+                                className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                            >
+                                <option value={0}>No aplicar</option>
+                                <option value={50}>Aplicar (+50 USD)</option>
+                            </select>
+                        </div>
+                        <div className="p-1">
+                            <label htmlFor="estacionamiento" className="block text-black-500">Estacionamiento (3 USD por día):</label>
+                            <div className="flex items-center">
+                                <input
+                                    type="number"
+                                    id="estacionamiento"
+                                    value={estacionamientoDias}
+                                    onChange={handleEstacionamientoChange}
+                                    className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                    min="0"
+                                    step="1"
+                                /> Días
+                            </div>
+                        </div>
                         <p className="mt-4 text-4xl">Total: <strong>$ {total} DLL</strong></p>
                         <p className="mt-4 text-4xl">Cambio: <strong>$ {parseFloat(recibo) + parseFloat(reciboCC) - total} DLL</strong>
                         </p>
                     </div>
-
                     <div className="mt-4">
                         <button
                             className="btn btn-primary text-white-100 w-full"

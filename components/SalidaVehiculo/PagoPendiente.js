@@ -4,6 +4,7 @@ import Pagado from './Pagado';  // Importa el componente Pagado
 import moment from 'moment'; // Importamos moment.js
 
 const PagoPendiente = ({vehiculo, user}) => {
+
     const {
         ciudad,
         estado,
@@ -27,7 +28,12 @@ const PagoPendiente = ({vehiculo, user}) => {
     const [cobrado, setCobrado] = useState(false);
     const [vehiculoActualizado, setVehiculoActualizado] = useState([]);
 
-    const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago);
+    // Nuevos estados
+    const [pagoTardioFlete, setPagoTardioFlete] = useState(0); // 0 o 50 USD
+    const [estacionamientoDias, setEstacionamientoDias] = useState(0); // Días de estacionamiento
+    const [estacionamientoTotal, setEstacionamientoTotal] = useState(0); // Total de estacionamiento (días * 3 USD)
+
+    const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
     const pagoTotalPendiente = total - parseFloat(pagoPrimero);
 
     const handleDarSalida = async () => {
@@ -55,6 +61,8 @@ const PagoPendiente = ({vehiculo, user}) => {
                 cajaCambio: 0,
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
                 pagosPendientes: true,
                 pagoTotalPendiente: parseFloat(pagoTotalPendiente) || 0,
                 pagos001: parseFloat(pagoPrimero) || 0,
@@ -95,6 +103,8 @@ const PagoPendiente = ({vehiculo, user}) => {
                 pagos003: 0,
                 pagos004: 0,
                 pagos005: 0,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
             });
 
             // Actualizamos los datos del vehículo
@@ -127,6 +137,8 @@ const PagoPendiente = ({vehiculo, user}) => {
                 pagos003: 0,
                 pagos004: 0,
                 pagos005: 0,
+                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
+                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
             }]);
 
             setMovimientoGuardado(true);
@@ -145,6 +157,12 @@ const PagoPendiente = ({vehiculo, user}) => {
         } finally {
             setCargando(false);
         }
+    };
+
+    const handleEstacionamientoChange = (e) => {
+        const dias = parseInt(e.target.value) || 0;
+        setEstacionamientoDias(dias);
+        setEstacionamientoTotal(dias * 3); // 3 USD por día
     };
 
     return (
@@ -288,7 +306,32 @@ const PagoPendiente = ({vehiculo, user}) => {
                             </div>
                         </div>
 
-
+<div className="p-1">
+                            <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de Flete:</label>
+                            <select
+                                id="pagoTardioFlete"
+                                value={pagoTardioFlete}
+                                onChange={(e) => setPagoTardioFlete(parseFloat(e.target.value))}
+                                className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                            >
+                                <option value={0}>No aplicar</option>
+                                <option value={50}>Aplicar (+50 USD)</option>
+                            </select>
+                        </div>
+                        <div className="p-1">
+                            <label htmlFor="estacionamiento" className="block text-black-500">Estacionamiento (3 USD por día):</label>
+                            <div className="flex items-center">
+                                <input
+                                    type="number"
+                                    id="estacionamiento"
+                                    value={estacionamientoDias}
+                                    onChange={handleEstacionamientoChange}
+                                    className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
+                                    min="0"
+                                    step="1"
+                                /> Días
+                            </div>
+                        </div>
                         <p className="mt-4 text-4xl">Total: <strong>$ {total} DLL</strong></p>
                         <p className="mt-4 text-4xl">Pendiente por
                             pagar: <strong>$ {total - parseFloat(pagoPrimero)} DLL</strong></p>

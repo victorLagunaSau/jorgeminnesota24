@@ -1,13 +1,11 @@
 import React, {useState} from 'react';
 import ImprimeSalida from './ImprimeSalida';
-import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes'; // Componente para impresiones sin pagos pendientes
-import moment from 'moment'; // Importamos moment.js
+import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes';
+import moment from 'moment';
 
 const Pagado = ({vehiculo}) => {
-    // Extraer el primer objeto del arreglo 'vehiculo'
     const vehiculoData = vehiculo[0] || {};
 
-    // Extraer propiedades con valores predeterminados
     const {
         ciudad = "Desconocido",
         estado = "Desconocido",
@@ -22,74 +20,70 @@ const Pagado = ({vehiculo}) => {
         titulo = "NO",
         cliente = "No especificado",
         telefonoCliente = "No especificado",
-        pagosPendientes = false, // Valor predeterminado en caso de que no exista
-        pagoTotalPendiente = 0, // Valor predeterminado en caso de que no exista
+        pagosPendientes = false,
+        pagoTotalPendiente = 0,
         pagos001 = 0,
         pagos002 = 0,
         pagos003 = 0,
         pagos004 = 0,
         pagos005 = 0,
-        registro = {seconds: 0, nanoseconds: 0}, // Campo de fecha de registro
+        pagoTardioFlete = 0, // Nuevo campo
+        estacionamiento = 0, // Nuevo campo
+        registro = {seconds: 0, nanoseconds: 0},
     } = vehiculoData;
 
     const [showModal, setShowModal] = useState(false);
 
     const handleImprimeSalida = () => {
-        setShowModal(true); // Abre el modal
+        setShowModal(true);
     };
 
     const closeModal = () => {
-        setShowModal(false); // Cierra el modal
+        setShowModal(false);
     };
 
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             <div>
-                {/* Fecha de registro */}
                 <p className="text-black-500 text-2xl">
                     <strong className="mr-3"> Fecha de Registro: </strong> {
-                    vehiculoData &&
-                    vehiculoData.registro &&
-                    vehiculoData.registro.timestamp &&
-                    vehiculoData.registro.timestamp.seconds
-                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                        : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
+                    registro?.seconds
+                        ? moment(registro.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : moment().format('DD/MM/YYYY HH:mm:ss')
                 }
                 </p>
 
-                <label htmlFor="titulo" className="block text-black-500">Procedencia:</label>
+                <label className="block text-black-500">Procedencia:</label>
                 <div className="flex">
                     <p className="ml-2">Ciudad: <strong>{ciudad}</strong></p>
                     <p className="ml-2">Estado: <strong>{estado}</strong></p>
                 </div>
 
-                <label htmlFor="titulo" className="block text-black-500">Vehículo:</label>
+                <label className="block text-black-500">Vehículo:</label>
                 <div className="flex">
                     <p className="ml-2">Modelo: <strong>{modelo}</strong></p>
                     <p className="ml-2">Marca: <strong>{marca}</strong></p>
-                    <div className="ml-2">
-                        <p>Título: <strong>{titulo}</strong></p>
-                    </div>
+                    <p className="ml-2">Título: <strong>{titulo}</strong></p>
                 </div>
 
-                <label htmlFor="titulo" className="block text-black-500">Cliente:</label>
+                <label className="block text-black-500">Cliente:</label>
                 <p className="ml-2">Nombre: <strong>{cliente}</strong></p>
                 <p className="ml-2">Teléfono: <strong>{telefonoCliente}</strong></p>
-                <p className="mt-4 text-xl">Precio de transporte: <strong>$ {price} DLL</strong></p>
 
+                <p className="mt-4 text-xl">Precio de transporte: <strong>$ {price} DLL</strong></p>
                 <div>
                     <p>Pago en Dll: <strong>{pago}</strong></p>
                     <p>Pago Extras por Storage: <strong>{storage}</strong></p>
                     <p>Pago Sobre Peso: <strong>{sobrePeso}</strong></p>
                     <p>Pago Extras: <strong>{gastosExtra}</strong></p>
+                    <p>Pago Tardío Flete: <strong>{pagoTardioFlete}</strong></p>
+                    <p>Estacionamiento: <strong>{estacionamiento}</strong></p>
                     <p className="mt-4 text-xl">Total: <strong>$ {totalPago} DLL</strong></p>
                 </div>
 
-                {/* Mostrar detalles de pagos pendientes solo si pagosPendientes es true */}
                 {pagosPendientes && (
                     <div className="mt-4 p-4 bg-yellow-100 rounded">
                         <h2 className="text-lg font-bold text-red-500">Pagos Pendientes</h2>
-
                         <p>Pagos Parciales:</p>
                         <ul className="list-disc ml-6">
                             {pagos001 > 0 && <li>Pago 1: ${pagos001}</li>}
@@ -107,15 +101,13 @@ const Pagado = ({vehiculo}) => {
                 </button>
             </div>
 
-            {/* Modal popup */}
             {showModal && (
                 <div className="fixed inset-0 flex justify-center items-center z-50">
                     <div className="modal-box max-w-5xl w-full bg-white-500">
-                        {/* Condición para mostrar el componente adecuado */}
                         {pagosPendientes ? (
                             <ImprimeSalidaSinPendientes
                                 onClose={closeModal}
-                                vehiculoData={vehiculoData} // Pasa el objeto completo
+                                vehiculoData={vehiculoData}
                                 pago={pago}
                                 storage={storage}
                                 titulo={titulo}
@@ -123,7 +115,7 @@ const Pagado = ({vehiculo}) => {
                         ) : (
                             <ImprimeSalida
                                 onClose={closeModal}
-                                vehiculoData={vehiculoData} // Pasa el objeto completo
+                                vehiculoData={vehiculoData}
                                 pago={pago}
                                 storage={storage}
                                 titulo={titulo}
