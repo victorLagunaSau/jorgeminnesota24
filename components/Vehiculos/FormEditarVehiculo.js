@@ -356,13 +356,13 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                 </div>
             </div>
             <div className="flex justify-between mt-5">
-                <button
-                    type="button"
-                    onClick={handleDeleteVehiculo}
-                    className="btn btn-sm btn-danger w-1/6"
-                >
-                    Eliminar
-                </button>
+                {/*<button*/}
+                {/*    type="button"*/}
+                {/*    onClick={handleDeleteVehiculo}*/}
+                {/*    className="btn btn-sm btn-danger w-1/6"*/}
+                {/*>*/}
+                {/*    Eliminar*/}
+                {/*</button>*/}
                 <button
                     type="button"
                     onClick={handleSubmit}
