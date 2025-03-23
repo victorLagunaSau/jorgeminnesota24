@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { firestore } from "../../firebase/firebaseIni";
+import React, {useEffect, useState} from "react";
+import {firestore} from "../../firebase/firebaseIni";
 import * as XLSX from "xlsx";
 import FormDatosVehiculo from "./FormDatosVehiculo";
 import FormEditarVehiculo from "./FormEditarVehiculo";
+import EntregadoVehiculo from './EntregadoVehiculo';
 
-const Vehiculos = ({ user }) => {
+const Vehiculos = ({user}) => {
     const [vehiculosNoAsignados, setVehiculosNoAsignados] = useState([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [isCopied, setIsCopied] = useState(false);
@@ -12,12 +13,26 @@ const Vehiculos = ({ user }) => {
     const [selectedVehiculo, setSelectedVehiculo] = useState(null);
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isEntregadoModalOpen, setIsEntregadoModalOpen] = useState(false); // Nuevo estado
+    const [vehiculoIdEntregado, setVehiculoIdEntregado] = useState(null); // Nuevo estado
     const [statusFilter, setStatusFilter] = useState("");
     const [sortOrder, setSortOrder] = useState("asc");
     const itemsPerPage = 20;
+    const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
+
 
     const handleSortByDate = () => {
         setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    };
+
+    const handleEntregadoClick = (vehiculo) => {
+        setSelectedVehiculo(vehiculo); // Guardar el vehículo completo
+        setIsEntregadoModalOpen(true); // Abrir el modal
+    };
+
+    const handleCloseEntregadoModal = () => {
+        setIsEntregadoModalOpen(false);
+        setVehiculoIdEntregado(null);
     };
 
     useEffect(() => {
@@ -92,7 +107,7 @@ const Vehiculos = ({ user }) => {
             if (vehiculo.registro && vehiculo.registro.timestamp) {
                 const fecha = new Date(
                     vehiculo.registro.timestamp.seconds * 1000 +
-                        vehiculo.registro.timestamp.nanoseconds / 1000000
+                    vehiculo.registro.timestamp.nanoseconds / 1000000
                 );
                 vehiculo.fechaRegistro = fecha.toLocaleString();
             }
@@ -116,6 +131,13 @@ const Vehiculos = ({ user }) => {
             <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
                 <strong>Vehículos</strong>
             </h3>
+            {isEntregadoModalOpen && (
+                <EntregadoVehiculo
+                    user={user}
+                    vehiculo={selectedVehiculo} // Pasar el vehículo completo
+                    onClose={handleCloseEntregadoModal}
+                />
+            )}
             <div className="flex flex-col w-full my-4">
                 <div className="flex justify-end">
                     <button onClick={exportToExcel} className=" btn bg-green-500 text-white-100 px-4 py-2 rounded-lg">
@@ -284,6 +306,7 @@ const Vehiculos = ({ user }) => {
                                 <td className="border px-4 py-2">
                                     <strong>{vehiculo.cliente}</strong>
                                 </td>
+
                                 <td className="border px-4 py-2">
                                     <button
                                         className="btn btn-outline btn-primary"
@@ -291,6 +314,14 @@ const Vehiculos = ({ user }) => {
                                     >
                                         Editar
                                     </button>
+                                    {user.id === ID_USUARIO_PERMITIDO && ( // Mostrar solo si el ID coincide
+                                        <button
+                                            className="btn btn-outline btn-info ml-2 mt-4"
+                                            onClick={() => handleEntregadoClick(vehiculo)} // Pasar el vehículo completo
+                                        >
+                                            Entregado
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
