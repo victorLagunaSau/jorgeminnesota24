@@ -68,6 +68,14 @@ const Sidebar = ({ onSelectModule, selectedModule }) => {
                                         Corte del día
                                     </button>
                                 </li>
+                                <li>
+                                    <button
+                                        className={getButtonClass('corteTotal')}
+                                        onClick={() => onSelectModule('corteTotal')}
+                                    >
+                                        Corte Total
+                                    </button>
+                                </li>
                             </ul>
                         )}
                     </li>

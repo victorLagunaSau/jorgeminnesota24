@@ -10,6 +10,7 @@ import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
 import SalidaCaja from "./SalidaCaja/SalidaCaja";
 import EntradaCaja from "./EntradaCaja/EntradaCaja"
 import CorteDia from "./CorteDia/CorteDia"
+import CorteTotal from "./CorteGeneral/CorteTotal"
 import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
 import Users from "./Users/Users";
@@ -71,6 +72,8 @@ const Admin = () => {
                 return <EntradaCaja user={user} />;
             case 'corteDia':
                 return <CorteDia user={user} />;
+            case 'corteTotal':
+                return <CorteTotal user={user} />;
             case 'reporteCobros':
                 return <ReporteCobros user={user} />;
             case 'viajes':
