@@ -45,32 +45,46 @@ const ReporteMovimientos = React.forwardRef(({
             <h3 className="text-xl font-semibold">Resumen de Efectivo</h3>
             <table className="table-auto w-full border-collapse border border-gray-200 mt-2">
                 <tbody>
-                    <tr>
-                        <td className="border px-4 py-2 font-semibold">Total en Caja Vehículos:</td>
-                        <td className="border px-4 py-2 font-semibold text-right">
-                            ${totalCaja.toFixed(2).toLocaleString('en-US')}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
-                        <td className="border px-4 py-2 font-semibold text-right">
-                            ${totalRecibido.toFixed(2).toLocaleString('en-US')}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td className="border px-4 py-2 font-semibold">Total de Salidas / Pagos:</td>
-                        <td className="border px-4 py-2 font-semibold text-right text-red-500">
-                            -${totalSalidas.toFixed(2).toLocaleString('en-US')}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td className="border px-4 py-2 font-bold">Total General:</td>
-                        <td className="border px-4 py-2 font-bold text-right">
-                            ${(
-                                totalCaja + totalRecibido - totalSalidas
-                            ).toFixed(2).toLocaleString('en-US')}
-                        </td>
-                    </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold">Total en Caja Vehículos:</td>
+                    <td className="border px-4 py-2 font-semibold text-right">
+                        ${totalCaja.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold">Total en Caja CC:</td>
+                    <td className="border px-4 py-2 font-semibold text-right">
+                        ${totalCC.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
+                    <td className="border px-4 py-2 font-semibold text-right">
+                        ${totalRecibido.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-bold">Total Ingresos:</td>
+                    <td className="border px-4 py-2 font-bold text-right">
+                        ${(
+                        totalCaja + totalCC + totalRecibido
+                    ).toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold">Total de Salidas / Pagos:</td>
+                    <td className="border px-4 py-2 font-semibold text-right text-red-500">
+                        -${totalSalidas.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-bold">Total General:</td>
+                    <td className="border px-4 py-2 font-bold text-right">
+                        ${(
+                        totalCaja + totalCC + totalRecibido - totalSalidas
+                    ).toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
                 </tbody>
             </table>
         </div>
@@ -120,11 +134,15 @@ const CorteTotal = () => {
         const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
 
         // Filtrar los movimientos para entradas (sin filtrar por usuario)
-        const filteredEntradas = movements.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
+const filteredEntradas = movements.filter((movement) =>
+    movement.estatus === "EE" &&
+    movement.tipo === "Entrada" &&
+    movement.tipoPago !== "ECI"
+);
+setEntradasData(filteredEntradas);
 
         // Filtrar los movimientos para salidas (sin filtrar por usuario)
         const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
-    console.log(filteredVehiculos)
         setVehiculosData(filteredVehiculos);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
@@ -138,6 +156,7 @@ const CorteTotal = () => {
     }, 0);
     const totalCC = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.cajaCC) || 0), 0);
     const totalPendientes = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.pagoTotalPendiente) || 0), 0);
+
 
     const totalRecibido = entradasData.reduce((total, movement) => total + (parseFloat(movement.cajaRecibo) || 0), 0);
 
