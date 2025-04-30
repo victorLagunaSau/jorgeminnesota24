@@ -134,12 +134,13 @@ const CorteTotal = () => {
         const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
 
         // Filtrar los movimientos para entradas (sin filtrar por usuario)
-const filteredEntradas = movements.filter((movement) =>
-    movement.estatus === "EE" &&
-    movement.tipo === "Entrada" &&
-    movement.tipoPago !== "ECI"
-);
-setEntradasData(filteredEntradas);
+        const filteredEntradas = movements.filter((movement) =>
+            movement.estatus === "EE" &&
+            movement.tipo === "Entrada" &&
+            movement.entradaCajaTipo !== "ECI"
+        );
+        setEntradasData(filteredEntradas);
+        console.log(entradasData)
 
         // Filtrar los movimientos para salidas (sin filtrar por usuario)
         const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
