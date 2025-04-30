@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { firestore } from "../../firebase/firebaseIni";
+import React, {useEffect, useState} from "react";
+import {firestore} from "../../firebase/firebaseIni";
 import * as XLSX from "xlsx";
 import PagosPendientes from "./PagosPendientes";
 
@@ -91,40 +91,77 @@ const Cobranza = ({user}) => {
                     Exportar a Excel
                 </button>
             </div>
-
+            <div className="flex justify-start mt-4 space-x-2">
+                <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                >
+                    Anterior
+                </button>
+                <span className="flex items-center text-sm px-2">
+                    Página {currentPage} de {Math.ceil(filteredVehiculos.length / itemsPerPage)}
+                </span>
+                <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage * itemsPerPage >= filteredVehiculos.length}
+                >
+                    Siguiente
+                </button>
+            </div>
             <table className="table-auto w-full my-4">
                 <thead>
-                    <tr>
-                        <th className="px-4 py-2">#</th>
-                        <th className="px-4 py-2">Cliente</th>
-                        <th className="px-4 py-2">Vehículo</th>
-                        <th className="px-4 py-2">Pago Total Pendiente</th>
-                        <th className="px-4 py-2">Acción</th>
-                    </tr>
+                <tr>
+                    <th className="px-4 py-2">#</th>
+                    <th className="px-4 py-2">Cliente</th>
+                    <th className="px-4 py-2">Vehículo</th>
+                    <th className="px-4 py-2">Pago Total Pendiente</th>
+                    <th className="px-4 py-2">Acción</th>
+                </tr>
                 </thead>
                 <tbody>
-                    {filteredVehiculos
-                        .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-                        .map((vehiculo, index) => (
-                            <tr key={vehiculo.id}>
-                                <td className="border px-4 py-2">
-                                    {(currentPage - 1) * itemsPerPage + index + 1}
-                                </td>
-                                <td className="border px-4 py-2">{vehiculo.cliente}</td>
-                                <td className="border px-4 py-2">{vehiculo.modelo}</td>
-                                <td className="border px-4 py-2">${vehiculo.pagoTotalPendiente || 0}</td>
-                                <td>
-                                    <button
-                                        className="btn btn-info btn-sm"
-                                        onClick={() => handleOpenModal(vehiculo.id)}
-                                    >
-                                        Pagar ahora
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                {filteredVehiculos
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((vehiculo, index) => (
+                        <tr key={vehiculo.id}>
+                            <td className="border px-4 py-2">
+                                {(currentPage - 1) * itemsPerPage + index + 1}
+                            </td>
+                            <td className="border px-4 py-2">{vehiculo.cliente}</td>
+                            <td className="border px-4 py-2">{vehiculo.modelo}</td>
+                            <td className="border px-4 py-2">${vehiculo.pagoTotalPendiente || 0}</td>
+                            <td>
+                                <button
+                                    className="btn btn-info btn-sm"
+                                    onClick={() => handleOpenModal(vehiculo.id)}
+                                >
+                                    Pagar ahora
+                                </button>
+                            </td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
+            <div className="flex justify-start mt-4 space-x-2">
+                <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                >
+                    Anterior
+                </button>
+                <span className="flex items-center text-sm px-2">
+                    Página {currentPage} de {Math.ceil(filteredVehiculos.length / itemsPerPage)}
+                </span>
+                <button
+                    className="btn btn-outline btn-sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage * itemsPerPage >= filteredVehiculos.length}
+                >
+                    Siguiente
+                </button>
+            </div>
 
             {modalOpen && selectedVehiculoId && (
                 <PagosPendientes

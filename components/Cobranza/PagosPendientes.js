@@ -1,12 +1,18 @@
-import React, { useState, useEffect } from "react";
-import { firestore } from "../../firebase/firebaseIni";
+import React, {useState, useEffect, useRef} from "react";
+import {firestore} from "../../firebase/firebaseIni";
+import ReciboPP from "./ReciboPP";
+import ReactToPrint from "react-to-print";
 
-const PagosPendientes = ({ vehiculoId, onClose, user }) => {
+const PagosPendientes = ({vehiculoId, onClose, user}) => {
     const [vehiculo, setVehiculo] = useState(null);
     const [pago2, setPago2] = useState(0);
     const [pago3, setPago3] = useState(0);
     const [alertMessage, setAlertMessage] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [fechaPago, setFechaPago] = useState(new Date().toISOString().split("T")[0]);
+    const componentRef = useRef();
+    const [pagoExitoso, setPagoExitoso] = useState(false);
+    const reactToPrintRef = useRef();
 
     useEffect(() => {
         const fetchVehiculo = async () => {
@@ -29,7 +35,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
     }, [vehiculoId]);
 
     const showAlert = (message, type) => {
-        setAlertMessage({ message, type });
+        setAlertMessage({message, type});
         setTimeout(() => setAlertMessage(null), 3000);
     };
 
@@ -88,8 +94,15 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
 
             });
 
-            showAlert("Pago registrado correctamente.", "success");
-            onClose();
+            setPagoExitoso(true);
+            showAlert("Pago registrado correctamente. Puedes imprimir el recibo.", "success");
+
+setTimeout(() => {
+    if (reactToPrintRef.current) {
+        reactToPrintRef.current.handlePrint();
+    }
+}, 500);
+
         } catch (error) {
             showAlert("Error al procesar el pago.", "error");
         } finally {
@@ -102,12 +115,16 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
             <div className="modal-box">
                 <h2 className="text-2xl font-bold mb-4">Registrar Pago</h2>
                 {alertMessage && (
-                    <div className={`alert ${alertMessage.type === "success" ? "alert-success" : "alert-error"} shadow-lg mb-4`}>
+                    <div
+                        className={`alert ${alertMessage.type === "success" ? "alert-success" : "alert-error"} shadow-lg mb-4`}>
                         {alertMessage.message}
                     </div>
                 )}
                 {vehiculo ? (
                     <>
+                        <div>
+                            <p> Fecha del Pago: <strong>{fechaPago}</strong></p>
+                        </div>
                         <div>
                             <p><strong>Cliente:</strong> {vehiculo.cliente}</p>
                             <p><strong>Vehículo:</strong> {vehiculo.marca} {vehiculo.modelo}</p>
@@ -130,6 +147,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                                             className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                             min="0"
                                             step="any"
+                                                disabled={pagoExitoso}
                                         />
                                         <span className="ml-2">Dll</span>
                                     </div>
@@ -146,6 +164,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                                             className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                             min="0"
                                             step="any"
+                                                disabled={pagoExitoso}
                                         />
                                         <span className="ml-2">Dll</span>
                                     </div>
@@ -154,11 +173,38 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                         </div>
 
                         <div className="mt-4 flex justify-end">
-                            <button className={`btn btn-info ${loading ? "loading" : ""}`} onClick={handlePago} disabled={loading}>
-                                {loading ? "Procesando..." : "Registrar Pago"}
-                            </button>
+                            {!pagoExitoso && (
+                                <button className={`btn btn-info ${loading ? "loading" : ""}`} onClick={handlePago}
+                                        disabled={loading}>
+                                    {loading ? "Procesando..." : "Registrar Pago"}
+                                </button>
+                            )}
                             <button className="btn btn-outline ml-2" onClick={onClose}>Cerrar</button>
                         </div>
+
+                        {pagoExitoso && (
+                            <div className="mt-2 flex justify-end">
+                                <ReactToPrint
+                                    trigger={() => (
+                                        <button className="btn btn-secondary ml-2">
+                                            Imprimir Recibo
+                                        </button>
+                                    )}
+                                    content={() => componentRef.current}
+                                    ref={reactToPrintRef}
+                                />
+                                <div style={{display: "none"}}>
+                                    <ReciboPP
+                                        ref={componentRef}
+                                        vehiculo={vehiculo}
+                                        pago2={pago2}
+                                        pago3={pago3}
+                                        fechaPago={fechaPago}
+                                        user={user}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </>
                 ) : (
                     <p>Cargando datos...</p>
