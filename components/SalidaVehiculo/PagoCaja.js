@@ -38,6 +38,9 @@ const PagoCaja = ({vehiculo, user}) => {
     const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
     const cajaCambio = parseFloat(recibo) + parseFloat(reciboCC) - total;
 
+    const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
+    const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
+
     const handleDarSalida = async () => {
 
         if (cajaCambio < 0) {
@@ -196,6 +199,7 @@ const PagoCaja = ({vehiculo, user}) => {
                                 className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                 min="0"
                                 step="any"
+                                disabled={!edicionPermitida}
                             /> Dll
                             </div>
                         </div>
@@ -217,6 +221,7 @@ const PagoCaja = ({vehiculo, user}) => {
                                 className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                 min="0"
                                 step="any"
+                                disabled={!edicionPermitida}
                             /> Dll
                             </div>
                         </div>
@@ -238,6 +243,7 @@ const PagoCaja = ({vehiculo, user}) => {
                                 className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                 min="0"
                                 step="any"
+                                disabled={!edicionPermitida}
                             /> Dll
                             </div>
                         </div>
@@ -259,6 +265,7 @@ const PagoCaja = ({vehiculo, user}) => {
                                 className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
                                 min="0"
                                 step="any"
+                                disabled={!edicionPermitida}
                             /> Dll
                             </div>
                         </div>
