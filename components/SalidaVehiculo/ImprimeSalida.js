@@ -20,7 +20,6 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
     const pagoTardioFlete = parseNumberOrZero(vehiculoData.pagoTardioFlete);
     const estacionamiento = parseNumberOrZero(vehiculoData.estacionamiento);
 
-
     // Convertir los valores a palabras
     const montoEnDolares = toWords(vehiculoPrice).toUpperCase() + " DLL";
     const montoEnDolaresPago = toWords(montoPago).toUpperCase() + " DLL";
@@ -43,6 +42,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
+                {vehiculoData.folioVenta && vehiculoData.folioVenta !== "pendiente" && (
+                    <span><strong className="ml-5">Folio:</strong> {vehiculoData.folioVenta}</span>
+                )}
                 </p>
                 <p className="text-gray-400">{title}</p>
             </div>
@@ -91,6 +93,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
+                    {vehiculoData.folioVenta && vehiculoData.folioVenta !== "pendiente" && (
+                        <span><strong className="ml-5">Folio:</strong> {vehiculoData.folioVenta}</span>
+                    )}
                 </p>
 
                 <p className="text-gray-400">{title}</p>
@@ -133,8 +138,10 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-xs text-black-500 ml-1 ">({montoEnDolaresSPeso})</p>
                     <p className="text-sm text-black-500 ml-1 ">Extras: <strong>$ {datoGastosExtra} DLL</strong></p>
                     <p className="text-xs text-black-500 ml-1 ">({montoGastosExtra})</p>
-                    <p className="text-xs text-black-500 ml-1 ">Pago Tardío de Flete:<strong> $ {pagoTardioFlete} DLL</strong> </p>
-                    <p className="text-xs text-black-500 ml-1 ">Estacionamiento:<strong> $ {estacionamiento} DLL</strong> </p>
+                    <p className="text-xs text-black-500 ml-1 ">Pago Tardío de
+                        Flete:<strong> $ {pagoTardioFlete} DLL</strong></p>
+                    <p className="text-xs text-black-500 ml-1 ">Estacionamiento:<strong> $ {estacionamiento} DLL</strong>
+                    </p>
                     <p className="text-xl text-black-500 ml-1 ">Total: <strong>$ {montoTotal} DLL</strong></p>
                     <p className="text-xs text-black-500 ml-1 ">({montoEnDolaresTotal})</p>
 

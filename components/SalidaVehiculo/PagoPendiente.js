@@ -52,6 +52,26 @@ const PagoPendiente = ({vehiculo, user}) => {
 
             await new Promise((resolve) => setTimeout(resolve, 2000)); // Simula un delay
 
+            let nuevoFolio = null;
+
+            await firestore().runTransaction(async (transaction) => {
+                const folioRef = firestore().collection("config").doc("consecutivos");
+                const folioDoc = await transaction.get(folioRef);
+
+                if (!folioDoc.exists) {
+                    throw "Documento de consecutivos no existe";
+                }
+
+                const data = folioDoc.data();
+                const folioActual = data.folioventa || 0;
+                nuevoFolio = folioActual + 1;
+
+                // Actualizamos el folio en la transacción
+                transaction.update(folioRef, {
+                    folioventa: nuevoFolio
+                });
+            });
+
             // Guardar en la colección de vehículos
             await firestore().collection("vehiculos").doc(vehiculo[0].binNip).update({
                 estatus: "EN",
@@ -73,6 +93,7 @@ const PagoPendiente = ({vehiculo, user}) => {
                 pagos003: 0,
                 pagos004: 0,
                 pagos005: 0,
+                folioVenta: nuevoFolio,
             });
 
             // Guardar en la colección de movimientos
@@ -108,6 +129,7 @@ const PagoPendiente = ({vehiculo, user}) => {
                 pagos005: 0,
                 pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
                 estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                folioVenta: nuevoFolio,
             });
 
             // Actualizamos los datos del vehículo
@@ -142,6 +164,7 @@ const PagoPendiente = ({vehiculo, user}) => {
                 pagos005: 0,
                 pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
                 estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                folioVenta: nuevoFolio,
             }]);
 
             setMovimientoGuardado(true);
@@ -171,7 +194,7 @@ const PagoPendiente = ({vehiculo, user}) => {
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             <p className="text-black-500 text-3xl">
-                <strong className="mr-3"> Fecha de Registro: </strong> {
+                <strong className="mr-3">Registro de vehículo: </strong> {
                 vehiculo &&
                 vehiculo[0] &&
                 vehiculo[0].registro &&
@@ -313,7 +336,7 @@ const PagoPendiente = ({vehiculo, user}) => {
                             </div>
                         </div>
 
-<div className="p-1">
+                        <div className="p-1">
                             <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de Flete:</label>
                             <select
                                 id="pagoTardioFlete"

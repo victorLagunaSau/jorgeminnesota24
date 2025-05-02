@@ -44,7 +44,7 @@ const PagoCaja = ({vehiculo, user}) => {
     const handleDarSalida = async () => {
 
         if (cajaCambio < 0) {
-            setMensajeError("El cambio no puede ser 0 o negativo.");
+            setMensajeError("El cliente no ha cubierto el total, aún falta dinero.");
             return;
         }
 
@@ -57,6 +57,25 @@ const PagoCaja = ({vehiculo, user}) => {
             const totalPago = parseFloat(storageState) + parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
             await new Promise((resolve) => setTimeout(resolve, 2000)); // Simula un delay
 
+            let nuevoFolio = null;
+
+            await firestore().runTransaction(async (transaction) => {
+                const folioRef = firestore().collection("config").doc("consecutivos");
+                const folioDoc = await transaction.get(folioRef);
+
+                if (!folioDoc.exists) {
+                    throw "Documento de consecutivos no existe";
+                }
+
+                const data = folioDoc.data();
+                const folioActual = data.folioventa || 0;
+                nuevoFolio = folioActual + 1;
+
+                // Actualizamos el folio en la transacción
+                transaction.update(folioRef, {
+                    folioventa: nuevoFolio
+                });
+            });
             // Guardar en la colección de vehículos
             await firestore().collection("vehiculos").doc(vehiculo[0].binNip).update({
                 estatus: "EN",
@@ -72,6 +91,7 @@ const PagoCaja = ({vehiculo, user}) => {
                 pagosPendientes: false,
                 pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
                 estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                folioVenta: nuevoFolio,
             });
 
             // Guardar en la colección de movimientos
@@ -101,6 +121,7 @@ const PagoCaja = ({vehiculo, user}) => {
                 pagosPendientes: false,
                 pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
                 estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                folioVenta: nuevoFolio,
             });
 
             // Actualizamos los datos del vehículo
@@ -128,6 +149,7 @@ const PagoCaja = ({vehiculo, user}) => {
                 cajaCC: reciboCC,
                 pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
                 estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                folioVenta: nuevoFolio,
             }]);
             setMovimientoGuardado(true);
             setMensajeError("");
@@ -141,8 +163,21 @@ const PagoCaja = ({vehiculo, user}) => {
             setEstacionamientoTotal(0); // Reiniciar el total de estacionamiento
             setCobrado(true);
         } catch (error) {
-            setMensajeError("Ocurrió un error al actualizar el estatus del vehículo y registrar el movimiento");
-        } finally {
+    console.error("Error al registrar movimiento:", error);
+
+    let mensaje = "Ocurrió un error al procesar el pago.";
+
+    if (typeof error === "string") {
+        mensaje += " Detalles: " + error;
+    } else if (error instanceof Error) {
+        mensaje += " Detalles: " + error.message;
+    } else if (error?.code) {
+        // Errores específicos de Firebase (opcional)
+        mensaje += ` Código: ${error.code}`;
+    }
+
+    setMensajeError(mensaje);
+} finally {
             setCargando(false);
         }
     };
@@ -156,7 +191,7 @@ const PagoCaja = ({vehiculo, user}) => {
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             <p className="text-black-500 text-3xl">
-                <strong className="mr-3"> Fecha de Registro: </strong> {
+                <strong className="mr-3">Registro de vehículo: </strong> {
                 vehiculo &&
                 vehiculo[0] &&
                 vehiculo[0].registro &&
@@ -312,7 +347,8 @@ const PagoCaja = ({vehiculo, user}) => {
                             </div>
                         </div>
                         <div className="p-1">
-                            <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de Flete:</label>
+                            <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de
+                                Flete:</label>
                             <select
                                 id="pagoTardioFlete"
                                 value={pagoTardioFlete}
@@ -324,7 +360,8 @@ const PagoCaja = ({vehiculo, user}) => {
                             </select>
                         </div>
                         <div className="p-1">
-                            <label htmlFor="estacionamiento" className="block text-black-500">Estacionamiento (3 USD por día):</label>
+                            <label htmlFor="estacionamiento" className="block text-black-500">Estacionamiento (3 USD por
+                                día):</label>
                             <div className="flex items-center">
                                 <input
                                     type="number"

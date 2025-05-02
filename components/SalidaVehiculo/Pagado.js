@@ -30,6 +30,7 @@ const Pagado = ({vehiculo}) => {
         pagoTardioFlete = 0, // Nuevo campo
         estacionamiento = 0, // Nuevo campo
         registro = {seconds: 0, nanoseconds: 0},
+        folioVenta = "pendiente"
     } = vehiculoData;
 
     const [showModal, setShowModal] = useState(false);
@@ -45,8 +46,13 @@ const Pagado = ({vehiculo}) => {
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             <div>
+                {folioVenta && folioVenta !== "pendiente" && (
+                    <p className="text-black-500 text-2xl">
+                        <strong className="mr-3">Folio:</strong> {folioVenta}
+                    </p>
+                )}
                 <p className="text-black-500 text-2xl">
-                    <strong className="mr-3"> Fecha de Registro: </strong> {
+                    <strong className="mr-3"> Fecha de Registro de Pago: </strong> {
                     registro?.seconds
                         ? moment(registro.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss')

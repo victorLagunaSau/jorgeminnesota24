@@ -37,6 +37,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
+                    {vehiculoData.folioVenta && vehiculoData.folioVenta !== "pendiente" && (
+                        <span><strong className="ml-5">Folio:</strong> {vehiculoData.folioVenta}</span>
+                    )}
                 </p>
 
                 <p className="text-gray-400">{title}</p>
@@ -87,6 +90,9 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                         ? moment(vehiculoData.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
                         : moment().format('DD/MM/YYYY HH:mm:ss') // Si no hay timestamp, muestra la fecha actual
                 }
+                {vehiculoData.folioVenta && vehiculoData.folioVenta !== "pendiente" && (
+                    <span><strong className="ml-5">Folio:</strong> {vehiculoData.folioVenta}</span>
+                )}
                 </p>
 
                 <p className="text-gray-400">{title}</p>
