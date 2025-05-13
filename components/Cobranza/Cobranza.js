@@ -10,6 +10,8 @@ const Cobranza = ({user}) => {
     const itemsPerPage = 20;
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedVehiculoId, setSelectedVehiculoId] = useState(null);
+    const [ordenAscendente, setOrdenAscendente] = useState(true);
+    const [filtroBinNip, setFiltroBinNip] = useState("");
 
     useEffect(() => {
         const obtenerCobranza = () => {
@@ -40,7 +42,7 @@ const Cobranza = ({user}) => {
             vehiculo.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             vehiculo.binNip.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
+    console.log(filteredVehiculos)
     const handleSearchTermChange = (event) => {
         setSearchTerm(event.target.value);
         setCurrentPage(1);
@@ -65,6 +67,16 @@ const Cobranza = ({user}) => {
     const handleCloseModal = () => {
         setSelectedVehiculoId(null);
         setModalOpen(false);
+    };
+
+    const ordenarPorFecha = () => {
+        const vehiculosOrdenados = [...filteredVehiculos].sort((a, b) => {
+            const fechaA = a.registro?.timestamp?.seconds || 0;
+            const fechaB = b.registro?.timestamp?.seconds || 0;
+            return ordenAscendente ? fechaA - fechaB : fechaB - fechaA;
+        });
+        setVehiculosConPagoPendiente(vehiculosOrdenados);
+        setOrdenAscendente(!ordenAscendente);
     };
 
     return (
@@ -114,8 +126,15 @@ const Cobranza = ({user}) => {
                 <thead>
                 <tr>
                     <th className="px-4 py-2">#</th>
-                    <th className="px-4 py-2">Cliente</th>
-                    <th className="px-4 py-2">Vehículo</th>
+                    <th className="px-4 py-2 cursor-pointer" onClick={ordenarPorFecha}>
+                        Cliente / Fecha de registro
+                        <span className="ml-1 text-xs">
+                            {ordenAscendente ? "▲" : "▼"}
+                        </span>
+                    </th>
+                    <th className="px-4 py-2">
+                        Vehículo / Bin/Nip
+                    </th>
                     <th className="px-4 py-2">Pago Total Pendiente</th>
                     <th className="px-4 py-2">Acción</th>
                 </tr>
@@ -128,10 +147,23 @@ const Cobranza = ({user}) => {
                             <td className="border px-4 py-2">
                                 {(currentPage - 1) * itemsPerPage + index + 1}
                             </td>
-                            <td className="border px-4 py-2">{vehiculo.cliente}</td>
-                            <td className="border px-4 py-2">{vehiculo.modelo}</td>
+
+                            <td className="border px-4 py-2">
+                                <div className="font-semibold">{vehiculo.cliente}</div>
+                                <div className="text-sm text-gray-500">Registro:
+                                    {vehiculo.registro?.timestamp?.seconds
+                                        ? new Date(vehiculo.registro.timestamp.seconds * 1000).toLocaleDateString()
+                                        : "Sin fecha"}
+                                </div>
+                            </td>
+
+
+                            <td className="border px-4 py-2">
+                                <   div className="font-semibold">{vehiculo.modelo}</div>
+                                <div className="text-sm text-gray-500"> Bin/Nip: {vehiculo.binNip}</div>
+                            </td>
                             <td className="border px-4 py-2">${vehiculo.pagoTotalPendiente || 0}</td>
-                            <td>
+                            <td className="border px-4 py-2">
                                 <button
                                     className="btn btn-info btn-sm"
                                     onClick={() => handleOpenModal(vehiculo.id)}
