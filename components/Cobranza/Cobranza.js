@@ -42,7 +42,7 @@ const Cobranza = ({user}) => {
             vehiculo.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
             vehiculo.binNip.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    console.log(filteredVehiculos)
+
     const handleSearchTermChange = (event) => {
         setSearchTerm(event.target.value);
         setCurrentPage(1);
