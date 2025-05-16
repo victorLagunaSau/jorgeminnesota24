@@ -308,12 +308,12 @@ const Vehiculos = ({user}) => {
                                 </td>
 
                                 <td className="border px-4 py-2">
-                                    <button
-                                        className="btn btn-outline btn-primary"
-                                        onClick={() => handleEditClick(vehiculo)}
-                                    >
-                                        Editar
-                                    </button>
+                                    {/*<button*/}
+                                    {/*    className="btn btn-outline btn-primary"*/}
+                                    {/*    onClick={() => handleEditClick(vehiculo)}*/}
+                                    {/*>*/}
+                                    {/*    Editar*/}
+                                    {/*</button>*/}
                                     {user.id === ID_USUARIO_PERMITIDO && ( // Mostrar solo si el ID coincide
                                         <button
                                             className="btn btn-outline btn-info ml-2 mt-4"
