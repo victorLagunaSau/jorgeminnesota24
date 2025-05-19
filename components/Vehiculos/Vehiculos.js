@@ -19,7 +19,10 @@ const Vehiculos = ({user}) => {
     const [sortOrder, setSortOrder] = useState("asc");
     const itemsPerPage = 20;
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
-
+    //const ID_USUARIO_PERMITIDO = "PpTKE8o5ivdDZHa5EFfCkUoVTmD2";
+    const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
+    console.log(user.id)
+    console.log(edicionPermitida)
 
     const handleSortByDate = () => {
         setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -308,20 +311,22 @@ const Vehiculos = ({user}) => {
                                 </td>
 
                                 <td className="border px-4 py-2">
-                                    {/*<button*/}
-                                    {/*    className="btn btn-outline btn-primary"*/}
-                                    {/*    onClick={() => handleEditClick(vehiculo)}*/}
-                                    {/*>*/}
-                                    {/*    Editar*/}
-                                    {/*</button>*/}
-                                    {user.id === ID_USUARIO_PERMITIDO && ( // Mostrar solo si el ID coincide
-                                        <button
-                                            className="btn btn-outline btn-info ml-2 mt-4"
-                                            onClick={() => handleEntregadoClick(vehiculo)} // Pasar el vehículo completo
-                                        >
-                                            Entregado
-                                        </button>
-                                    )}
+                                    <button
+                                        className="btn btn-outline btn-primary ml-2 mt-4"
+                                        onClick={() => handleEditClick(vehiculo)}
+                                        disabled={!edicionPermitida}
+                                    >
+                                        Editar
+                                    </button>
+
+                                    <button
+                                        className="btn btn-outline btn-info ml-2 mt-4"
+                                        onClick={() => handleEntregadoClick(vehiculo)} // Pasar el vehículo completo
+                                        disabled={!edicionPermitida}
+                                    >
+                                        Entregado
+                                    </button>
+
                                 </td>
                             </tr>
                         ))}
