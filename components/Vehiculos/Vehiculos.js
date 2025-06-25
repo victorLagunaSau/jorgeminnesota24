@@ -18,11 +18,16 @@ const Vehiculos = ({user}) => {
     const [statusFilter, setStatusFilter] = useState("");
     const [sortOrder, setSortOrder] = useState("asc");
     const itemsPerPage = 20;
-    const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
-    //const ID_USUARIO_PERMITIDO = "PpTKE8o5ivdDZHa5EFfCkUoVTmD2";
+    // const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
+    const ID_USUARIO_PERMITIDO = "PpTKE8o5ivdDZHa5EFfCkUoVTmD2";
     const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
-    console.log(user.id)
-    console.log(edicionPermitida)
+
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [deleteTargetVehiculo, setDeleteTargetVehiculo] = useState(null);
+    const [pinInput, setPinInput] = useState("");
+    const [pinError, setPinError] = useState("");
+    const CORRECT_PIN = "9571";
+
 
     const handleSortByDate = () => {
         setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -128,6 +133,49 @@ const Vehiculos = ({user}) => {
         setIsEditModalOpen(true);
     };
 
+    const handleBorrarVehiculoClick = (vehiculo) => {
+        setDeleteTargetVehiculo(vehiculo);
+        setIsDeleteModalOpen(true);
+        setPinInput("");
+        setTimeout(() => {
+            document.getElementById("modal_borrar_vehiculo")?.showModal();
+        }, 100); // Garantiza que esté montado
+    };
+
+    const handleConfirmDelete = async () => {
+        if (pinInput !== CORRECT_PIN) {
+            alert("PIN incorrecto");
+            return;
+        }
+
+        try {
+            const firestoreInstance = firestore();
+
+            // 1. Eliminar vehículo
+            await firestoreInstance.collection("vehiculos").doc(deleteTargetVehiculo.id).delete();
+
+            // 2. Eliminar movimientos relacionados
+            const movimientosSnapshot = await firestoreInstance
+                .collection("movimientos")
+                .where("binNip", "==", deleteTargetVehiculo.id)
+                .get();
+
+            const batch = firestoreInstance.batch();
+            movimientosSnapshot.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+
+            alert("Vehículo y movimientos eliminados con éxito.");
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            alert("Error al eliminar el vehículo.");
+        } finally {
+            setIsDeleteModalOpen(false);
+            setDeleteTargetVehiculo(null);
+        }
+    };
 
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
@@ -326,6 +374,14 @@ const Vehiculos = ({user}) => {
                                     >
                                         Entregado
                                     </button>
+                                    {edicionPermitida && (
+                                        <button
+                                            className="btn btn-outline btn-info ml-2 mt-4"
+                                            onClick={() => handleBorrarVehiculoClick(vehiculo)}
+                                        >
+                                            Borrar Vehículo
+                                        </button>
+                                    )}
 
                                 </td>
                             </tr>
@@ -350,6 +406,40 @@ const Vehiculos = ({user}) => {
                     Siguiente
                 </button>
             </div>
+            <dialog id="modal_borrar_vehiculo" className="modal" open={isDeleteModalOpen}>
+                <div className="modal-box">
+                    <h3 className="font-bold text-lg">Confirmar eliminación</h3>
+                    <p className="py-4">Ingresa el PIN de 4 dígitos para confirmar:</p>
+
+                    <input
+                        type="password"
+                        value={pinInput}
+                        onChange={(e) => setPinInput(e.target.value)}
+                        maxLength={4}
+                        className="input input-bordered w-full mb-4"
+                        placeholder="****"
+                    />
+
+                    <div className="modal-action flex justify-between">
+                        <form method="dialog">
+                            <button
+                                className="btn"
+                                onClick={() => {
+                                    setIsDeleteModalOpen(false);
+                                    setDeleteTargetVehiculo(null);
+                                    setPinInput("");
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                        </form>
+                        <button className="btn btn-error" onClick={handleConfirmDelete}>
+                            Confirmar Borrado
+                        </button>
+                    </div>
+                </div>
+            </dialog>
+
         </div>
     );
 };

@@ -112,14 +112,14 @@ const CorteDia = ({user}) => {
         }));
 
         const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
-        // Filtrar los movimientos para vehículos
         const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
-
-        // Filtrar los movimientos para entradas
         const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
-
-        // Filtrar los movimientos para salidas
         const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
+
+        // Y en lugar de usar "filteredUserID", usa directamente "movements":
+        // const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
+        // const filteredEntradas = movements.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
+        // const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
 
 
         setVehiculosData(filteredVehiculos);

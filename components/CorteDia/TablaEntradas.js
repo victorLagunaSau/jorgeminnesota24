@@ -22,6 +22,7 @@ const TablaEntradas = ({ entradasData, totalRecibido }) => (
             <tr key={entrada.id}>
               <td className="px-2 py-1 border text-center">{index + 1}</td>
               <td className="px-2 py-1 border"><strong>{entrada.entradaCajaReceptor}</strong></td>
+              {/*<td className="px-2 py-1 border"><strong>{entrada.entradaCajaReceptor} {entrada.id}</strong></td>*/}
               <td className="px-2 py-1 border">{entrada.entradaCajaConceptoPago}</td>
               <td className="px-2 py-1 border">{entrada.entradaCajaMotivoPago}</td>
               <td className="px-2 py-1 border">{entrada.entradaCajaTipo}</td>
