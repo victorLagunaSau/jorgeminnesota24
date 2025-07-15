@@ -4,12 +4,14 @@ import ReactToPrint from "react-to-print";
 import TablaVehiculos from "./TablaVehiculos";
 import TablaEntradas from "./TablaEntradas";
 import TablaSalidas from "./TablaSalidas";
+import TablaVehiculosPendientes from "./TablaVehiculosPendientes";
 
 // Componente para mostrar e imprimir la tabla de movimientos
 const ReporteMovimientos = React.forwardRef(({
                                                  startDate,
                                                  endDate,
                                                  vehiculosData,
+                                                 vehiculosPendientesData,
                                                  totalPago,
                                                  totalCaja,
                                                  totalCC,
@@ -88,6 +90,13 @@ const ReporteMovimientos = React.forwardRef(({
                 </tbody>
             </table>
         </div>
+        <TablaVehiculosPendientes
+            vehiculosData={vehiculosPendientesData}
+            totalPago={totalPago}
+            totalCaja={totalCaja}
+            totalCC={totalCC}
+            totalPendientes={totalPendientes}
+        />
     </div>
 ));
 
@@ -96,6 +105,7 @@ const CorteTotal = () => {
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
     const [vehiculosData, setVehiculosData] = useState([]);
+    const [vehiculosPendientesData, setVehiculosPendientesData] = useState([]);
     const [entradasData, setEntradasData] = useState([]);
     const [salidasData, setSalidasData] = useState([]);
     const [errorMessage, setErrorMessage] = useState("");
@@ -132,7 +142,8 @@ const CorteTotal = () => {
 
         // Filtrar los movimientos para vehículos (sin filtrar por usuario)
         const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
-
+        // Filtrar los movimientos para vehículos (sin filtrar por usuario)
+        const filteredVehiculosPendientes = movements.filter((movement) => movement.estatus === "PR" && movement.tipo !== "Pago");
         // Filtrar los movimientos para entradas (sin filtrar por usuario)
         const filteredEntradas = movements.filter((movement) =>
             movement.estatus === "EE" &&
@@ -145,6 +156,7 @@ const CorteTotal = () => {
         // Filtrar los movimientos para salidas (sin filtrar por usuario)
         const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
         setVehiculosData(filteredVehiculos);
+        setVehiculosPendientesData(filteredVehiculosPendientes);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
 
@@ -219,6 +231,7 @@ const CorteTotal = () => {
                 startDate={startDate}
                 endDate={endDate}
                 vehiculosData={vehiculosData}
+                vehiculosPendientesData={vehiculosPendientesData}
                 totalPago={totalPago}
                 totalCaja={totalCaja}
                 totalCC={totalCC}

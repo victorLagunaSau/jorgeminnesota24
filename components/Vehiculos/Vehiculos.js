@@ -19,7 +19,6 @@ const Vehiculos = ({user}) => {
     const [sortOrder, setSortOrder] = useState("asc");
     const itemsPerPage = 20;
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
-
     //     const ID_USUARIO_PERMITIDO = "PpTKE8o5ivdDZHa5EFfCkUoVTmD2";
     const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
 
