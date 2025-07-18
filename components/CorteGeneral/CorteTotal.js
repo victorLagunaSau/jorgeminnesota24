@@ -143,7 +143,7 @@ const CorteTotal = () => {
         // Filtrar los movimientos para vehículos (sin filtrar por usuario)
         const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
         // Filtrar los movimientos para vehículos (sin filtrar por usuario)
-        const filteredVehiculosPendientes = movements.filter((movement) => movement.estatus === "PR" && movement.tipo !== "Pago");
+        const filteredVehiculosPendientes = movements.filter((movement) => movement.tipo !== "Pago");
         // Filtrar los movimientos para entradas (sin filtrar por usuario)
         const filteredEntradas = movements.filter((movement) =>
             movement.estatus === "EE" &&
@@ -151,7 +151,7 @@ const CorteTotal = () => {
             movement.entradaCajaTipo !== "ECI"
         );
         setEntradasData(filteredEntradas);
-        console.log(entradasData)
+
 
         // Filtrar los movimientos para salidas (sin filtrar por usuario)
         const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
