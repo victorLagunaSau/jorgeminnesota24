@@ -15,6 +15,7 @@ import ReporteCobros from "./Reports/ReporteCobros";
 import Vehiculos from "./Vehiculos/Vehiculos";
 import Users from "./Users/Users";
 import Reports from "./Reports/Reports";
+import ReportPendientesPago from "./Reports/ReportPendientesPago";
 import Cobranza from "./Cobranza/Cobranza";
 
 
@@ -84,6 +85,8 @@ const Admin = () => {
                 return <EstadosPrecios />;
             case 'reports':
                 return <Reports user={user} />;
+            case 'reportsPendientesPago':
+                return <ReportPendientesPago user={user} />;
             case 'cobranza':
                 return <Cobranza user={user} />;
             case 'users':
