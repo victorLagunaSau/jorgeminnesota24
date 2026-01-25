@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../firebase/firebaseIni";
-import { FaPlus, FaTrash, FaSave, FaExclamationCircle, FaUserClock } from "react-icons/fa";
+import { FaPlus, FaTrash, FaSave, FaExclamationCircle, FaUserClock, FaDollarSign } from "react-icons/fa";
 
-// Agregamos 'user' a las props para saber quién edita
 const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
     const [updatedRegions, setUpdatedRegions] = useState([]);
     const [alertMessage, setAlertMessage] = useState({ msg: '', tipo: '' });
@@ -11,7 +10,9 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
         if (currentRegions?.regions) {
             const data = currentRegions.regions.map(r => ({
                 ...r,
-                cost: r.cost || "0"
+                cost: r.cost || "0",
+                // Aseguramos que profit exista al cargar, si no, lo calculamos
+                profit: r.profit || (parseFloat(r.price || 0) - parseFloat(r.cost || 0)).toString()
             })).sort((a, b) => a.order - b.order);
             setUpdatedRegions(data);
         }
@@ -20,6 +21,14 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
     const handleFieldChange = (index, field, value) => {
         const copy = [...updatedRegions];
         copy[index][field] = value;
+
+        // CÁLCULO EN TIEMPO REAL: Si cambia precio o costo, actualizamos profit automáticamente
+        if (field === 'price' || field === 'cost') {
+            const p = field === 'price' ? parseFloat(value || 0) : parseFloat(copy[index].price || 0);
+            const c = field === 'cost' ? parseFloat(value || 0) : parseFloat(copy[index].cost || 0);
+            copy[index].profit = (p - c).toString();
+        }
+
         setUpdatedRegions(copy);
     };
 
@@ -30,15 +39,23 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
 
         setUpdatedRegions([{
             city: '',
-            price: '',
+            price: '0',
             cost: '0',
+            profit: '0', // Inicializamos en 0
             isNew: true,
             order: nextOrder
         }, ...updatedRegions]);
     };
 
+    const getProfitColor = (profit) => {
+        const p = parseFloat(profit);
+        if (p <= 0) return 'text-red-600 font-black';
+        if (p < 50) return 'text-orange-500 font-bold';
+        return 'text-green-600 font-bold';
+    };
+
     const handleSave = async () => {
-        const hasEmpty = updatedRegions.some(r => !r.city || !r.price || !r.cost);
+        const hasEmpty = updatedRegions.some(r => !r.city || r.price === "" || r.cost === "");
         if (hasEmpty) {
             setAlertMessage({ msg: "Todos los campos son obligatorios.", tipo: 'error' });
             return;
@@ -54,7 +71,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
         }
 
         try {
-            // Guardamos las regiones y el objeto de auditoría por fuera
+            // Se guarda el arreglo con el campo 'profit' incluido en cada región
             await firestore().collection("province").doc(currentRegions.id).update({
                 regions: updatedRegions,
                 ultimaEdicion: {
@@ -64,7 +81,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                 }
             });
 
-            setAlertMessage({ msg: "Matriz de costos actualizada y registrada", tipo: 'success' });
+            setAlertMessage({ msg: "Matriz con ganancias guardada en BD", tipo: 'success' });
             setTimeout(() => {
                 setAlertMessage({ msg: '', tipo: '' });
                 closeModal();
@@ -88,10 +105,9 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                     <h2 className="text-2xl font-black text-blue-900 uppercase italic leading-none">
                         {currentRegions?.state}
                     </h2>
-                    {/* Badge informativo de última edición si existe */}
                     {currentRegions?.ultimaEdicion && (
                         <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-1 uppercase font-bold">
-                            <FaUserClock /> Ultima edición por: {currentRegions.ultimaEdicion.usuario}
+                            <FaUserClock /> Ultima edición: {currentRegions.ultimaEdicion.usuario}
                         </div>
                     )}
                 </div>
@@ -104,11 +120,12 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                 <table className="table table-compact w-full border-separate border-spacing-y-1">
                     <thead>
                         <tr className="text-[10px] uppercase text-gray-400 bg-gray-50 border-b">
-                            <th className="w-12 text-center">New</th>
+                            <th className="w-8 text-center">New</th>
                             <th>Ciudad / Destino</th>
-                            <th className="w-28 text-blue-700 font-black">Venta ($)</th>
-                            <th className="w-28 text-red-600 font-black">Costo Carrier ($)</th>
-                            <th className="w-12 text-center"></th>
+                            <th className="w-24 text-blue-700 font-black text-center">Cobro ($)</th>
+                            <th className="w-24 text-red-600 font-black text-center">Pago ($)</th>
+                            <th className="w-24 text-green-700 font-black text-center bg-green-50">Profit (BD)</th>
+                            <th className="w-8 text-center"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -135,7 +152,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                                         type="number"
                                         value={region.price}
                                         onChange={(e) => handleFieldChange(index, 'price', e.target.value)}
-                                        className="input input-bordered input-xs w-full bg-blue-50 text-blue-800 font-mono font-bold"
+                                        className="input input-bordered input-xs w-full bg-blue-50 text-blue-800 font-mono font-bold text-center"
                                     />
                                 </td>
                                 <td>
@@ -143,8 +160,14 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                                         type="number"
                                         value={region.cost}
                                         onChange={(e) => handleFieldChange(index, 'cost', e.target.value)}
-                                        className={`input input-bordered input-xs w-full font-mono font-bold bg-white ${parseFloat(region.cost) > parseFloat(region.price) ? 'border-red-500 text-red-600' : 'text-gray-700'}`}
+                                        className={`input input-bordered input-xs w-full font-mono font-bold text-center bg-white ${parseFloat(region.cost) > parseFloat(region.price) ? 'border-red-500 text-red-600' : 'text-gray-700'}`}
                                     />
+                                </td>
+                                <td className="bg-green-50 text-center">
+                                    <div className={`flex items-center justify-center gap-1 text-[13px] ${getProfitColor(region.profit)}`}>
+                                        <FaDollarSign size={10}/>
+                                        {parseFloat(region.profit).toLocaleString()}
+                                    </div>
                                 </td>
                                 <td className="text-center">
                                     <button
