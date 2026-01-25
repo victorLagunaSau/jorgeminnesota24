@@ -1,180 +1,93 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import { firestore } from "../../firebase/firebaseIni";
-import ImputAutoEstados from "../misc/ImputAutoEstados";
+import { FaMapMarkerAlt, FaSave } from "react-icons/fa";
 
-const FormEstadosPrecios = () => {
-    const initialState = {
-        selectedState: '',
-        cityRegions: [],
-        newCity: '',
-        newPrice: '',
-        confirmState: false,
-        savedSuccessfully: false
+const FormEstadosPrecios = ({ user, onSuccess }) => {
+    const [loading, setLoading] = useState(false);
+    const [nombreEstado, setNombreEstado] = useState("");
+    const [alerta, setAlerta] = useState({ mostrar: false, mensaje: "", tipo: "" });
+
+    const mostrarAviso = (mensaje, tipo = "info") => {
+        setAlerta({ mostrar: true, mensaje, tipo });
+        setTimeout(() => setAlerta({ mostrar: false, mensaje: "", tipo: "" }), 3000);
     };
 
-    const [formValues, setFormValues] = useState({ ...initialState });
-    const [orderCounter, setOrderCounter] = useState(1);
-
-    const handleConfirmState = () => {
-        if (formValues.selectedState) {
-            setFormValues({ ...formValues, confirmState: true });
-        } else {
-            // Handle error, state must be selected
+    const ejecutarGuardado = async () => {
+        if (!nombreEstado.trim()) {
+            mostrarAviso("El nombre del estado es obligatorio", "error");
+            return;
         }
-    };
 
-    const handleSaveCityRegion = () => {
-        if (formValues.newCity && formValues.newPrice) {
-            const updatedCityRegions = [...formValues.cityRegions, { city: formValues.newCity, price: formValues.newPrice, order: orderCounter }];
-            setOrderCounter(orderCounter + 1); // Incrementar el contador de orden
-            setFormValues({ ...formValues, cityRegions: updatedCityRegions, newCity: '', newPrice: '' });
-        } else {
-            // Handle error, both city and price must be provided
-        }
-    };
+        setLoading(true);
+        try {
+            // Estructura limpia para producción
+            const nuevoEstado = {
+                state: nombreEstado.toUpperCase(),
+                regions: [], // Iniciamos el array vacío para no romper la edición
+                registro: {
+                    usuario: user?.nombre || "Admin",
+                    idUsuario: user?.id || "N/A",
+                    timestamp: new Date()
+                }
+            };
 
-    const handleDeleteCityRegion = (index) => {
-        const updatedCityRegions = [...formValues.cityRegions];
-        updatedCityRegions.splice(index, 1);
-        setFormValues({ ...formValues, cityRegions: updatedCityRegions });
-    };
+            await firestore().collection("province").add(nuevoEstado);
 
-    const handleSaveToFirebase = () => {
-        if (formValues.selectedState && formValues.cityRegions.length > 0) {
-            firestore()
-                .collection("province")
-                .add({
-                    state: formValues.selectedState,
-                    regions: formValues.cityRegions
-                })
-                .then(() => {
-                    console.log('Datos guardados  correctamente.');
-                    // Indicar que se guardó exitosamente
-                    setFormValues({ ...formValues, savedSuccessfully: true });
-                    // Reiniciar el formulario después de 2 segundos
-                    setTimeout(() => {
-                        setFormValues({ ...initialState });
-                        setOrderCounter(1); // Reiniciar el contador de orden
-                    }, 2000);
-                })
-                .catch((error) => {
-                    console.error('Error al guardar datos:', error);
-                    // Aquí puedes manejar el error, mostrar una notificación, etc.
-                });
-        } else {
-            // Handle error, state must be selected and at least one city/region must be added
+            mostrarAviso(`${nombreEstado.toUpperCase()} registrado. Configura los precios en la tabla.`, "success");
+            setNombreEstado("");
+            if (onSuccess) onSuccess();
+        } catch (e) {
+            mostrarAviso("Error al conectar con la base de datos", "error");
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-[500px]">
-            {!formValues.confirmState && (
-                <>
-                    <h3 className="justify-center text-3xl lg:text-3xl font-mediumtext-black-500">
-                        Selecciona un <strong>estado</strong>.
-                    </h3>
-                    <p>Para iniciar, agrega un estado/región.</p>
-                    <div className="flex justify-center items-center h-full m-3">
-                        <ImputAutoEstados
-                            onSelect={(option) => setFormValues({ ...formValues, selectedState: option })}
-                        />
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative font-sans">
+            {/* ALERTAS DINÁMICAS */}
+            {alerta.mostrar && (
+                <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
+                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 px-6 uppercase text-[11px]`}>
+                        <span>{alerta.mensaje}</span>
                     </div>
-
-                    <div className="flex justify-center items-center h-full m-3">
-                        <button
-                            type="button"
-                            onClick={handleConfirmState}
-                            className="btn btn-outline btn-primary btn-sm"
-                        >
-                            Confirmar estado
-                        </button>
-                    </div>
-                </>
-            )}
-            {formValues.confirmState && (
-                <div>
-                    <div className="flex justify-center items-center h-full">
-                        <p>Seleccionado:</p>
-                    </div>
-                    <div className="flex justify-center items-center h-full mb-3">
-                        <h3 className="text-4xl font-medium text-primary mb-4">{formValues.selectedState}</h3>
-                    </div>
-
-                    <div className="flex justify-center items-center h-full">
-                        <p>Agrega una ciudad o provincia</p>
-                    </div>
-                    <div className="flex justify-center items-center h-full m-3">
-                        <input
-                            type="text"
-                            placeholder="Nombre de la ciudad"
-                            value={formValues.newCity}
-                            onChange={(e) => setFormValues({ ...formValues, newCity: e.target.value })}
-                            className="input input-bordered input-error w-full max-w-xs bg-white-500"
-                        />
-                    </div>
-                    <div className="flex justify-center items-center h-full">
-                        <p>Agrega el valor del servicio</p>
-                    </div>
-                    <div className="flex justify-center items-center h-full m-3">
-                        <input
-                            type="number"
-                            placeholder="Precio"
-                            value={formValues.newPrice}
-                            onChange={(e) => setFormValues({ ...formValues, newPrice: e.target.value })}
-                            className="input input-bordered input-error w-full max-w-xs bg-white-500 m-2"
-                        />
-                    </div>
-                    <div className="flex justify-center items-center h-full m-3">
-                        <button
-                            type="button"
-                            onClick={handleSaveCityRegion}
-                            className="btn btn-outline btn-primary btn-sm"
-                        >
-                            Agregar a la lista
-                        </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: '4px' }}>N</th>
-                                    <th style={{ width: '30px' }}>Region</th>
-                                    <th style={{ width: '6px' }}>Precio</th>
-                                    <th style={{ width: '6px' }}>Borrar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {formValues.cityRegions.map((cityRegion, index) => (
-                                    <tr key={index}>
-                                        <td style={{ width: '4px' }}>{cityRegion.order}</td>
-                                        <td style={{ width: '30px' }}>{cityRegion.city}</td>
-                                        <td style={{ width: '6px' }}>${cityRegion.price}</td>
-                                        <td style={{ width: '6px' }}>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDeleteCityRegion(index)}
-                                                className="ml-2 btn btn-sm btn-danger"
-                                            >
-                                                x
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={handleSaveToFirebase}
-                        className="btn btn-primary mt-4"
-                    >
-                        Guardar
-                    </button>
-                    {formValues.savedSuccessfully && (
-                        <div className="text-green-600 mt-2">Guardado con éxito. Reiniciando formulario...</div>
-                    )}
                 </div>
             )}
+
+            <div className="flex flex-row flex-nowrap gap-4 items-end w-full">
+                {/* CAMPO ÚNICO DE REGISTRO */}
+                <div className="flex-grow p-1">
+                    <label className="block text-[11px] font-bold text-gray-600 uppercase italic mb-1">
+                        <FaMapMarkerAlt className="inline mr-1 text-blue-800" />
+                        Nombre del Nuevo Estado (USA/MX):
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="Ej: TEXAS, NUEVO LEON, NORTH CAROLINA..."
+                        value={nombreEstado}
+                        onChange={(e) => setNombreEstado(e.target.value)}
+                        className="input input-bordered w-full input-sm bg-white text-black focus:border-blue-800 uppercase font-black tracking-widest"
+                    />
+                </div>
+
+                {/* BOTÓN DE ACCIÓN RÁPIDA */}
+                <div className="p-1">
+                    <button
+                        onClick={ejecutarGuardado}
+                        disabled={loading || !nombreEstado.trim()}
+                        className={`btn btn-sm px-8 ${loading || !nombreEstado.trim() ? 'btn-disabled opacity-50' : 'btn-info text-white'}`}
+                    >
+                        {loading ? <span className="loading loading-spinner loading-xs"></span> : <FaSave />}
+                        REGISTRAR Y CONFIGURAR
+                    </button>
+                </div>
+            </div>
+
+            <div className="mt-2 ml-1">
+                <p className="text-[10px] text-gray-400 italic">
+                    * Al registrar, el estado aparecerá en la tabla inferior para que definas ciudades, precios de venta y costos.
+                </p>
+            </div>
         </div>
     );
 };

@@ -1,194 +1,175 @@
-import { useState, useEffect } from "react";
-import firebase from "firebase/app";
-import "firebase/firestore";
+import React, { useState, useEffect } from "react";
+import { firestore } from "../../firebase/firebaseIni";
+import { FaPlus, FaTrash, FaSave, FaExclamationCircle, FaUserClock } from "react-icons/fa";
 
-const EditarEstadosPrecios = ({ currentRegions, closeModal }) => {
+// Agregamos 'user' a las props para saber quién edita
+const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
     const [updatedRegions, setUpdatedRegions] = useState([]);
-    const [alertMessage, setAlertMessage] = useState('');
+    const [alertMessage, setAlertMessage] = useState({ msg: '', tipo: '' });
 
     useEffect(() => {
-        if (currentRegions) {
-            setUpdatedRegions([...currentRegions.regions]);
+        if (currentRegions?.regions) {
+            const data = currentRegions.regions.map(r => ({
+                ...r,
+                cost: r.cost || "0"
+            })).sort((a, b) => a.order - b.order);
+            setUpdatedRegions(data);
         }
     }, [currentRegions]);
 
-    const handleCityChange = (index, value) => {
-        const updatedRegionsCopy = [...updatedRegions];
-        updatedRegionsCopy[index].city = value;
-        setUpdatedRegions(updatedRegionsCopy);
-    };
-
-    const handlePriceChange = (index, value) => {
-        const updatedRegionsCopy = [...updatedRegions];
-        updatedRegionsCopy[index].price = value;
-        setUpdatedRegions(updatedRegionsCopy);
-    };
-
-    const handleDeleteRegion = (index) => {
-        const updatedRegionsCopy = [...updatedRegions];
-        updatedRegionsCopy.splice(index, 1);
-        setUpdatedRegions(updatedRegionsCopy);
+    const handleFieldChange = (index, field, value) => {
+        const copy = [...updatedRegions];
+        copy[index][field] = value;
+        setUpdatedRegions(copy);
     };
 
     const handleAddRegion = () => {
-        const newRegion = { city: '', price: '', isNew: true };
-        setUpdatedRegions([newRegion, ...updatedRegions]);
+        const nextOrder = updatedRegions.length > 0
+            ? Math.max(...updatedRegions.map(r => r.order)) + 1
+            : 1;
+
+        setUpdatedRegions([{
+            city: '',
+            price: '',
+            cost: '0',
+            isNew: true,
+            order: nextOrder
+        }, ...updatedRegions]);
     };
 
-    const handleNewCheckboxChange = (index, isChecked) => {
-        const updatedRegionsCopy = [...updatedRegions];
-        updatedRegionsCopy[index].isNew = isChecked;
-        setUpdatedRegions(updatedRegionsCopy);
-    };
-
-    const handleSave = () => {
-        const isEmpty = updatedRegions.some(region => region.city === '' || region.price === '');
-
-        if (isEmpty) {
-            setAlertMessage("Todos los campos deben estar completos antes de guardar.");
+    const handleSave = async () => {
+        const hasEmpty = updatedRegions.some(r => !r.city || !r.price || !r.cost);
+        if (hasEmpty) {
+            setAlertMessage({ msg: "Todos los campos son obligatorios.", tipo: 'error' });
             return;
         }
 
-        const db = firebase.firestore();
-        const estadoRef = db.collection("province").doc(currentRegions.id);
-
-        estadoRef.update({
-            regions: updatedRegions
-        })
-            .then(() => {
-                setAlertMessage("¡Guardado con éxito!");
-                setTimeout(() => {
-                    setAlertMessage('');
-                    closeModal(); // Cierra el modal después de guardar
-                }, 2000);
-            })
-            .catch((error) => {
-                console.error("Error al actualizar datos en Firebase:", error);
-                setAlertMessage("Error al actualizar datos en Firebase.");
+        const hasNegativeMargin = updatedRegions.some(r => parseFloat(r.cost) > parseFloat(r.price));
+        if (hasNegativeMargin) {
+            setAlertMessage({
+                msg: "Error: El Pago al Carrier no puede ser mayor al Cobro del Cliente.",
+                tipo: 'error'
             });
-    };
+            return;
+        }
 
-    // Función para borrar el estado
-    const handleDeleteState = () => {
-        const db = firebase.firestore();
-        const estadoRef = db.collection("province").doc(currentRegions.id);
-
-        estadoRef.delete()
-            .then(() => {
-                setAlertMessage("¡Estado eliminado con éxito!");
-                setTimeout(() => {
-                    setAlertMessage('');
-                    closeModal(); // Cerrar el modal tras eliminar el estado
-                }, 2000);
-            })
-            .catch((error) => {
-                console.error("Error al eliminar el estado de Firebase:", error);
-                setAlertMessage("Error al eliminar el estado.");
+        try {
+            // Guardamos las regiones y el objeto de auditoría por fuera
+            await firestore().collection("province").doc(currentRegions.id).update({
+                regions: updatedRegions,
+                ultimaEdicion: {
+                    usuario: user?.nombre || "Admin",
+                    idUsuario: user?.id || "N/A",
+                    timestamp: new Date()
+                }
             });
+
+            setAlertMessage({ msg: "Matriz de costos actualizada y registrada", tipo: 'success' });
+            setTimeout(() => {
+                setAlertMessage({ msg: '', tipo: '' });
+                closeModal();
+            }, 1500);
+        } catch (error) {
+            setAlertMessage({ msg: "Error al sincronizar con Firebase", tipo: 'error' });
+        }
     };
 
     return (
-        <div className="overflow-x-auto bg-white-100 p-5 rounded-md">
-            {/* Mostrar mensaje de alerta si existe */}
-            {alertMessage && (
-                <div role="alert" className="alert alert-warning">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none"
-                         viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    <span>{alertMessage}</span>
+        <div className="bg-white font-sans p-2">
+            {alertMessage.msg && (
+                <div className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 shadow-md text-white font-bold text-[12px] uppercase`}>
+                    <FaExclamationCircle />
+                    <span>{alertMessage.msg}</span>
                 </div>
             )}
 
-            {/* Mostrar nombre del estado */}
-            {currentRegions && (
-                <div className="text-2xl mt-8">
-                    <h2>{currentRegions.state}</h2>
+            <div className="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-3">
+                <div className="flex flex-col">
+                    <h2 className="text-2xl font-black text-blue-900 uppercase italic leading-none">
+                        {currentRegions?.state}
+                    </h2>
+                    {/* Badge informativo de última edición si existe */}
+                    {currentRegions?.ultimaEdicion && (
+                        <div className="flex items-center gap-1 text-[9px] text-gray-400 mt-1 uppercase font-bold">
+                            <FaUserClock /> Ultima edición por: {currentRegions.ultimaEdicion.usuario}
+                        </div>
+                    )}
                 </div>
-            )}
-
-            {/* Mostrar tabla solo si hay regiones */}
-            <table className="table">
-                <thead>
-                <tr>
-                    <th>Nueva</th>
-                    <th>Nombre</th>
-                    <th>Precio</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                {updatedRegions.map((region, index) => (
-                    <tr key={index}>
-                        <th>
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    className="checkbox"
-                                    checked={region.isNew}
-                                    onChange={(e) => handleNewCheckboxChange(index, e.target.checked)}
-                                />
-                            </label>
-                        </th>
-                        <td>
-                            <input
-                                type="text"
-                                value={region.city}
-                                onChange={(e) => handleCityChange(index, e.target.value)}
-                                className="input input-bordered input-sm w-full bg-white-500"
-                            />
-                        </td>
-                        <td>
-                            <input
-                                type="number"
-                                value={region.price}
-                                onChange={(e) => handlePriceChange(index, e.target.value)}
-                                className="input input-bordered input-sm w-full bg-white-500"
-                            />
-                        </td>
-                        <td>
-                            <button
-                                onClick={() => handleDeleteRegion(index)}
-                                className="btn btn-danger btn-circle btn-sm"
-                            >
-                                X
-                            </button>
-                        </td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
-
-            {/* Botón para agregar región */}
-            <button
-                onClick={handleAddRegion}
-                className="btn btn-primary mt-4 text-white-500"
-            >
-                Agregar Región
-            </button>
-
-
-
-            {/* Botones de cerrar y guardar */}
-            <div className="modal-action mt-4">
-                            {/* Mostrar botón de borrar estado solo si regions está vacío */}
-            {updatedRegions.length === 0 && (
-                <button
-                    onClick={handleDeleteState}
-                    className="btn btn-danger mt-4 m-2 text-white-500"
-                >
-                    Borrar Estado
+                <button onClick={handleAddRegion} className="btn btn-sm btn-info text-white gap-2 font-bold uppercase text-[11px]">
+                    <FaPlus /> Nuevo Destino
                 </button>
-            )}
-                <button
-                    onClick={closeModal}
-                    className="btn btn-primary mt-2 m-2 text-white-500"
-                >
-                    Cerrar
+            </div>
+
+            <div className="max-h-[400px] overflow-y-auto border rounded-md">
+                <table className="table table-compact w-full border-separate border-spacing-y-1">
+                    <thead>
+                        <tr className="text-[10px] uppercase text-gray-400 bg-gray-50 border-b">
+                            <th className="w-12 text-center">New</th>
+                            <th>Ciudad / Destino</th>
+                            <th className="w-28 text-blue-700 font-black">Venta ($)</th>
+                            <th className="w-28 text-red-600 font-black">Costo Carrier ($)</th>
+                            <th className="w-12 text-center"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {updatedRegions.map((region, index) => (
+                            <tr key={index} className="hover:bg-gray-50 border-b border-gray-100">
+                                <td className="text-center">
+                                    <input
+                                        type="checkbox"
+                                        className="checkbox checkbox-xs checkbox-info"
+                                        checked={region.isNew}
+                                        onChange={(e) => handleFieldChange(index, 'isNew', e.target.checked)}
+                                    />
+                                </td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        value={region.city}
+                                        onChange={(e) => handleFieldChange(index, 'city', e.target.value.toUpperCase())}
+                                        className="input input-bordered input-xs w-full bg-white text-black font-bold uppercase focus:border-blue-500"
+                                    />
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        value={region.price}
+                                        onChange={(e) => handleFieldChange(index, 'price', e.target.value)}
+                                        className="input input-bordered input-xs w-full bg-blue-50 text-blue-800 font-mono font-bold"
+                                    />
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        value={region.cost}
+                                        onChange={(e) => handleFieldChange(index, 'cost', e.target.value)}
+                                        className={`input input-bordered input-xs w-full font-mono font-bold bg-white ${parseFloat(region.cost) > parseFloat(region.price) ? 'border-red-500 text-red-600' : 'text-gray-700'}`}
+                                    />
+                                </td>
+                                <td className="text-center">
+                                    <button
+                                        onClick={() => {
+                                            const copy = [...updatedRegions];
+                                            copy.splice(index, 1);
+                                            setUpdatedRegions(copy);
+                                        }}
+                                        className="btn btn-ghost btn-xs text-red-400"
+                                    >
+                                        <FaTrash />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <div className="modal-action flex gap-2 pt-4 border-t border-gray-100 mt-4">
+                <button onClick={closeModal} className="btn btn-sm btn-ghost px-6 uppercase font-bold text-[11px]">
+                    Cancelar
                 </button>
-                <button className="btn btn-primary mt-2 m-2 text-white-500" onClick={handleSave}>
-                    Guardar
+                <button onClick={handleSave} className="btn btn-sm btn-info text-white px-10 uppercase font-bold text-[11px] gap-2 shadow-lg">
+                    <FaSave /> Guardar Matriz
                 </button>
             </div>
         </div>

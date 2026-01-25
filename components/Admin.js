@@ -103,7 +103,7 @@ const Admin = () => {
             case 'vehiculos':
                 return <Vehiculos user={user} />;
             case 'estadosPrecios':
-                return <EstadosPrecios />;
+                return <EstadosPrecios user={user}/>;
             case 'reports':
                 return <Reports user={user} />;
             case 'reportsPendientesPago':
