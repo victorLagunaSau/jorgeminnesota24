@@ -1,35 +1,56 @@
-import React, {useState, useEffect} from "react";
-import {motion} from "framer-motion";
-import FormViajes from "./FormViajes";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import FormViaje from "./FormViaje";
 import TablaViajes from "./TablaViajes";
 
-const Viajes = ({user}) => {
+const Viajes = ({ user }) => {
+    const [view, setView] = useState("administracion");
 
     return (
-        <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
-            <h3 className="justify-center text-3xl lg:text-3xl font-mediumtext-black-500">
-                <strong>Pago de viajes</strong>.
-            </h3>
-            <div className="flex flex-col w-full my-4 ">
-                <motion.h3 className="text-2xl sm:text-3xl lg:text-4xl font-medium text-black-100 mx-auto text-center">
-                    <button
-                        className="btn btn-outline btn-error"
-                        onClick={() => document.getElementById("viajesModal").showModal()}
-                    >
-                        + Pagar Viaje
-                    </button>
-                </motion.h3>
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full font-sans p-2"
+        >
+            <div className="mb-6 flex items-center justify-between bg-white p-4 rounded-lg shadow-sm border-l-8 border-red-600">
+                <div>
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tighter leading-none">
+                        Administración de Viajes
+                    </h2>
+                    <p className="text-[11px] text-gray-500 font-bold uppercase tracking-widest mt-1">
+                        Control Operativo | Logística Integral
+                    </p>
+                </div>
 
-                <dialog id="viajesModal" className="modal ">
-                    <div className="modal-box w-11/12 max-w-5xl bg-white-100">
-                        <FormViajes user={user}/>
+                <div className="flex items-center gap-6">
+                    <div className="text-right border-r pr-6 border-gray-100">
+                        <p className="text-[10px] text-gray-400 font-bold uppercase italic">Usuario:</p>
+                        <p className="text-sm font-black text-red-600 uppercase">{user?.nombre || "Admin"}</p>
                     </div>
-                </dialog>
+
+                    <button
+                        onClick={() => setView(view === "administracion" ? "nuevo" : "administracion")}
+                        className={`btn btn-sm px-6 font-bold uppercase text-[11px] shadow-sm transition-all duration-300 ${
+                            view === "administracion" ? "btn-error text-white" : "btn-outline border-gray-300 text-gray-600 hover:bg-gray-100"
+                        }`}
+                    >
+                        {view === "administracion" ? "Nuevo Viaje" : "Ver Administración"}
+                    </button>
+                </div>
             </div>
-            <div className="flex flex-col w-full my-0 ">
-                <TablaViajes />
-            </div>
-        </div>
+
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={view}
+                    initial={{ opacity: 0, x: view === "nuevo" ? 20 : -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: view === "nuevo" ? -20 : 20 }}
+                    transition={{ duration: 0.2 }}
+                >
+                    {view === "nuevo" ? <FormViaje user={user} /> : <TablaViajes user={user} />}
+                </motion.div>
+            </AnimatePresence>
+        </motion.div>
     );
 };
 
