@@ -11,14 +11,17 @@ import Sidebar from "./Layout/Sidebar";
 import EstadosPrecios from "./EstadosPrecios/EstadosPrecios";
 import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
-import EliminaVehiculos from "./EliminaVehiculos/EliminaVehiculos";
-import EliminarMovimientosERC from "./EliminaERC/EliminarMovimientosERC";
+
+// --- SE COMENTAN LOS IMPORTS QUE NO ENCUENTRA VERCEL ---
+// import EliminaVehiculos from "./EliminaVehiculos/EliminaVehiculos";
+// import EliminarMovimientosERC from "./EliminaERC/EliminarMovimientosERC";
+// import ReporteVehiculos from "./Reports/ReporteVehiculos";
+
 import SalidaCaja from "./SalidaCaja/SalidaCaja";
 import EntradaCaja from "./EntradaCaja/EntradaCaja";
 import CorteDia from "./CorteDia/CorteDia";
 import CorteTotal from "./CorteGeneral/CorteTotal";
 import ReporteCobros from "./Reports/ReporteCobros";
-import ReporteVehiculos from "./Reports/ReporteVehiculos";
 import Vehiculos from "./Vehiculos/Vehiculos";
 import Users from "./Users/Users";
 import Reports from "./Reports/Reports";
@@ -38,7 +41,7 @@ const Admin = () => {
             if (user) {
                 dataUser(user.uid);
             } else {
-                router.push("/"); // Redirigir al inicio si el usuario no está autenticado
+                router.push("/");
             }
         });
 
@@ -54,8 +57,8 @@ const Admin = () => {
                 if (doc.exists) {
                     const userData = doc.data();
                     if (!userData.tipo || !userData.tipo.includes("admin")) {
-                        router.push("/"); // Redirigir a una página de acceso denegado
-                        console.error("No cuentas con acceso para esta herramienta, contacta con soporte");
+                        router.push("/");
+                        console.error("Acceso denegado");
                     } else {
                         setUser(userData);
                     }
@@ -82,10 +85,15 @@ const Admin = () => {
                 return <Clientes user={user} />;
             case 'salidaVehiculo':
                 return <SalidaVehiculo user={user} />;
+            // --- SE COMENTA EL RENDERING DE LOS MODULOS INEXISTENTES ---
+            /*
             case 'eliminaVehiculos':
                 return <EliminaVehiculos user={user} />;
             case 'eliminarMovimientosERC':
                 return <EliminarMovimientosERC user={user} />;
+            case 'reporteVehiculos':
+                return <ReporteVehiculos user={user} />;
+            */
             case 'salidaCaja':
                 return <SalidaCaja user={user} />;
             case 'entradaCaja':
@@ -96,8 +104,6 @@ const Admin = () => {
                 return <CorteTotal user={user} />;
             case 'reporteCobros':
                 return <ReporteCobros user={user} />;
-            case 'reporteVehiculos':
-                return <ReporteVehiculos user={user} />;
             case 'viajes':
                 return <Viajes user={user} />;
             case 'vehiculos':
@@ -115,7 +121,7 @@ const Admin = () => {
             default:
                 return (
                     <div className="text-center mt-20">
-                        <h2 className="text-2xl font-light text-gray-400">
+                        <h2 className="text-2xl font-light text-gray-400 italic">
                             Bienvenido al Panel de Administración
                         </h2>
                     </div>
@@ -124,7 +130,7 @@ const Admin = () => {
     };
 
     return (
-        <div className="flex bg-gray-50 min-h-screen">
+        <div className="flex bg-gray-50 min-h-screen text-black">
             <Sidebar onSelectModule={setSelectedModule} selectedModule={selectedModule} />
             <HeaderPanel user={user} onLogout={handleLogout} />
 
@@ -136,8 +142,8 @@ const Admin = () => {
                             animate={{ x: 0, opacity: 1 }}
                             className="mb-6"
                         >
-                            <h3 className="font-medium text-gray-600">
-                                Administrador <strong className="text-black">General</strong>.
+                            <h3 className="font-medium text-gray-600 uppercase text-xs tracking-widest">
+                                Panel <strong className="text-black font-black italic">Administrador</strong>
                             </h3>
                         </motion.div>
 
@@ -147,7 +153,7 @@ const Admin = () => {
                     </div>
                 ) : (
                     <div className="flex justify-center items-center h-full">
-                        <div className="loading loading-spinner loading-lg text-primary"></div>
+                        <div className="loading loading-spinner loading-lg text-red-600"></div>
                     </div>
                 )}
             </main>
