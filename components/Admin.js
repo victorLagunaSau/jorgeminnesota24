@@ -86,14 +86,14 @@ const Admin = () => {
             case 'salidaVehiculo':
                 return <SalidaVehiculo user={user} />;
             // --- SE COMENTA EL RENDERING DE LOS MODULOS INEXISTENTES ---
-            /*
-            case 'eliminaVehiculos':
-                return <EliminaVehiculos user={user} />;
-            case 'eliminarMovimientosERC':
-                return <EliminarMovimientosERC user={user} />;
-            case 'reporteVehiculos':
-                return <ReporteVehiculos user={user} />;
-            */
+
+            // case 'eliminaVehiculos':
+            //     return <EliminaVehiculos user={user} />;
+            // case 'eliminarMovimientosERC':
+            //     return <EliminarMovimientosERC user={user} />;
+            // case 'reporteVehiculos':
+            //     return <ReporteVehiculos user={user} />;
+
             case 'salidaCaja':
                 return <SalidaCaja user={user} />;
             case 'entradaCaja':
