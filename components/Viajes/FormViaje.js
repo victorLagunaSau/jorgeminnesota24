@@ -1,20 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {useState, useEffect, useRef} from "react";
 import ReactToPrint from "react-to-print";
-import { firestore } from "../../firebase/firebaseIni";
+import {firestore} from "../../firebase/firebaseIni";
 import {
     FaTrash, FaCheckCircle, FaExclamationCircle,
     FaPrint, FaCar, FaCheckDouble, FaTimes
 } from "react-icons/fa";
 import HojaChofer from "./HojaChofer";
 
-const FormViaje = ({ user }) => {
+const FormViaje = ({user}) => {
     // --- ESTADOS DE CONTROL ---
     const [viajeIniciado, setViajeIniciado] = useState(false);
     const [choferes, setChoferes] = useState([]);
     const [provincias, setProvincias] = useState([]);
     const [loading, setLoading] = useState(true);
     const [guardando, setGuardando] = useState(false);
-    const [alertMessage, setAlertMessage] = useState({ msg: '', tipo: '' });
+    const [alertMessage, setAlertMessage] = useState({msg: '', tipo: ''});
 
     // --- ESTADOS PARA MODAL DE ÉXITO E IMPRESIÓN ---
     const [mostrarModalExito, setMostrarModalExito] = useState(false);
@@ -32,16 +32,27 @@ const FormViaje = ({ user }) => {
 
     const [vehiculos, setVehiculos] = useState([]);
 
-    // --- CARGA DE DATOS (Firebase) ---
+// --- CARGA DE DATOS (FILTRADO INTELIGENTE: ADMIN VS CARRIER) ---
     useEffect(() => {
-        const unsubChoferes = firestore().collection("choferes").orderBy("nombreChofer", "asc")
-            .onSnapshot(snap => {
-                setChoferes(snap.docs.map(doc => ({
-                    id: doc.id,
-                    nombre: doc.data().nombreChofer,
-                    empresa: doc.data().empresaNombre
-                })));
-            });
+        if (!user) return;
+
+        let q = firestore().collection("choferes");
+
+        // SI NO ES ADMIN: Filtramos estrictamente por su ID de empresa
+        if (!user.admin) {
+            q = q.where("empresaId", "==", user.id);
+        } else {
+            // SI ES ADMIN: Ordenamos por nombre para que vea a todos
+            q = q.orderBy("nombreChofer", "asc");
+        }
+
+        const unsubChoferes = q.onSnapshot(snap => {
+            setChoferes(snap.docs.map(doc => ({
+                id: doc.id,
+                nombre: doc.data().nombreChofer,
+                empresa: doc.data().empresaNombre
+            })));
+        });
 
         const unsubProvincias = firestore().collection("province").orderBy("state", "asc")
             .onSnapshot(snap => {
@@ -53,8 +64,28 @@ const FormViaje = ({ user }) => {
                 setLoading(false);
             });
 
-        return () => { unsubChoferes(); unsubProvincias(); };
-    }, []);
+        return () => {
+            unsubChoferes();
+            unsubProvincias();
+        };
+    }, [user]);
+
+    // --- FUNCIÓN PARA FOLIO AUTOMÁTICO ---
+    const iniciarViajeConFolio = async () => {
+        setLoading(true);
+        try {
+            const conRef = firestore().collection("config").doc("consecutivos");
+            const doc = await conRef.get();
+            const proximo = (doc.data()["viajesPendientes"] || 0) + 1;
+
+            setEncabezado(prev => ({...prev, numViaje: String(proximo)}));
+            setViajeIniciado(true);
+        } catch (e) {
+            setAlertMessage({msg: "Error al obtener folio", tipo: 'error'});
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // --- LÓGICA DE LA TABLA ---
     const agregarFila = () => {
@@ -75,7 +106,7 @@ const FormViaje = ({ user }) => {
                     valorFinal = value === "" ? "0" : parseFloat(value).toString();
                 }
 
-                let actualizacion = { ...v, [field]: valorFinal };
+                let actualizacion = {...v, [field]: valorFinal};
 
                 if (field === 'estado') {
                     const estadoData = provincias.find(p => p.state === value);
@@ -83,7 +114,8 @@ const FormViaje = ({ user }) => {
                         actualizacion.ciudad = estadoData.regions[0].city;
                         actualizacion.flete = parseFloat(estadoData.regions[0].cost || 0);
                     } else {
-                        actualizacion.ciudad = ""; actualizacion.flete = 0;
+                        actualizacion.ciudad = "";
+                        actualizacion.flete = 0;
                     }
                 }
 
@@ -108,60 +140,72 @@ const FormViaje = ({ user }) => {
                 firestore().collection("lotesEnTransito").doc(loteLimpio).get()
             ]);
             if (docV.exists || docT.exists) {
-                setAlertMessage({ msg: `Lote ${loteLimpio} duplicado o en tránsito`, tipo: 'error' });
-                setVehiculos(vehiculos.map(v => v.id === id ? { ...v, lote: "" } : v));
-                setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 5000);
+                setAlertMessage({msg: `Lote ${loteLimpio} duplicado o en tránsito`, tipo: 'error'});
+                setVehiculos(vehiculos.map(v => v.id === id ? {...v, lote: ""} : v));
+                setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
         v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && v.flete > 0
     );
 
-    // --- ACCIÓN FINALIZAR (BATCH + MODAL + IMPRESIÓN) ---
+    // --- ACCIÓN FINALIZAR CON TRANSACCIÓN ---
     const finalizarViaje = async () => {
         if (!esValido) return;
         setGuardando(true);
         try {
-            const tFlete = vehiculos.reduce((acc, v) => acc + v.flete, 0);
-            const viajeData = {
-                numViaje: encabezado.numViaje.toUpperCase(),
-                chofer: choferes.find(c => c.id === encabezado.choferId),
-                estatus: "PENDIENTE",
-                fechaCreacion: new Date(),
-                creadoPor: { id: user?.id || "N/A", nombre: user?.nombre || "Admin" },
-                resumenFinanciero: {
-                    totalFletes: tFlete,
-                    totalSoloGastos: vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) + parseFloat(v.sPeso) + parseFloat(v.gExtra)), 0),
-                    totalVehiculos: vehiculos.length
-                },
-                vehiculos: vehiculos.map((v, index) => ({ ...v, order: index + 1 }))
-            };
+            const conRef = firestore().collection("config").doc("consecutivos");
 
-            const batch = firestore().batch();
-            batch.set(firestore().collection("viajesPendientes").doc(viajeData.numViaje), viajeData);
-            vehiculos.forEach(v => {
-                batch.set(firestore().collection("lotesEnTransito").doc(v.lote), {
-                    viajeAsignado: viajeData.numViaje,
-                    choferNombre: viajeData.chofer.nombre,
-                    fechaBloqueo: new Date()
+            await firestore().runTransaction(async (transaction) => {
+                const conDoc = await transaction.get(conRef);
+                const proximoFolio = (conDoc.data()["viajesPendientes"] || 0) + 1;
+                const numViajeFinal = String(proximoFolio);
+
+                const tFlete = vehiculos.reduce((acc, v) => acc + v.flete, 0);
+                const choferData = choferes.find(c => c.id === encabezado.choferId);
+
+                const viajeData = {
+                    numViaje: numViajeFinal,
+                    chofer: choferData,
+                    empresaId: user.id, // Guardamos siempre el ID del creador
+                    estatus: "PENDIENTE",
+                    fechaCreacion: new Date(),
+                    creadoPor: {id: user?.id || "N/A", nombre: user?.nombre || "Admin"},
+                    resumenFinanciero: {
+                        totalFletes: tFlete,
+                        totalSoloGastos: vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) + parseFloat(v.sPeso) + parseFloat(v.gExtra)), 0),
+                        totalVehiculos: vehiculos.length
+                    },
+                    vehiculos: vehiculos.map((v, index) => ({...v, order: index + 1}))
+                };
+
+                transaction.set(firestore().collection("viajesPendientes").doc(numViajeFinal), viajeData);
+
+                vehiculos.forEach(v => {
+                    transaction.set(firestore().collection("lotesEnTransito").doc(v.lote), {
+                        viajeAsignado: numViajeFinal,
+                        choferNombre: choferData.nombre,
+                        fechaBloqueo: new Date()
+                    });
                 });
+
+                transaction.update(conRef, {"viajesPendientes": proximoFolio});
+                setViajeReciente(viajeData);
             });
 
-            await batch.commit();
-
-            setViajeReciente(viajeData);
             setMostrarModalExito(true);
             setGuardando(false);
 
-            // Disparo automático de impresión (600ms para asegurar carga del componente oculto)
             setTimeout(() => {
                 if (btnPrintRef.current) btnPrintRef.current.click();
             }, 600);
 
         } catch (e) {
-            setAlertMessage({ msg: "Error al guardar viaje", tipo: 'error' });
+            setAlertMessage({msg: "Error al guardar viaje: " + e.message, tipo: 'error'});
             setGuardando(false);
         }
     };
@@ -169,28 +213,33 @@ const FormViaje = ({ user }) => {
     return (
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 font-sans text-black">
 
-            {/* COMPONENTE DE IMPRESIÓN OCULTO */}
-            <div style={{ display: "none" }}>
-                <HojaChofer ref={componenteRef} viaje={viajeReciente} />
+            <div style={{display: "none"}}>
+                <HojaChofer ref={componenteRef} viaje={viajeReciente}/>
             </div>
 
             {/* MODAL DE ÉXITO */}
             {mostrarModalExito && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-                    <div className="bg-white-500 rounded-xl max-w-md w-full shadow-2xl border-2 border-t-8 border-blue-600 p-8 text-center animate-in zoom-in">
-                        <div className="text-blue-600 text-6xl flex justify-center mb-4"><FaCheckCircle /></div>
-                        <h4 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Viaje Registrado</h4>
-                        <p className="text-[11px] font-bold text-gray-400 uppercase mt-2">Folio: #{viajeReciente?.numViaje}</p>
+                <div
+                    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div
+                        className="bg-white-500 rounded-xl max-w-md w-full shadow-2xl border-2 border-t-8 border-blue-600 p-8 text-center animate-in zoom-in">
+                        <div className="text-blue-600 text-6xl flex justify-center mb-4"><FaCheckCircle/></div>
+                        <h4 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Viaje
+                            Registrado</h4>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase mt-2">Folio:
+                            #{viajeReciente?.numViaje}</p>
 
-                        <div className="my-6 p-4 bg-blue-50 rounded-lg border border-dashed border-blue-200">
+                        <div className="my-6 p-4 bg-blue-1000 rounded-lg border border-dashed border-blue-200">
                             <p className="text-lg font-black text-gray-800 uppercase leading-none">{viajeReciente?.chofer?.nombre}</p>
-                            <p className="text-[10px] font-black text-gray-400 mt-2 uppercase">{viajeReciente?.vehiculos?.length} UNIDADES EN TRÁNSITO</p>
+                            <p className="text-[10px] font-black text-gray-400 mt-2 uppercase">{viajeReciente?.vehiculos?.length} UNIDADES
+                                EN TRÁNSITO</p>
                         </div>
 
                         <ReactToPrint
                             trigger={() => (
-                                <button ref={btnPrintRef} className="btn btn-info text-white w-full h-14 uppercase font-black tracking-widest gap-2">
-                                    <FaPrint /> Imprimir Hoja Chofer
+                                <button ref={btnPrintRef}
+                                        className="btn btn-info text-white w-full h-14 uppercase font-black tracking-widest gap-2">
+                                    <FaPrint/> Imprimir Hoja Chofer
                                 </button>
                             )}
                             content={() => componenteRef.current}
@@ -198,105 +247,168 @@ const FormViaje = ({ user }) => {
 
                         <button onClick={() => {
                             setVehiculos([]);
-                            setEncabezado({ numViaje: "", choferId: "", fecha: new Date().toLocaleDateString() });
+                            setEncabezado({numViaje: "", choferId: "", fecha: new Date().toLocaleDateString()});
                             setViajeIniciado(false);
                             setMostrarModalExito(false);
                         }} className="btn btn-success text-white w-full mt-4 h-14 gap-3 font-black uppercase shadow-lg">
-                            <FaCheckDouble /> Registrar Nuevo Viaje
+                            <FaCheckDouble/> Registrar Nuevo Viaje
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* ENCABEZADO Y FORMULARIO */}
             {alertMessage.msg && (
-                <div className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 text-white font-bold text-[12px]`}>
-                    <FaExclamationCircle /> <span>{alertMessage.msg}</span>
+                <div
+                    className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 text-white font-bold text-[12px]`}>
+                    <FaExclamationCircle/> <span>{alertMessage.msg}</span>
                 </div>
             )}
 
-            <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Registra un Nuevo Viaje</h2>
+            <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Registra un Nuevo
+                Viaje</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
+            <div
+                className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
                 <div>
-                    <label className="block text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje *</label>
-                    <input type="text" disabled={viajeIniciado} className="input input-bordered input-sm w-full bg-white text-black font-bold uppercase"
-                        value={encabezado.numViaje} onChange={(e) => setEncabezado({ ...encabezado, numViaje: e.target.value })} />
+                    <label className="block text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje
+                        (Auto)</label>
+                    <input type="text" disabled
+                           className="input input-bordered input-sm w-full bg-gray-100 text-black font-bold uppercase text-center"
+                           value={encabezado.numViaje} placeholder="Automático"/>
                 </div>
                 <div>
                     <label className="block text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
-                    <select disabled={viajeIniciado} className="select select-bordered select-sm w-full bg-white text-black font-bold"
-                        value={encabezado.choferId} onChange={(e) => setEncabezado({ ...encabezado, choferId: e.target.value })}>
+                    <select disabled={viajeIniciado}
+                            className="select select-bordered select-sm w-full bg-white text-black font-bold"
+                            value={encabezado.choferId}
+                            onChange={(e) => setEncabezado({...encabezado, choferId: e.target.value})}>
                         <option value="">{loading ? "Cargando..." : "Elegir Chofer"}</option>
                         {choferes.map(c => (<option key={c.id} value={c.id}>{c.nombre} ({c.empresa})</option>))}
                     </select>
                 </div>
-                <div className="text-center font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</div>
-                <button onClick={() => setViajeIniciado(!viajeIniciado)} disabled={!encabezado.numViaje || !encabezado.choferId}
-                    className={`btn btn-sm w-full font-black ${viajeIniciado ? 'btn-outline' : 'btn-error text-white'}`}>
-                    {viajeIniciado ? "Modificar Datos" : "Iniciar Registro"}
+                <div
+                    className="text-center font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</div>
+
+                <button onClick={viajeIniciado ? () => setViajeIniciado(false) : iniciarViajeConFolio}
+                        disabled={!encabezado.choferId}
+                        className={`btn btn-sm w-full font-black ${viajeIniciado ? 'btn-outline' : 'btn-error text-white'}`}>
+                    {viajeIniciado ? "Modificar Chofer" : "Iniciar Registro"}
                 </button>
             </div>
 
-            {/* TABLA DE VEHÍCULOS */}
-            <div className={`transition-all duration-500 ${viajeIniciado ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}>
+            <div
+                className={`transition-all duration-500 ${viajeIniciado ? 'opacity-100' : 'opacity-20 pointer-events-none'}`}>
                 <div className="flex justify-between items-center mb-4">
-                    <span className="text-[11px] font-black uppercase text-gray-400 italic">Unidades: {vehiculos.length} / 13</span>
-                    <button onClick={agregarFila} disabled={vehiculos.length >= 13} className="btn btn-sm btn-info text-white font-black px-8">+ Agregar</button>
+                    <span
+                        className="text-[11px] font-black uppercase text-gray-400 italic">Unidades: {vehiculos.length} / 13</span>
+                    <button onClick={agregarFila} disabled={vehiculos.length >= 13}
+                            className="btn btn-sm btn-info text-white font-black px-8">+ Agregar
+                    </button>
                 </div>
 
                 <div className="overflow-x-auto border rounded-xl shadow-inner max-h-[400px]">
                     <table className="table table-compact w-full">
                         <thead>
-                            <tr className="text-[10px] uppercase bg-gray-100 text-gray-500 sticky top-0 z-20">
-                                <th>#</th><th>Lote *</th><th>Marca *</th><th>Modelo *</th><th>Cliente *</th>
-                                <th>Almacén</th><th>Estado *</th><th>Ciudad *</th><th className="text-blue-800">Flete</th>
-                                <th>Storage</th><th>S. Peso</th><th>G. Extra</th><th>Título</th><th></th>
-                            </tr>
+                        <tr className="text-[10px] uppercase bg-gray-100 text-gray-500 sticky top-0 z-20">
+                            <th>#</th>
+                            <th>Lote *</th>
+                            <th>Marca *</th>
+                            <th>Modelo *</th>
+                            <th>Cliente *</th>
+                            <th>Almacén</th>
+                            <th>Estado *</th>
+                            <th>Ciudad *</th>
+                            <th className="text-blue-800">Flete</th>
+                            <th>Storage</th>
+                            <th>S. Peso</th>
+                            <th>G. Extra</th>
+                            <th>Título</th>
+                            <th></th>
+                        </tr>
                         </thead>
                         <tbody className="bg-white">
-                            {vehiculos.map((v, i) => (
-                                <tr key={v.id} className="hover:bg-blue-50">
-                                    <td className="font-mono text-[10px] text-gray-400 italic">{i + 1}</td>
-                                    <td><input type="text" value={v.lote} onBlur={(e) => validarLoteUnico(v.id, e.target.value)} onChange={(e) => handleTableChange(v.id, 'lote', e.target.value.toUpperCase())} className="input input-xs w-full bg-transparent font-black"/></td>
-                                    <td><input type="text" value={v.marca} onChange={(e) => handleTableChange(v.id, 'marca', e.target.value.toUpperCase())} className="input input-xs w-full bg-transparent uppercase"/></td>
-                                    <td><input type="text" value={v.modelo} onChange={(e) => handleTableChange(v.id, 'modelo', e.target.value.toUpperCase())} className="input input-xs w-full bg-transparent uppercase"/></td>
-                                    <td><input type="text" value={v.clienteAlt} onChange={(e) => handleTableChange(v.id, 'clienteAlt', e.target.value.toUpperCase())} className="input input-xs w-full bg-transparent uppercase"/></td>
-                                    <td>
-                                        <select value={v.almacen} onChange={(e) => handleTableChange(v.id, 'almacen', e.target.value)} className="select select-ghost select-xs w-full">
-                                            <option value="Copart">Copart</option><option value="Adesa">Adesa</option><option value="Manheim">Manheim</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select value={v.estado} onChange={(e) => handleTableChange(v.id, 'estado', e.target.value)} className="select select-xs w-full text-red-800 font-bold">
-                                            <option value="">-- ST --</option>
-                                            {provincias.map(p => <option key={p.id} value={p.state}>{p.state}</option>)}
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select value={v.ciudad} onChange={(e) => handleTableChange(v.id, 'ciudad', e.target.value)} className="select select-xs w-full text-red-800 font-bold">
-                                            {provincias.find(p => p.state === v.estado)?.regions.map((r, idx) => (<option key={idx} value={r.city}>{r.city}</option>))}
-                                        </select>
-                                    </td>
-                                    <td className="font-black text-blue-900 text-center">${v.flete}</td>
-                                    <td><input type="number" value={v.storage} onChange={(e) => handleTableChange(v.id, 'storage', e.target.value)} className="input input-xs w-16 text-center"/></td>
-                                    <td><input type="number" value={v.sPeso} onChange={(e) => handleTableChange(v.id, 'sPeso', e.target.value)} className="input input-xs w-16 text-center"/></td>
-                                    <td><input type="number" value={v.gExtra} onChange={(e) => handleTableChange(v.id, 'gExtra', e.target.value)} className="input input-xs w-16 text-center"/></td>
-                                    <td>
-                                        <select value={v.titulo} onChange={(e) => handleTableChange(v.id, 'titulo', e.target.value)} className="select select-xs w-full font-bold">
-                                            <option value="NO">NO</option><option value="SI">SI</option>
-                                        </select>
-                                    </td>
-                                    <td><button onClick={() => setVehiculos(vehiculos.filter(veh => veh.id !== v.id))} className="text-red-400"><FaTrash size={12}/></button></td>
-                                </tr>
-                            ))}
+                        {vehiculos.map((v, i) => (
+                            <tr key={v.id} className="bg-gray-200">
+                                <td className="font-mono text-[10px] text-gray-400 italic">{i + 1}</td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        value={v.lote}
+                                        maxLength={8} // <--- Evita que escriban más de 8
+                                        onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
+                                        onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
+                                        className={`input input-xs w-full font-black ${v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'}`}
+                                        placeholder="8 dígitos"
+                                    />
+                                </td>
+                                <td><input type="text" value={v.marca}
+                                           onChange={(e) => handleTableChange(v.id, 'marca', e.target.value.toUpperCase())}
+                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
+                                <td><input type="text" value={v.modelo}
+                                           onChange={(e) => handleTableChange(v.id, 'modelo', e.target.value.toUpperCase())}
+                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
+                                <td><input type="text" value={v.clienteAlt}
+                                           onChange={(e) => handleTableChange(v.id, 'clienteAlt', e.target.value.toUpperCase())}
+                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
+                                <td>
+                                    <select value={v.almacen}
+                                            onChange={(e) => handleTableChange(v.id, 'almacen', e.target.value)}
+                                            className="select select-ghost select-xs w-full">
+                                        <option value="Copart">Copart</option>
+                                        <option value="IAA">IAA</option>
+                                        <option value="Manheim">Manheim</option>
+                                        <option value="Adesa">Adesa</option>
+                                        <option value="Otra">Otra</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value={v.estado}
+                                            onChange={(e) => handleTableChange(v.id, 'estado', e.target.value)}
+                                            className="select select-xs w-full text-red-800 font-bold">
+                                        <option value="">-- ST --</option>
+                                        {provincias.map(p => <option key={p.id} value={p.state}>{p.state}</option>)}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value={v.ciudad}
+                                            onChange={(e) => handleTableChange(v.id, 'ciudad', e.target.value)}
+                                            className="select select-xs w-full text-red-800 font-bold">
+                                        {provincias.find(p => p.state === v.estado)?.regions.map((r, idx) => (
+                                            <option key={idx} value={r.city}>{r.city}</option>))}
+                                    </select>
+                                </td>
+                                <td className="font-black text-blue-900 text-center">${v.flete}</td>
+                                <td><input type="number" value={v.storage}
+                                           onChange={(e) => handleTableChange(v.id, 'storage', e.target.value)}
+                                           className="input input-xs w-16 text-center"/></td>
+                                <td><input type="number" value={v.sPeso}
+                                           onChange={(e) => handleTableChange(v.id, 'sPeso', e.target.value)}
+                                           className="input input-xs w-16 text-center"/></td>
+                                <td><input type="number" value={v.gExtra}
+                                           onChange={(e) => handleTableChange(v.id, 'gExtra', e.target.value)}
+                                           className="input input-xs w-16 text-center"/></td>
+                                <td>
+                                    <select value={v.titulo}
+                                            onChange={(e) => handleTableChange(v.id, 'titulo', e.target.value)}
+                                            className="select select-xs w-full font-bold">
+                                        <option value="NO">NO</option>
+                                        <option value="SI">SI</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button onClick={() => setVehiculos(vehiculos.filter(veh => veh.id !== v.id))}
+                                            className="text-red-400"><FaTrash size={12}/></button>
+                                </td>
+                            </tr>
+                        ))}
                         </tbody>
                     </table>
                 </div>
             </div>
 
             <div className="mt-8 flex justify-end">
-                <button onClick={finalizarViaje} disabled={!esValido || guardando} className="btn btn-error text-white font-black px-16 gap-3 shadow-xl">
+                <button onClick={finalizarViaje} disabled={!esValido || guardando}
+                        className="btn btn-error text-white font-black px-16 gap-3 shadow-xl">
                     {guardando ? <span className="loading loading-spinner"></span> : <FaCheckCircle/>} FINALIZAR VIAJE
                 </button>
             </div>
