@@ -3,14 +3,13 @@ import Head from "next/head";
 import { firestore, auth } from "../firebase/firebaseIni";
 import FormViaje from "../components/Viajes/FormViaje";
 import TablaViajes from "../components/Viajes/TablaViajes";
-import { FaTruck, FaPlus, FaListUl, FaSignOutAlt, FaLock, FaUser } from "react-icons/fa";
+import { FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt } from "react-icons/fa";
 
 const CarriersPage = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [view, setView] = useState("tabla"); // 'tabla' o 'nuevo'
+    const [view, setView] = useState("tabla");
 
-    // Estados para Login
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
     const [error, setError] = useState("");
@@ -22,9 +21,8 @@ const CarriersPage = () => {
                 if (doc.exists && doc.data().tipo === "empresa") {
                     setUser({ id: doc.id, ...doc.data() });
                 } else {
-                    // Si no es empresa, cerramos sesión por seguridad
                     auth().signOut();
-                    setError("Acceso denegado: Solo para Carriers registrados.");
+                    setError("Acceso denegado.");
                 }
             } else {
                 setUser(null);
@@ -40,110 +38,105 @@ const CarriersPage = () => {
         try {
             await auth().signInWithEmailAndPassword(email, pass);
         } catch (err) {
-            setError("Credenciales incorrectas o usuario no registrado.");
+            setError("Credenciales incorrectas.");
         }
     };
 
     if (loading) return (
-        <div className="h-screen flex flex-col justify-center items-center bg-white-500">
+        <div className="h-screen flex flex-col justify-center items-center bg-white">
             <span className="loading loading-ring loading-lg text-red-600"></span>
-            <p className="text-[10px] font-black uppercase mt-4 animate-pulse">Cargando Portal...</p>
         </div>
     );
 
-    // VISTA DE LOGIN (Si no hay usuario)
     if (!user) {
         return (
-            <div className="min-h-screen bg-gray-300 flex flex-col justify-center p-6 font-sans">
-                <div className="max-w-md mx-auto w-full bg-white-500 rounded-3xl shadow-xl p-8 border border-gray-100">
+            <div className="min-h-screen bg-gray-100 flex flex-col justify-center p-6">
+                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-8">
-                        <img src="/assets/Logoprint.png" className="w-24 mx-auto mb-4" alt="Logo" />
-                        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Carrier Portal</h1>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Logística Jorge Minnesota</p>
+                        <img src="/assets/Logo.png" className="w-24 mx-auto mb-4" alt="Logo" />
+                        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Jorge Minnesota INC</h1>
                     </div>
-
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="relative">
                             <FaUser className="absolute left-4 top-4 text-gray-300" />
                             <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-gray-200 text-black border-none focus:ring-2 focus:ring-red-600" required />
+                                className="input input-bordered w-full pl-12 bg-gray-50 border-none" required />
                         </div>
                         <div className="relative">
                             <FaLock className="absolute left-4 top-4 text-gray-300" />
                             <input type="password" placeholder="Contraseña" value={pass} onChange={(e) => setPass(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-gray-200 text-black border-none focus:ring-2 focus:ring-red-600" required />
+                                className="input input-bordered w-full pl-12 bg-gray-50 border-none" required />
                         </div>
-                        {error && <p className="text-[10px] font-bold text-red-600 uppercase text-center">{error}</p>}
-                        <button type="submit" className="btn btn-error w-full text-white-500 font-black uppercase tracking-widest shadow-lg shadow-red-200">
-                            Entrar al Sistema
-                        </button>
+                        <button type="submit" className="btn btn-error w-full text-white font-black uppercase shadow-lg">Entrar</button>
                     </form>
                 </div>
             </div>
         );
     }
 
-    // VISTA DEL PORTAL (Usuario logueado)
     return (
-        <div className="min-h-screen bg-gray-100 pb-24 font-sans text-black">
-            <Head><title>Portal de Viajes | Jorge Minnesota</title></Head>
+        <div className="min-h-screen bg-gray-50 pb-20 font-sans text-black">
+            <Head><title>Portal | Jorge Minnesota INC</title></Head>
 
-            {/* HEADER MÓVIL */}
-            <div className="bg-white-500 p-4 shadow-sm flex justify-between items-center sticky top-0 z-50 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                    <div className="bg-red-600 p-2 rounded-lg text-white-500"><FaTruck size={18}/></div>
-                    <div>
-                        <h1 className="font-black text-sm text-gray-800 uppercase italic leading-none">Mi Portal</h1>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase mt-1 truncate max-w-[150px]">{user.username}</p>
-                    </div>
+            {/* HEADER SUPERIOR RE-DISEÑADO */}
+            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60]">
+                <div className="flex items-center gap-4">
+                    <img src="/assets/Logo.png" className="w-16 h-auto" alt="Logo" />
+                    <h1 className="text-lg font-black uppercase italic text-black leading-none tracking-tighter">
+                        Jorge Minnesota INC
+                    </h1>
                 </div>
-                <button onClick={() => auth().signOut()} className="btn btn-ghost btn-xs text-gray-400 font-bold uppercase underline">
-                    Salir
+                <button onClick={() => auth().signOut()} className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg">
+                    <FaSignOutAlt /> Salir
                 </button>
-            </div>
+            </header>
 
-            {/* CONTENIDO DINÁMICO */}
-            <main className="p-3 md:p-6">
+            {/* MODULO INFERIOR CON NOMBRE DE USUARIO Y BOTÓN DINÁMICO */}
+            <section className="bg-white px-6 py-4 flex justify-between items-center border-b shadow-sm">
+                <div>
+                    <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
+                        VICTOR LAGUNA INC
+                    </h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">
+                        {user.username}
+                    </p>
+                </div>
+
+                {/* BOTÓN SUPERIOR PEQUEÑO: SOLO MUESTRA LA SECCIÓN DONDE NO ESTÁS */}
+                <button
+                    onClick={() => setView(view === 'tabla' ? 'nuevo' : 'tabla')}
+                    className="btn btn-xs h-8 bg-gray-800 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
+                >
+                    {view === 'tabla' ? <><FaPlus className="mr-1"/> Nuevo</> : <><FaListUl className="mr-1"/> Lista</>}
+                </button>
+            </section>
+
+            {/* CONTENIDO PRINCIPAL */}
+            <main className="p-4">
                 {view === "nuevo" ? (
-                    <FormViaje
-                        user={user}
-                        isCarrierMode={true}
-                        onSuccess={() => setView("tabla")}
-                    />
+                    <FormViaje user={user} isCarrierMode={true} onSuccess={() => setView("tabla")} />
                 ) : (
-                    <TablaViajes
-                        user={user}
-                        isCarrierMode={true}
-                    />
+                    <TablaViajes user={user} isCarrierMode={true} />
                 )}
             </main>
 
-            {/* TAB BAR INFERIOR (ESTILO APP) */}
-            <nav className="fixed bottom-0 left-0 w-full bg-white-500 border-t border-gray-200 flex justify-around items-center p-3 z-50 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+            {/* NAVEGACIÓN INFERIOR: CUADRADA, DE LADO A LADO */}
+            <nav className="fixed bottom-0 left-0 w-full flex h-20 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
                 <button
                     onClick={() => setView("tabla")}
-                    className={`flex flex-col items-center transition-colors ${view === 'tabla' ? 'text-red-600' : 'text-gray-300'}`}
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors border-r border-gray-100 ${view === 'tabla' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                 >
                     <FaListUl size={22} />
-                    <span className="text-[9px] font-black uppercase mt-1">Mis Viajes</span>
+                    <span className="text-[10px] font-black uppercase">Mis Viajes</span>
                 </button>
 
                 <button
                     onClick={() => setView("nuevo")}
-                    className="relative"
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === 'nuevo' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                 >
-                    <div className={`flex flex-col items-center p-4 rounded-full -mt-12 shadow-xl border-4 border-gray-100 transition-all ${view === 'nuevo' ? 'bg-red-400 text-white-500 scale-110' : 'bg-red-600 text-white-500'}`}>
-                        <FaPlus size={24} />
-                    </div>
-                    <span className={`text-[9px] font-black uppercase mt-1 block text-center ${view === 'nuevo' ? 'text-red-600' : 'text-gray-300'}`}>
-                        Nuevo
-                    </span>
+                    <FaPlus size={22} />
+                    <span className="text-[10px] font-black uppercase">Nuevo Viaje</span>
                 </button>
-
-                <div className="w-22 flex flex-col items-center text-gray-300 grayscale opacity-50 cursor-not-allowed">
-                    <FaSignOutAlt size={22} />
-                    <span className="text-[9px] font-black uppercase mt-1">Soporte</span>
-                </div>
             </nav>
         </div>
     );
