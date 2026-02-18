@@ -3,7 +3,7 @@ import ReactToPrint from "react-to-print";
 import {firestore} from "../../firebase/firebaseIni";
 import {
     FaTrash, FaCheckCircle, FaExclamationCircle,
-    FaPrint, FaCar, FaCheckDouble, FaTimes
+    FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink
 } from "react-icons/fa";
 import HojaChofer from "./HojaChofer";
 
@@ -32,27 +32,41 @@ const FormViaje = ({user}) => {
 
     const [vehiculos, setVehiculos] = useState([]);
 
-// --- CARGA DE DATOS (FILTRADO INTELIGENTE: ADMIN VS CARRIER) ---
+// --- CARGA DE DATOS (FILTRADO HÍBRIDO: PROPIOS + LIDERADOS) ---
     useEffect(() => {
         if (!user) return;
 
-        let q = firestore().collection("choferes");
+        // Consultamos la colección para filtrar localmente (Firebase 7 no soporta consultas OR complejas fácilmente)
+        const unsubChoferes = firestore().collection("choferes")
+            .onSnapshot(snap => {
+                const todos = snap.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
 
-        // SI NO ES ADMIN: Filtramos estrictamente por su ID de empresa
-        if (!user.admin) {
-            q = q.where("empresaId", "==", user.id);
-        } else {
-            // SI ES ADMIN: Ordenamos por nombre para que vea a todos
-            q = q.orderBy("nombreChofer", "asc");
-        }
-
-        const unsubChoferes = q.onSnapshot(snap => {
-            setChoferes(snap.docs.map(doc => ({
-                id: doc.id,
-                nombre: doc.data().nombreChofer,
-                empresa: doc.data().empresaNombre
-            })));
-        });
+                if (!user.admin) {
+                    // Si no es admin: Ve sus choferes (empresaId) O choferes donde es líder (empresaLiderId)
+                    const filtrados = todos.filter(c =>
+                        c.empresaId === user.id || c.empresaLiderId === user.id
+                    );
+                    setChoferes(filtrados.map(c => ({
+                        id: c.id,
+                        nombre: c.nombreChofer,
+                        empresa: c.empresaNombre,
+                        empresaLiderId: c.empresaLiderId || "",
+                        esSubcontratado: c.empresaLiderId === user.id && c.empresaId !== user.id
+                    })));
+                } else {
+                    // Si es admin: Ve todos
+                    setChoferes(todos.map(c => ({
+                        id: c.id,
+                        nombre: c.nombreChofer,
+                        empresa: c.empresaNombre,
+                        empresaLiderId: c.empresaLiderId || "",
+                        esSubcontratado: false
+                    })));
+                }
+            });
 
         const unsubProvincias = firestore().collection("province").orderBy("state", "asc")
             .onSnapshot(snap => {
@@ -171,10 +185,15 @@ const FormViaje = ({user}) => {
                 const viajeData = {
                     numViaje: numViajeFinal,
                     chofer: choferData,
-                    empresaId: user.id, // Guardamos siempre el ID del creador
+                    empresaId: user.id, // ID del creador (Carrier o Admin)
+                    empresaLiderId: choferData.empresaLiderId || "", // Guardamos quién es el líder de este chofer
                     estatus: "PENDIENTE",
                     fechaCreacion: new Date(),
-                    creadoPor: {id: user?.id || "N/A", nombre: user?.nombre || "Admin"},
+                    creadoPor: {
+                        id: user?.id || "N/A",
+                        nombre: user?.nombre || "Admin",
+                        tipo: user?.tipo || "desconocido"
+                    },
                     resumenFinanciero: {
                         totalFletes: tFlete,
                         totalSoloGastos: vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) + parseFloat(v.sPeso) + parseFloat(v.gExtra)), 0),
@@ -222,14 +241,14 @@ const FormViaje = ({user}) => {
                 <div
                     className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
                     <div
-                        className="bg-white-500 rounded-xl max-w-md w-full shadow-2xl border-2 border-t-8 border-blue-600 p-8 text-center animate-in zoom-in">
+                        className="bg-white rounded-xl max-w-md w-full shadow-2xl border-2 border-t-8 border-blue-600 p-8 text-center animate-in zoom-in">
                         <div className="text-blue-600 text-6xl flex justify-center mb-4"><FaCheckCircle/></div>
                         <h4 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Viaje
                             Registrado</h4>
                         <p className="text-[11px] font-bold text-gray-400 uppercase mt-2">Folio:
                             #{viajeReciente?.numViaje}</p>
 
-                        <div className="my-6 p-4 bg-blue-1000 rounded-lg border border-dashed border-blue-200">
+                        <div className="my-6 p-4 bg-blue-50 rounded-lg border border-dashed border-blue-200">
                             <p className="text-lg font-black text-gray-800 uppercase leading-none">{viajeReciente?.chofer?.nombre}</p>
                             <p className="text-[10px] font-black text-gray-400 mt-2 uppercase">{viajeReciente?.vehiculos?.length} UNIDADES
                                 EN TRÁNSITO</p>
@@ -283,7 +302,11 @@ const FormViaje = ({user}) => {
                             value={encabezado.choferId}
                             onChange={(e) => setEncabezado({...encabezado, choferId: e.target.value})}>
                         <option value="">{loading ? "Cargando..." : "Elegir Chofer"}</option>
-                        {choferes.map(c => (<option key={c.id} value={c.id}>{c.nombre} ({c.empresa})</option>))}
+                        {choferes.map(c => (
+                            <option key={c.id} value={c.id} className={c.esSubcontratado ? "text-blue-700 font-bold" : ""}>
+                                {c.nombre} {c.esSubcontratado ? "🔗 (Subcontratado)" : `(${c.empresa})`}
+                            </option>
+                        ))}
                     </select>
                 </div>
                 <div
@@ -334,7 +357,7 @@ const FormViaje = ({user}) => {
                                     <input
                                         type="text"
                                         value={v.lote}
-                                        maxLength={8} // <--- Evita que escriban más de 8
+                                        maxLength={8}
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
                                         onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
                                         className={`input input-xs w-full font-black ${v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'}`}

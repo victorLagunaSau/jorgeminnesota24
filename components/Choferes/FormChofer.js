@@ -15,7 +15,9 @@ const FormChofer = ({ user, onSuccess }) => {
         paisChofer: "United States",
         licencia: "",
         empresaId: "",
-        empresaNombre: ""
+        empresaNombre: "",
+        empresaLiderId: "",
+        empresaLiderNombre: ""
     });
 
     useEffect(() => {
@@ -63,8 +65,12 @@ const FormChofer = ({ user, onSuccess }) => {
                 telefonoChofer: datos.telefonoChofer,
                 paisChofer: datos.paisChofer,
                 licencia: datos.licencia || "N/A",
+                // Datos Fiscales (Dueño del Chofer)
                 empresaId: datos.empresaId,
                 empresaNombre: datos.empresaNombre,
+                // Datos de Operación (Quien asigna viajes)
+                empresaLiderId: datos.empresaLiderId || "",
+                empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
                 registro: {
                     usuario: user?.nombre || "Admin",
                     idUsuario: user?.id || "N/A",
@@ -76,9 +82,17 @@ const FormChofer = ({ user, onSuccess }) => {
             await conRef.update({ choferes: nuevoFolio });
 
             mostrarAviso(`Chofer #${nuevoFolio} guardado`, "success");
-            setDatos({ nombreChofer: "", apodoChofer: "", telefonoChofer: "", paisChofer: "United States", licencia: "", empresaId: "", empresaNombre: "" });
+            setDatos({
+                nombreChofer: "", apodoChofer: "", telefonoChofer: "",
+                paisChofer: "United States", licencia: "",
+                empresaId: "", empresaNombre: "",
+                empresaLiderId: "", empresaLiderNombre: ""
+            });
             if (onSuccess) onSuccess();
-        } catch (e) { mostrarAviso("Error de conexión", "error"); }
+        } catch (e) {
+            console.error(e);
+            mostrarAviso("Error de conexión", "error");
+        }
         finally { setLoading(false); }
     };
 
@@ -100,8 +114,9 @@ const FormChofer = ({ user, onSuccess }) => {
                     <input type="text" value={datos.nombreChofer} onChange={(e)=>setDatos({...datos, nombreChofer: e.target.value})}
                         className="input input-bordered w-full input-sm bg-white text-black focus:border-red-600 uppercase font-bold" />
                 </div>
-                <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-red-600 uppercase italic">Empresa / Carrier: *</label>
+
+                <div className="w-60 p-1">
+                    <label className="block text-[10px] font-bold text-red-600 uppercase italic">Empresa Fiscal (W-9): *</label>
                     <select className="select select-bordered select-sm w-full bg-white text-black border-red-200 font-bold"
                         value={datos.empresaId}
                         onChange={(e) => {
@@ -112,41 +127,55 @@ const FormChofer = ({ user, onSuccess }) => {
                         {empresas.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
                     </select>
                 </div>
+
+                <div className="w-60 p-1">
+                    <label className="block text-[10px] font-bold text-blue-700 uppercase italic">Empresa Líder (Despacho):</label>
+                    <select className="select select-bordered select-sm w-full bg-white text-black border-blue-200 font-bold"
+                        value={datos.empresaLiderId}
+                        onChange={(e) => {
+                            const idx = e.target.selectedIndex;
+                            setDatos({...datos, empresaLiderId: e.target.value, empresaLiderNombre: e.target.options[idx].text});
+                        }}>
+                        <option value="">Independiente / Ninguna</option>
+                        {empresas.map(emp => <option key={emp.id} value={emp.id}>{emp.nombre}</option>)}
+                    </select>
+                </div>
+            </div>
+
+            <div className="flex flex-row flex-nowrap gap-2 items-end w-full border-t border-gray-100 pt-2">
                 <div className="w-56 p-1">
                     <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono (USA/MX): *</label>
                     <PhoneInput onlyCountries={['us', 'mx']} country={'us'} value={datos.telefonoChofer} onChange={handlePhoneChange}
                         inputStyle={{ paddingLeft: '45px', width: '100%', height: '32px' }}
                         inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white font-bold' }} />
                 </div>
-            </div>
-
-            <div className="flex flex-row flex-nowrap gap-2 items-end w-full border-t border-gray-100 pt-2">
-                <div className="w-64 p-1">
+                <div className="w-56 p-1">
                     <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Apodo / Handle:</label>
                     <input type="text" value={datos.apodoChofer} onChange={(e)=>setDatos({...datos, apodoChofer: e.target.value})}
                         className="input input-bordered w-full input-sm bg-white text-black uppercase" />
                 </div>
-                <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic text-blue-700">Licencia (Máx 13):</label>
+                <div className="w-56 p-1">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Licencia (Máx 13):</label>
                     <input type="text" value={datos.licencia} onChange={handleLicenciaChange} maxLength={13}
                         className="input input-bordered w-full input-sm bg-white text-black font-mono" placeholder="Alfanumérico" />
                 </div>
                 <div className="flex-grow flex justify-end p-1">
                     <label htmlFor={listo ? "modal-confirm-chofer" : ""}
-                        className={`btn btn-sm px-12 ${listo ? 'btn-error text-white font-bold' : 'btn-disabled opacity-40'}`}>
+                        className={`btn btn-sm px-10 ${listo ? 'btn-error text-white font-bold' : 'btn-disabled opacity-40'}`}>
                         {loading ? "Registrando..." : "+ Guardar Chofer"}
                     </label>
                 </div>
             </div>
 
+            {/* MODAL CONFIRMACIÓN */}
             <input type="checkbox" id="modal-confirm-chofer" className="modal-toggle" />
             <div className="modal">
                 <div className="modal-box bg-white border-t-4 border-red-600">
                     <h3 className="font-bold text-lg text-black uppercase">Confirmar Alta de Chofer</h3>
                     <div className="py-4 text-[13px] text-gray-700 space-y-1">
                         <p>Nombre: <span className="font-bold text-black">{datos.nombreChofer}</span></p>
-                        <p>Asignado a: <span className="font-bold text-red-600">{datos.empresaNombre}</span></p>
-                        <p>País Celular: <span className="font-bold text-blue-700">{datos.paisChofer}</span></p>
+                        <p>Empresa Fiscal: <span className="font-bold text-red-600">{datos.empresaNombre}</span></p>
+                        <p>Líder Asignado: <span className="font-bold text-blue-700">{datos.empresaLiderNombre || 'Ninguno'}</span></p>
                     </div>
                     <div className="modal-action">
                         <label htmlFor="modal-confirm-chofer" className="btn btn-sm btn-outline">Cancelar</label>
