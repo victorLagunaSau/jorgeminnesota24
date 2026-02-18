@@ -108,7 +108,10 @@ const FormViaje = ({user}) => {
             id: Date.now(),
             lote: "", marca: "", modelo: "", clienteAlt: "",
             almacen: "Copart",
-            estado: "", ciudad: "", flete: 0, storage: "0", sPeso: "0", gExtra: "0", titulo: "NO"
+            estado: "", ciudad: "",
+            flete: 0,          // Se usará para el COST (chofer)
+            precioVenta: 0,    // Se usará para el PRICE (cliente) - OCULTO
+            storage: "0", sPeso: "0", gExtra: "0", titulo: "NO"
         }]);
     };
 
@@ -126,17 +129,27 @@ const FormViaje = ({user}) => {
                     const estadoData = provincias.find(p => p.state === value);
                     if (estadoData && estadoData.regions?.length > 0) {
                         actualizacion.ciudad = estadoData.regions[0].city;
+                        // LOGICA DE COSTO VS PRECIO
                         actualizacion.flete = parseFloat(estadoData.regions[0].cost || 0);
+                        actualizacion.precioVenta = parseFloat(estadoData.regions[0].price || 0);
                     } else {
                         actualizacion.ciudad = "";
                         actualizacion.flete = 0;
+                        actualizacion.precioVenta = 0;
                     }
                 }
 
                 if (field === 'ciudad') {
                     const estadoData = provincias.find(p => p.state === v.estado);
                     const regionData = estadoData?.regions?.find(r => r.city === value);
-                    actualizacion.flete = regionData ? parseFloat(regionData.cost || 0) : 0;
+                    if (regionData) {
+                        // LOGICA DE COSTO VS PRECIO
+                        actualizacion.flete = parseFloat(regionData.cost || 0);
+                        actualizacion.precioVenta = parseFloat(regionData.price || 0);
+                    } else {
+                        actualizacion.flete = 0;
+                        actualizacion.precioVenta = 0;
+                    }
                 }
                 return actualizacion;
             }

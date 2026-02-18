@@ -18,7 +18,7 @@ const HeaderPanel = ({ user, onLogout }) => {
     }, [router.pathname]);
 
     return (
-        <header className="fixed top-0 w-full z-30 bg-white-500 transition-all bg-gray-800 shadow-lg ">
+        <header className="fixed top-0 w-full z-30 bg-white-500 transition-all shadow-lg ">
             <div className="max-w-screen-xl mx-auto flex justify-between items-center py-3 sm:py-4 px-6 sm:px-8 lg:px-16">
                 <div className="flex items-center">
                     <img src="/assets/Logo.png" className="w-auto h-10" alt="Logo" />

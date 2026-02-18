@@ -59,7 +59,7 @@ const ModalLiquidacion = ({ viaje, user, onClose }) => {
                         gatePass: "X",
                         marca: v.marca || "",
                         modelo: v.modelo || "",
-                        price: String(v.flete || "0"),
+                        price: String(v.precioVenta || v.flete || "0"),
                         flete: parseFloat(v.flete || 0),
                         registro: {
                             idUsuario: viaje.creadoPor?.id || user?.id,
