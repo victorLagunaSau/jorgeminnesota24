@@ -24,8 +24,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
     const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
     const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
 
-    cconst
-    ejecutarPago = async () => {
+    const ejecutarPago = async () => {
         setProcesando(true);
         try {
             const consecutivoRef = firestore().collection("config").doc("consecutivos");
