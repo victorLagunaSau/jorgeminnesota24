@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaTruckLoading, FaWallet, FaCheckDouble, FaUserShield} from "react-icons/fa";
+import {FaFilter, FaPrint, FaTruckLoading, FaWallet, FaCheckDouble, FaUserShield, FaCheckCircle, FaTimes} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaChofer from "./HojaChofer";
 import HojaVerificacion from "./HojaVerificacion";
@@ -12,6 +12,7 @@ const TablaViajes = ({user}) => {
     const [clientes, setClientes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filtroGeneral, setFiltroGeneral] = useState("");
+    const [busquedaCliente, setBusquedaCliente] = useState({});
 
     // Referencias y Estados de UI
     const componentRef = useRef();
@@ -203,21 +204,79 @@ const TablaViajes = ({user}) => {
                                     {/* COLUMNA DINÁMICA: CLIENTE ADMIN VS CARRIER */}
                                     <td className="border-r border-b p-1">
                                         {user.admin ? (
-                                            <>
+                                        <div className="relative w-full group">
+                                            <div className="text-[8px] font-black text-blue-600 mb-1 italic">
+                                                Ref: {v.clienteAlt}
+                                            </div>
+
+                                            {/* INPUT DE BÚSQUEDA */}
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    disabled={isLocked}
+                                                    placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
+                                                    className="input input-bordered input-xs w-full font-bold text-[10px] uppercase pr-6"
+                                                    value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
+                                                    onChange={(e) => setBusquedaCliente({
+                                                        ...busquedaCliente,
+                                                        [`${viaje.id}-${idx}`]: e.target.value
+                                                    })}
+                                                />
+                                                {busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                    <button
+                                                        className="absolute right-1 top-1 text-gray-400 hover:text-red-500"
+                                                        onClick={() => setBusquedaCliente({
+                                                            ...busquedaCliente,
+                                                            [`${viaje.id}-${idx}`]: ""
+                                                        })}
+                                                    >
+                                                        <FaTimes size={10}/>
+                                                    </button>
+                                                )}
+                                            </div>
+
+                                            {/* LISTA DESPLEGABLE FILTRADA (Solo se muestra si hay texto) */}
+                                            {busquedaCliente[`${viaje.id}-${idx}`] && !isLocked && (
                                                 <div
-                                                    className="text-[8px] font-black text-blue-600 mb-1 italic">Ref: {v.clienteAlt}</div>
-                                                <select disabled={isLocked} value={v.clienteId || ""}
-                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteId', e.target.value)}
-                                                        className="select select-bordered select-xs w-full font-bold text-[10px] uppercase">
-                                                    <option value="">-- ASIGNAR --</option>
-                                                    {clientes.map(c => <option key={c.id}
-                                                                               value={c.id}>{c.nombre}</option>)}
-                                                </select>
-                                            </>
-                                        ) : (
-                                            <div
-                                                className="text-[10px] font-bold uppercase text-gray-500">{v.clienteAlt}</div>
-                                        )}
+                                                    className="absolute z-[100] w-full bg-white border shadow-xl rounded-md max-h-40 overflow-y-auto mt-1 border-blue-200">
+                                                    {clientes
+                                                        .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase()))
+                                                        .map(cliente => (
+                                                            <div
+                                                                key={cliente.id}
+                                                                className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[10px] font-bold uppercase border-b last:border-none"
+                                                                onClick={() => {
+                                                                    handleLocalEdit(viaje.id, idx, 'clienteId', cliente.id);
+                                                                    setBusquedaCliente({
+                                                                        ...busquedaCliente,
+                                                                        [`${viaje.id}-${idx}`]: ""
+                                                                    }); // Limpiar búsqueda
+                                                                }}
+                                                            >
+                                                                {cliente.nombre}
+                                                            </div>
+                                                        ))
+                                                    }
+                                                    {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).length === 0 && (
+                                                        <div className="p-2 text-gray-400 text-[9px] italic">No hay
+                                                            resultados...</div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* ETIQUETA DEL CLIENTE YA SELECCIONADO */}
+                                            {v.clienteNombre && !busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                <div
+                                                    className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1">
+                                                    <FaCheckCircle size={8}/> {v.clienteNombre}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            className="text-[10px] font-bold uppercase text-gray-500">{v.clienteAlt}</div>
+                                    )}
+
                                     </td>
 
                                     {/* INPUTS SOLO SI ES ADMIN Y NO ESTÁ BLOQUEADO */}

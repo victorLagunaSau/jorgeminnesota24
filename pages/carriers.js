@@ -95,7 +95,7 @@ const CarriersPage = () => {
             <section className="bg-white px-6 py-4 flex justify-between items-center border-b shadow-sm">
                 <div>
                     <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
-                        VICTOR LAGUNA INC
+                        {user.username}
                     </h2>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">
                         {user.username}
