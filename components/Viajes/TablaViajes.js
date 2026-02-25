@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaTruckLoading, FaWallet, FaCheckDouble, FaUserShield, FaCheckCircle, FaTimes} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaChofer from "./HojaChofer";
 import HojaVerificacion from "./HojaVerificacion";
@@ -204,78 +204,78 @@ const TablaViajes = ({user}) => {
                                     {/* COLUMNA DINÁMICA: CLIENTE ADMIN VS CARRIER */}
                                     <td className="border-r border-b p-1">
                                         {user.admin ? (
-                                        <div className="relative w-full group">
-                                            <div className="text-[8px] font-black text-blue-600 mb-1 italic">
-                                                Ref: {v.clienteAlt}
-                                            </div>
+                                            <div className="relative w-full group">
+                                                <div className="text-[8px] font-black text-blue-600 mb-1 italic">
+                                                    Ref: {v.clienteAlt}
+                                                </div>
 
-                                            {/* INPUT DE BÚSQUEDA */}
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    disabled={isLocked}
-                                                    placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
-                                                    className="input input-bordered input-xs w-full font-bold text-[10px] uppercase pr-6"
-                                                    value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
-                                                    onChange={(e) => setBusquedaCliente({
-                                                        ...busquedaCliente,
-                                                        [`${viaje.id}-${idx}`]: e.target.value
-                                                    })}
-                                                />
-                                                {busquedaCliente[`${viaje.id}-${idx}`] && (
-                                                    <button
-                                                        className="absolute right-1 top-1 text-gray-400 hover:text-red-500"
-                                                        onClick={() => setBusquedaCliente({
+                                                {/* INPUT DE BÚSQUEDA */}
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        disabled={isLocked}
+                                                        placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
+                                                        className="input input-bordered input-xs w-full font-bold text-[10px] uppercase pr-6"
+                                                        value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
+                                                        onChange={(e) => setBusquedaCliente({
                                                             ...busquedaCliente,
-                                                            [`${viaje.id}-${idx}`]: ""
+                                                            [`${viaje.id}-${idx}`]: e.target.value
                                                         })}
-                                                    >
-                                                        <FaTimes size={10}/>
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* LISTA DESPLEGABLE FILTRADA (Solo se muestra si hay texto) */}
-                                            {busquedaCliente[`${viaje.id}-${idx}`] && !isLocked && (
-                                                <div
-                                                    className="absolute z-[100] w-full bg-white border shadow-xl rounded-md max-h-40 overflow-y-auto mt-1 border-blue-200">
-                                                    {clientes
-                                                        .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase()))
-                                                        .map(cliente => (
-                                                            <div
-                                                                key={cliente.id}
-                                                                className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[10px] font-bold uppercase border-b last:border-none"
-                                                                onClick={() => {
-                                                                    handleLocalEdit(viaje.id, idx, 'clienteId', cliente.id);
-                                                                    setBusquedaCliente({
-                                                                        ...busquedaCliente,
-                                                                        [`${viaje.id}-${idx}`]: ""
-                                                                    }); // Limpiar búsqueda
-                                                                }}
-                                                            >
-                                                                {cliente.nombre}
-                                                            </div>
-                                                        ))
-                                                    }
-                                                    {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).length === 0 && (
-                                                        <div className="p-2 text-gray-400 text-[9px] italic">No hay
-                                                            resultados...</div>
+                                                    />
+                                                    {busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                        <button
+                                                            className="absolute right-1 top-1 text-gray-400 hover:text-red-500"
+                                                            onClick={() => setBusquedaCliente({
+                                                                ...busquedaCliente,
+                                                                [`${viaje.id}-${idx}`]: ""
+                                                            })}
+                                                        >
+                                                            <FaTimes size={10}/>
+                                                        </button>
                                                     )}
                                                 </div>
-                                            )}
 
-                                            {/* ETIQUETA DEL CLIENTE YA SELECCIONADO */}
-                                            {v.clienteNombre && !busquedaCliente[`${viaje.id}-${idx}`] && (
-                                                <div
-                                                    className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1">
-                                                    <FaCheckCircle size={8}/> {v.clienteNombre}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div
-                                            className="text-[10px] font-bold uppercase text-gray-500">{v.clienteAlt}</div>
-                                    )}
+                                                {/* LISTA DESPLEGABLE FILTRADA (Solo se muestra si hay texto) */}
+                                                {busquedaCliente[`${viaje.id}-${idx}`] && !isLocked && (
+                                                    <div
+                                                        className="absolute z-[100] w-full bg-white border shadow-xl rounded-md max-h-40 overflow-y-auto mt-1 border-blue-200">
+                                                        {clientes
+                                                            .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase()))
+                                                            .map(cliente => (
+                                                                <div
+                                                                    key={cliente.id}
+                                                                    className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[10px] font-bold uppercase border-b last:border-none"
+                                                                    onClick={() => {
+                                                                        handleLocalEdit(viaje.id, idx, 'clienteId', cliente.id);
+                                                                        setBusquedaCliente({
+                                                                            ...busquedaCliente,
+                                                                            [`${viaje.id}-${idx}`]: ""
+                                                                        }); // Limpiar búsqueda
+                                                                    }}
+                                                                >
+                                                                    {cliente.nombre}
+                                                                </div>
+                                                            ))
+                                                        }
+                                                        {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).length === 0 && (
+                                                            <div className="p-2 text-gray-400 text-[9px] italic">No hay
+                                                                resultados...</div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* ETIQUETA DEL CLIENTE YA SELECCIONADO */}
+                                                {v.clienteNombre && !busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                    <div
+                                                        className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1">
+                                                        <FaCheckCircle size={8}/> {v.clienteNombre}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className="text-[10px] font-bold uppercase text-gray-500">{v.clienteAlt}</div>
+                                        )}
 
                                     </td>
 
@@ -356,7 +356,8 @@ const TablaViajes = ({user}) => {
                                                             trigger={() => (
                                                                 <button
                                                                     className="btn btn-sm bg-gray-200 hover:bg-gray-300 border-none text-gray-800 font-black text-[9px] uppercase leading-tight py-2 h-12 w-full flex flex-col items-center justify-center gap-1 shadow-sm transition-all active:scale-95">
-                                                                    <div className="flex items-center gap-2 text-gray-700">
+                                                                    <div
+                                                                        className="flex items-center gap-2 text-gray-700">
                                                                         <FaPrint className=" text-sm"/> Imprimir PDF
                                                                     </div>
                                                                     <span></span>

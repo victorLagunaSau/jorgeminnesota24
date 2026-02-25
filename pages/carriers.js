@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, {useState, useEffect} from "react";
 import Head from "next/head";
-import { firestore, auth } from "../firebase/firebaseIni";
+import {firestore, auth} from "../firebase/firebaseIni";
 import FormViaje from "../components/Viajes/FormViaje";
 import TablaViajes from "../components/Viajes/TablaViajes";
-import { FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt } from "react-icons/fa";
+import {FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt} from "react-icons/fa";
 
 const CarriersPage = () => {
     const [user, setUser] = useState(null);
@@ -17,9 +17,21 @@ const CarriersPage = () => {
     useEffect(() => {
         const unsub = auth().onAuthStateChanged(async (userAuth) => {
             if (userAuth) {
-                const doc = await firestore().collection("users").doc(userAuth.uid).get();
-                if (doc.exists && doc.data().tipo === "empresa") {
-                    setUser({ id: doc.id, ...doc.data() });
+                // 1. Buscamos el usuario
+                const userDoc = await firestore().collection("users").doc(userAuth.uid).get();
+
+                if (userDoc.exists && userDoc.data().tipo === "empresa") {
+                    const userData = userDoc.data();
+
+                    // 2. Buscamos los datos de la empresa usando el mismo ID
+                    const empresaDoc = await firestore().collection("empresas").doc(userAuth.uid).get();
+                    const empresaData = empresaDoc.exists ? empresaDoc.data() : {};
+
+                    setUser({
+                        id: userDoc.id,
+                        ...userData,
+                        datosEmpresa: empresaData // Metemos los datos de la empresa aquí
+                    });
                 } else {
                     auth().signOut();
                     setError("Acceso denegado.");
@@ -53,21 +65,26 @@ const CarriersPage = () => {
             <div className="min-h-screen bg-gray-100 flex flex-col justify-center p-6">
                 <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-8">
-                        <img src="/assets/Logo.png" className="w-24 mx-auto mb-4" alt="Logo" />
-                        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Jorge Minnesota INC</h1>
+                        <img src="/assets/Logo.png" className="w-24 mx-auto mb-4" alt="Logo"/>
+                        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Jorge
+                            Minnesota INC</h1>
                     </div>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="relative">
-                            <FaUser className="absolute left-4 top-4 text-gray-300" />
-                            <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-gray-50 border-none" required />
+                            <FaUser className="absolute left-4 top-4 text-gray-300"/>
+                            <input type="email" placeholder="Email" value={email}
+                                   onChange={(e) => setEmail(e.target.value)}
+                                   className="input input-bordered w-full pl-12 bg-gray-50 border-none" required/>
                         </div>
                         <div className="relative">
-                            <FaLock className="absolute left-4 top-4 text-gray-300" />
-                            <input type="password" placeholder="Contraseña" value={pass} onChange={(e) => setPass(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-gray-50 border-none" required />
+                            <FaLock className="absolute left-4 top-4 text-gray-300"/>
+                            <input type="password" placeholder="Contraseña" value={pass}
+                                   onChange={(e) => setPass(e.target.value)}
+                                   className="input input-bordered w-full pl-12 bg-gray-50 border-none" required/>
                         </div>
-                        <button type="submit" className="btn btn-error w-full text-white font-black uppercase shadow-lg">Entrar</button>
+                        <button type="submit"
+                                className="btn btn-error w-full text-white font-black uppercase shadow-lg">Entrar
+                        </button>
                     </form>
                 </div>
             </div>
@@ -79,26 +96,30 @@ const CarriersPage = () => {
             <Head><title>Portal | Jorge Minnesota INC</title></Head>
 
             {/* HEADER SUPERIOR RE-DISEÑADO */}
-            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60]">
+            <header
+                className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60]">
                 <div className="flex items-center gap-4">
-                    <img src="/assets/Logo.png" className="w-16 h-auto" alt="Logo" />
+                    <img src="/assets/Logo.png" className="w-16 h-auto" alt="Logo"/>
                     <h1 className="text-lg font-black uppercase italic text-black leading-none tracking-tighter">
                         Jorge Minnesota INC
                     </h1>
                 </div>
-                <button onClick={() => auth().signOut()} className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg">
-                    <FaSignOutAlt /> Salir
+                <button onClick={() => auth().signOut()}
+                        className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg">
+                    <FaSignOutAlt/> Salir
                 </button>
             </header>
 
             {/* MODULO INFERIOR CON NOMBRE DE USUARIO Y BOTÓN DINÁMICO */}
             <section className="bg-white px-6 py-4 flex justify-between items-center border-b shadow-sm">
                 <div>
+                    {/* Nombre de la Empresa en grande */}
                     <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
-                        {user.username}
+                        {user.datosEmpresa?.nombreEmpresa || user.username}
                     </h2>
+                    {/* Nombre del Usuario en pequeño debajo */}
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">
-                        {user.username}
+                        Usuario: {user.username}
                     </p>
                 </div>
 
@@ -114,9 +135,9 @@ const CarriersPage = () => {
             {/* CONTENIDO PRINCIPAL */}
             <main className="p-4">
                 {view === "nuevo" ? (
-                    <FormViaje user={user} isCarrierMode={true} onSuccess={() => setView("tabla")} />
+                    <FormViaje user={user} isCarrierMode={true} onSuccess={() => setView("tabla")}/>
                 ) : (
-                    <TablaViajes user={user} isCarrierMode={true} />
+                    <TablaViajes user={user} isCarrierMode={true}/>
                 )}
             </main>
 
@@ -126,7 +147,7 @@ const CarriersPage = () => {
                     onClick={() => setView("tabla")}
                     className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors border-r border-gray-100 ${view === 'tabla' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                 >
-                    <FaListUl size={22} />
+                    <FaListUl size={22}/>
                     <span className="text-[10px] font-black uppercase">Mis Viajes</span>
                 </button>
 
@@ -134,7 +155,7 @@ const CarriersPage = () => {
                     onClick={() => setView("nuevo")}
                     className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === 'nuevo' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                 >
-                    <FaPlus size={22} />
+                    <FaPlus size={22}/>
                     <span className="text-[10px] font-black uppercase">Nuevo Viaje</span>
                 </button>
             </nav>
