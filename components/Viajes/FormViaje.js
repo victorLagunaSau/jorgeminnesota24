@@ -24,6 +24,9 @@ const FormViaje = ({user}) => {
     const componenteRef = useRef();
     const btnPrintRef = useRef();
 
+    const [busquedaChofer, setBusquedaChofer] = useState("");
+    const [mostrarLista, setMostrarLista] = useState(false);
+
     const [encabezado, setEncabezado] = useState({
         numViaje: "",
         choferId: "",
@@ -308,24 +311,73 @@ const FormViaje = ({user}) => {
                            className="input input-bordered input-sm w-full bg-gray-100 text-black font-bold uppercase text-center"
                            value={encabezado.numViaje} placeholder="Automático"/>
                 </div>
-                <div>
+                <div className="relative">
                     <label className="block text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
-                    <select disabled={viajeIniciado}
-                            className="select select-bordered select-sm w-full bg-white text-black font-bold"
-                            value={encabezado.choferId}
-                            onChange={(e) => setEncabezado({...encabezado, choferId: e.target.value})}>
-                        <option value="">{loading ? "Cargando..." : "Elegir Chofer"}</option>
-                        {choferes.map(c => (
-                            <option key={c.id} value={c.id} className={c.esSubcontratado ? "text-blue-700 font-bold" : ""}>
-                                {c.nombre} {c.esSubcontratado ? "🔗 (Subcontratado)" : `(${c.empresa})`}
-                            </option>
-                        ))}
-                    </select>
+
+                    {/* INPUT DE BÚSQUEDA */}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            disabled={viajeIniciado}
+                            placeholder={loading ? "Cargando..." : "Escribe para buscar chofer..."}
+                            className="input input-bordered input-sm w-full bg-white text-black font-bold uppercase pr-8"
+                            value={busquedaChofer}
+                            onFocus={() => setMostrarLista(true)}
+                            onChange={(e) => {
+                                setBusquedaChofer(e.target.value);
+                                setMostrarLista(true);
+                            }}
+                        />
+                        {busquedaChofer && !viajeIniciado && (
+                            <button
+                                className="absolute right-2 top-2 text-gray-400"
+                                onClick={() => {
+                                    setBusquedaChofer("");
+                                    setEncabezado({...encabezado, choferId: ""});
+                                }}
+                            >
+                                <FaTimes size={12}/>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* LISTA DESPLEGABLE FILTRADA */}
+                    {mostrarLista && !viajeIniciado && (
+                        <div
+                            className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-60 overflow-y-auto mt-1 border-red-200">
+                            {choferes
+                                .filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase()))
+                                .map(c => (
+                                    <div
+                                        key={c.id}
+                                        className="p-3 hover:bg-red-600 hover:text-white cursor-pointer text-[11px] font-black uppercase border-b last:border-none flex justify-between items-center"
+                                        onClick={() => {
+                                            setEncabezado({...encabezado, choferId: c.id});
+                                            setBusquedaChofer(c.nombre); // Seteamos el nombre en el input
+                                            setMostrarLista(false);      // Cerramos la lista
+                                        }}
+                                    >
+                                        <span>{c.nombre}</span>
+                                        <span className="text-[9px] opacity-70">
+                            {c.esSubcontratado ? "Subcontratado" : c.empresa}
+                        </span>
+                                    </div>
+                                ))
+                            }
+                            {choferes.filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase())).length === 0 && (
+                                <div className="p-3 text-gray-400 text-[10px] italic font-bold">No se encontró al
+                                    chofer...</div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div
                     className="text-center font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</div>
 
-                <button onClick={viajeIniciado ? () => setViajeIniciado(false) : iniciarViajeConFolio}
+                <button onClick={viajeIniciado ? () => {
+                    setViajeIniciado(false);
+                    setBusquedaChofer("");
+                } : iniciarViajeConFolio}
                         disabled={!encabezado.choferId}
                         className={`btn btn-sm w-full font-black ${viajeIniciado ? 'btn-outline' : 'btn-error text-white'}`}>
                     {viajeIniciado ? "Modificar Chofer" : "Iniciar Registro"}
