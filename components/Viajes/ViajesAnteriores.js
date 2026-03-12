@@ -1,15 +1,17 @@
 import React, {useState, useEffect} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaSearch, FaTrash, FaSave, FaHistory, FaCar, FaMapMarkerAlt, FaUser} from "react-icons/fa";
+import {FaSearch, FaTrash, FaSave, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaCheckCircle} from "react-icons/fa";
 
 const ViajesAnteriores = ({user}) => {
     const [busqueda, setBusqueda] = useState("");
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState([]);
     const [choferes, setChoferes] = useState([]);
     const [provincias, setProvincias] = useState([]);
+    const [clientes, setClientes] = useState([]); // Nueva colección
     const [loading, setLoading] = useState(false);
     const [folioPGM, setFolioPGM] = useState(null);
+    const [busquedaCliente, setBusquedaCliente] = useState({}); // Estado para el buscador de cliente por fila
 
     const [encabezado, setEncabezado] = useState({
         choferId: "",
@@ -26,6 +28,14 @@ const ViajesAnteriores = ({user}) => {
             setProvincias(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
         });
 
+        const unsubClientes = firestore().collection("clientes").onSnapshot(snap => {
+            setClientes(snap.docs.map(doc => ({
+                id: doc.id,
+                nombre: doc.data().cliente,
+                telefono: doc.data().telefonoCliente
+            })));
+        });
+
         const fetchFolio = async () => {
             const doc = await firestore().collection("config").doc("consecutivos").get();
             const actual = doc.data()?.folioManualPGM || 999;
@@ -36,8 +46,26 @@ const ViajesAnteriores = ({user}) => {
         return () => {
             unsubChoferes();
             unsubProvincias();
+            unsubClientes();
         };
     }, []);
+
+    // Función para asignar cliente a la fila
+    const asignarClienteAFila = (lote, cliente) => {
+        const nuevosVehiculos = vehiculosSeleccionados.map(v => {
+            if (v.lote === lote) {
+                return {
+                    ...v,
+                    clienteId: cliente.id,
+                    clienteNombre: cliente.nombre,
+                    clienteTelefono: cliente.telefono
+                };
+            }
+            return v;
+        });
+        setVehiculosSeleccionados(nuevosVehiculos);
+        setBusquedaCliente({...busquedaCliente, [lote]: ""}); // Limpiar input
+    };
 
     const buscarVehiculo = async () => {
         if (!busqueda) return;
@@ -58,7 +86,6 @@ const ViajesAnteriores = ({user}) => {
                 return;
             }
 
-            // Cruce de Flete (Cost)
             let fleteCalculado = parseFloat(vehData.flete || 0);
             if (fleteCalculado === 0) {
                 const prov = provincias.find(p => p.state === vehData.estado);
@@ -73,7 +100,11 @@ const ViajesAnteriores = ({user}) => {
                 storage: parseFloat(vehData.storage || 0),
                 sPeso: parseFloat(vehData.sobrePeso || vehData.sPeso || 0),
                 gExtra: parseFloat(vehData.gastosExtra || vehData.gExtra || 0),
-                titulo: vehData.titulo || "NO"
+                titulo: vehData.titulo || "NO",
+                // Inicializamos datos del cliente si ya existen en la ficha
+                clienteId: vehData.clienteId || "",
+                clienteNombre: vehData.clienteNombre || vehData.cliente || "",
+                clienteTelefono: vehData.clienteTelefono || ""
             }]);
             setBusqueda("");
         } catch (e) {
@@ -84,6 +115,12 @@ const ViajesAnteriores = ({user}) => {
     };
 
     const finalizarRegularizacion = async () => {
+        const faltanClientes = vehiculosSeleccionados.some(v => !v.clienteId);
+        if (faltanClientes) {
+            alert("Por favor, asigna un Cliente Oficial a todos los vehículos.");
+            return;
+        }
+
         if (vehiculosSeleccionados.length === 0 || !encabezado.choferId || !encabezado.fechaManual) {
             alert("Completa Chofer, Fecha y Vehículos.");
             return;
@@ -122,23 +159,21 @@ const ViajesAnteriores = ({user}) => {
                 batch.update(firestore().collection("vehiculos").doc(v.lote), {
                     numViaje: numViajeFinal,
                     folioPago: numViajeFinal,
-                    fechaAsignacionManual: new Date()
+                    fechaAsignacionManual: new Date(),
+                    // Actualizamos también la ficha del vehículo con el cliente oficial seleccionado
+                    clienteId: v.clienteId,
+                    clienteNombre: v.clienteNombre,
+                    clienteTelefono: v.clienteTelefono,
+                    cliente: v.clienteNombre
                 });
             });
             batch.update(firestore().collection("config").doc("consecutivos"), {folioManualPGM: folioPGM});
 
             await batch.commit();
-
-            // --- LIMPIEZA DE ESTADO EN LUGAR DE RELOAD ---
             alert(`Viaje ${numViajeFinal} creado exitosamente.`);
-
-            // Limpiamos los datos del viaje actual
             setVehiculosSeleccionados([]);
             setBusqueda("");
-            // Incrementamos el folio localmente para el siguiente registro
             setFolioPGM(prev => prev + 1);
-            // Opcional: Si quieres mantener el chofer y fecha para capturar varios del mismo día
-            // setEncabezado({choferId: "", fechaManual: "", empresaLiquidada: ""});
 
         } catch (error) {
             alert("Error: " + error.message);
@@ -152,8 +187,8 @@ const ViajesAnteriores = ({user}) => {
             <h2 className="text-2xl font-black uppercase italic mb-6 flex items-center gap-3">
                 <FaHistory/> Regularización de Historial</h2>
 
-            <div
-                className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+            {/* ENCABEZADO */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
                 <div>
                     <label className="text-[10px] font-black uppercase text-gray-400">Folio PGM</label>
                     <div className="text-xl font-black text-red-600">PGM-{folioPGM}</div>
@@ -173,22 +208,24 @@ const ViajesAnteriores = ({user}) => {
                 </div>
             </div>
 
+            {/* BUSCADOR DE LOTE */}
             <div className="mb-6 flex gap-2">
                 <input type="text" placeholder="Escanea o escribe el Lote..."
                        className="input input-bordered flex-1 font-mono font-black uppercase" value={busqueda}
                        onChange={(e) => setBusqueda(e.target.value)}
                        onKeyPress={(e) => e.key === 'Enter' && buscarVehiculo()}/>
                 <button onClick={buscarVehiculo} disabled={loading}
-                        className="btn btn-accent text-white px-10 font-black">VALIDAR LOTE
+                        className="btn btn-accent text-white px-10 font-black uppercase">Validar Lote
                 </button>
             </div>
 
+            {/* TABLA */}
             <div className="overflow-x-auto border rounded-xl shadow-inner mb-6">
                 <table className="table table-compact w-full border-separate border-spacing-0">
                     <thead className="bg-gray-800 text-white text-[9px] uppercase sticky top-0">
                     <tr>
                         <th className="p-2">Identificación</th>
-                        <th className="p-2">Ubicación / Cliente</th>
+                        <th className="p-2 w-48">Cliente Oficial</th>
                         <th className="p-2 text-right">Flete</th>
                         <th className="p-2 text-right">Storage</th>
                         <th className="p-2 text-right">Extras</th>
@@ -202,18 +239,63 @@ const ViajesAnteriores = ({user}) => {
                     {vehiculosSeleccionados.map((v, i) => {
                         const subtotal = v.flete + v.storage + v.sPeso + v.gExtra;
                         return (
-                            <tr key={i} className="text-[11px] font-bold border-b hover:bg-gray-50">
+                            <tr key={v.lote} className="text-[11px] font-bold border-b hover:bg-gray-50">
                                 <td className="p-2">
                                     <div className="text-blue-700 font-black">{v.lote}</div>
-                                    <div className="text-gray-500 uppercase flex items-center gap-1"><FaCar
-                                        size={10}/> {v.marca} {v.modelo}</div>
+                                    <div className="text-gray-500 uppercase flex items-center gap-1"><FaCar size={10}/> {v.marca} {v.modelo}</div>
+                                    <div className="text-red-700 uppercase italic text-[9px]"><FaMapMarkerAlt size={9}/> {v.ciudad}, {v.estado}</div>
                                 </td>
-                                <td className="p-2 leading-tight">
-                                    <div className="uppercase flex items-center gap-1 text-red-700"><FaMapMarkerAlt
-                                        size={10}/> {v.ciudad}, {v.estado}</div>
-                                    <div className="text-gray-400 uppercase flex items-center gap-1"><FaUser
-                                        size={10}/> {v.clienteNombre || v.cliente || "S/N"}</div>
+
+                                {/* SELECTOR DE CLIENTE INTEGRADO */}
+                                <td className="p-2">
+                                    <div className="relative w-full">
+                                        <div className="text-[8px] font-black text-blue-600 mb-1 italic uppercase">
+                                            Ref: {v.clienteAlt || "S/N"}
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="BUSCAR CLIENTE..."
+                                                className="input input-bordered input-xs w-full font-bold text-[9px] uppercase pr-6"
+                                                value={busquedaCliente[v.lote] || ""}
+                                                onChange={(e) => setBusquedaCliente({
+                                                    ...busquedaCliente,
+                                                    [v.lote]: e.target.value
+                                                })}
+                                            />
+                                            {busquedaCliente[v.lote] && (
+                                                <button className="absolute right-1 top-1 text-gray-400" onClick={() => setBusquedaCliente({...busquedaCliente, [v.lote]: ""})}>
+                                                    <FaTimes size={10}/>
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* DROPDOWN CLIENTES */}
+                                        {busquedaCliente[v.lote] && (
+                                            <div className="absolute z-[100] w-full bg-white border shadow-xl rounded-md max-h-32 overflow-y-auto mt-1 border-blue-200">
+                                                {clientes
+                                                    .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[v.lote].toLowerCase()))
+                                                    .map(cliente => (
+                                                        <div
+                                                            key={cliente.id}
+                                                            className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[9px] font-bold uppercase border-b last:border-none"
+                                                            onClick={() => asignarClienteAFila(v.lote, cliente)}
+                                                        >
+                                                            {cliente.nombre}
+                                                        </div>
+                                                    ))
+                                                }
+                                            </div>
+                                        )}
+
+                                        {v.clienteNombre && !busquedaCliente[v.lote] && (
+                                            <div className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1">
+                                                <FaCheckCircle size={8}/> {v.clienteNombre}
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
+
                                 <td className="p-2 text-right font-mono">${v.flete}</td>
                                 <td className="p-2 text-right font-mono text-gray-500">${v.storage}</td>
                                 <td className="p-2 text-right font-mono text-gray-500">${v.gExtra}</td>
