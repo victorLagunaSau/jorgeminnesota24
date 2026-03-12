@@ -12,10 +12,13 @@ import EstadosPrecios from "./EstadosPrecios/EstadosPrecios";
 import Viajes from "./Viajes/Viajes";
 import SalidaVehiculo from "./SalidaVehiculo/SalidaVehiculo";
 
+// NUEVO MÓDULO DE REGULARIZACIÓN
+import ViajesAnteriores from "./Viajes/ViajesAnteriores";
+
 // --- SE COMENTAN LOS IMPORTS QUE NO ENCUENTRA VERCEL ---
-// import EliminaVehiculos from "./EliminaVehiculos/EliminaVehiculos";
-// import EliminarMovimientosERC from "./EliminaERC/EliminarMovimientosERC";
-// import ReporteVehiculos from "./Reports/ReporteVehiculos";
+import EliminaVehiculos from "./EliminaVehiculos/EliminaVehiculos";
+import EliminarMovimientosERC from "./EliminaERC/EliminarMovimientosERC";
+import ReporteVehiculos from "./Reports/ReporteVehiculos";
 
 import SalidaCaja from "./SalidaCaja/SalidaCaja";
 import EntradaCaja from "./EntradaCaja/EntradaCaja";
@@ -30,6 +33,7 @@ import Cobranza from "./Cobranza/Cobranza";
 import Clientes from "./Clientes/Clientes";
 import Empresas from "./Empresas/Empresas";
 import Choferes from "./Choferes/Choferes";
+import ReporteViajesPagados from "./Viajes/ReporteViajesPagados";
 
 const Admin = () => {
     const router = useRouter();
@@ -85,15 +89,12 @@ const Admin = () => {
                 return <Clientes user={user} />;
             case 'salidaVehiculo':
                 return <SalidaVehiculo user={user} />;
-            // --- SE COMENTA EL RENDERING DE LOS MODULOS INEXISTENTES ---
-
-            // case 'eliminaVehiculos':
-            //     return <EliminaVehiculos user={user} />;
-            // case 'eliminarMovimientosERC':
-            //     return <EliminarMovimientosERC user={user} />;
-            // case 'reporteVehiculos':
-            //     return <ReporteVehiculos user={user} />;
-
+            case 'eliminaVehiculos':
+                return <EliminaVehiculos user={user} />;
+            case 'eliminarMovimientosERC':
+                return <EliminarMovimientosERC user={user} />;
+            case 'reporteVehiculos':
+                return <ReporteVehiculos user={user} />;
             case 'salidaCaja':
                 return <SalidaCaja user={user} />;
             case 'entradaCaja':
@@ -106,6 +107,13 @@ const Admin = () => {
                 return <ReporteCobros user={user} />;
             case 'viajes':
                 return <Viajes user={user} />;
+
+            // CASO AGREGADO PARA LA HERRAMIENTA DE REGULARIZACIÓN
+            case 'viajesAnteriores':
+                return <ViajesAnteriores user={user} />;
+            case 'reporteViajesPago':
+                return <ReporteViajesPagados user={user} />;
+
             case 'vehiculos':
                 return <Vehiculos user={user} />;
             case 'estadosPrecios':

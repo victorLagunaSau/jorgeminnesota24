@@ -96,6 +96,7 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                                         Control de Viajes
                                     </button>
                                 </li>
+
                                 <li>
                                     <button className={getButtonClass('choferes')} onClick={() => onSelectModule('choferes')}>
                                         Choferes
@@ -104,6 +105,17 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                                 <li>
                                     <button className={getButtonClass('empresas')} onClick={() => onSelectModule('empresas')}>
                                         Empresas Transportistas
+                                    </button>
+                                </li>
+                                {/* BOTÓN AGREGADO */}
+                                <li>
+                                    <button className={getButtonClass('viajesAnteriores')} onClick={() => onSelectModule('viajesAnteriores')}>
+                                        Regularización
+                                    </button>
+                                </li>
+                                <li>
+                                    <button className={getButtonClass('reporteViajesPago')} onClick={() => onSelectModule('reporteViajesPago')}>
+                                        Viajes Pagados
                                     </button>
                                 </li>
                             </ul>
@@ -132,7 +144,7 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                     <div className="mt-4 border-t border-gray-700 pt-2">
                         {/*<li><button className={getButtonClass('eliminaVehiculos')} onClick={() => onSelectModule('eliminaVehiculos')}>Elimina de Vehículos</button></li>*/}
                         {/*<li><button className={getButtonClass('eliminarMovimientosERC')} onClick={() => onSelectModule('eliminarMovimientosERC')}>Elimina de ERC</button></li>*/}
-                        {/*<li><button className={getButtonClass('reporteVehiculos')} onClick={() => onSelectModule('reporteVehiculos')}>Reporte Vehículos</button></li>*/}
+                        <li><button className={getButtonClass('reporteVehiculos')} onClick={() => onSelectModule('reporteVehiculos')}>Reporte Vehículos</button></li>
                     </div>
 
                 </ul>

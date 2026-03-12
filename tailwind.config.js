@@ -50,7 +50,7 @@ module.exports = {
       // MOVER COLORES A EXTEND para no borrar los de fábrica (como el white real)
       colors: {
         black: {
-          DEFAULT: "#000000",
+          DEFAULT: "#000",
           100: "#0B132A",
           500: "#000000",
         },
