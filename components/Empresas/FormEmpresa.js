@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
-import { firestore, storage, auth } from "../../firebase/firebaseIni"; // Asegúrate que firebaseIni exporte firebase (el sdk base)
+import { firestore, storage } from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import { FaCloudUploadAlt, FaUserLock } from "react-icons/fa";
+import { FaCloudUploadAlt, FaUserLock, FaExclamationTriangle } from "react-icons/fa";
 
 const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
     const [loading, setLoading] = useState(false);
@@ -22,36 +22,32 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
         paisEmpresa: "United States",
         representante: "",
         telefonoEmpresa: "",
-        // Nuevos campos para acceso
         emailAcceso: "",
         passwordAcceso: ""
     });
 
-// Este efecto se encarga de llenar O limpiar el formulario
-useEffect(() => {
-    if (empresaAEditar) {
-        // Si hay una empresa para editar, llenamos los campos
-        setDatos({ ...empresaAEditar });
-    } else {
-        // Si empresaAEditar es null (al cancelar o guardar), limpiamos todo
-        setDatos({
-            nombreEmpresa: "",
-            taxId: "",
-            mcNumber: "",
-            direccion: "",
-            zipCode: "",
-            taxClassification: "Individual",
-            ciudadEmpresa: "",
-            estadoEmpresa: "",
-            paisEmpresa: "United States",
-            representante: "",
-            telefonoEmpresa: "",
-            emailAcceso: "",
-            passwordAcceso: ""
-        });
-        setArchivo(null); // También limpiamos el archivo seleccionado
-    }
-}, [empresaAEditar]); // Se ejecuta cada vez que empresaAEditar cambia
+    useEffect(() => {
+        if (empresaAEditar) {
+            setDatos({ ...empresaAEditar });
+        } else {
+            setDatos({
+                nombreEmpresa: "",
+                taxId: "",
+                mcNumber: "",
+                direccion: "",
+                zipCode: "",
+                taxClassification: "Individual",
+                ciudadEmpresa: "",
+                estadoEmpresa: "",
+                paisEmpresa: "United States",
+                representante: "",
+                telefonoEmpresa: "",
+                emailAcceso: "",
+                passwordAcceso: ""
+            });
+            setArchivo(null);
+        }
+    }, [empresaAEditar]);
 
     const mostrarAviso = (mensaje, tipo = "info") => {
         setAlerta({ mostrar: true, mensaje, tipo });
@@ -77,62 +73,44 @@ useEffect(() => {
 
     const ejecutarGuardado = async () => {
         if (!datos.nombreEmpresa || !datos.taxId || !datos.telefonoEmpresa || !datos.emailAcceso || !datos.passwordAcceso) {
-            mostrarAviso("Faltan campos (Nombre, EIN, Teléfono, Email y Password)", "error");
+            mostrarAviso("Faltan campos obligatorios", "error");
             return;
         }
 
         setLoading(true);
         try {
             let urlW9 = datos.urlDocW9 || "";
+            // Si hay un archivo nuevo, lo subimos usando el taxId actual como referencia
             if (archivo) {
-                const storageRef = storage().ref(`empresas/W9_${datos.taxId || Date.now()}`);
+                const storageRef = storage().ref(`empresas/W9_${datos.taxId}`);
                 await storageRef.put(archivo);
                 urlW9 = await storageRef.getDownloadURL();
             }
 
-            let empresaId = datos.id; // Tomamos el ID actual (sea de Firestore o nuevo)
+            let empresaId = datos.id;
 
-            // --- LÓGICA DE USUARIO EN AUTH ---
-            // Si NO tiene ID (es nueva) o si tiene un ID de Firestore pero NO está en Auth
-            // Para simplificar: si no tenemos un registro previo de que el usuario ya existe en Auth, intentamos crearlo.
-
-            // Creamos instancia secundaria para no cerrar tu sesión
+            // Manejo de Auth (Lógica simplificada para actualización/creación)
             const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");
-
             try {
-                // Intentamos crear el usuario
-                const userCredential = await secondaryApp.auth().createUserWithEmailAndPassword(datos.emailAcceso, datos.passwordAcceso);
-
-                // Si la creación es exitosa, obtenemos el nuevo UID de Auth
-                const nuevoUidAuth = userCredential.user.uid;
-
-                // IMPORTANTE: Si la empresa ya existía en Firestore con un ID viejo (como "XtCDOA..."),
-                // pero ahora le creamos cuenta en Auth, lo mejor es migrarla al nuevo UID de Auth para que coincidan.
-                empresaId = nuevoUidAuth;
-
-            } catch (authError) {
-                // Si el error es que el email ya existe, simplemente ignoramos y seguimos (ya tiene cuenta)
-                if (authError.code === 'auth/email-already-in-loop' || authError.code === 'auth/email-already-in-use') {
-                    console.log("El usuario ya existe en Auth, procediendo a actualizar datos en Firestore.");
+                if (!empresaAEditar) {
+                    const userCredential = await secondaryApp.auth().createUserWithEmailAndPassword(datos.emailAcceso, datos.passwordAcceso);
+                    empresaId = userCredential.user.uid;
                 } else {
-                    // Si es otro error (password débil, etc), lanzamos el error
-                    throw authError;
+                    // Si ya existe, podrías agregar lógica para actualizar email en Auth aquí si fuera necesario
+                    console.log("Actualizando empresa existente...");
                 }
+            } catch (authError) {
+                if (authError.code !== 'auth/email-already-in-use') throw authError;
             } finally {
                 await secondaryApp.auth().signOut();
                 await secondaryApp.delete();
             }
-            // ---------------------------------
 
             const usuarioData = {
-                admin: false,
-                contactoDos: datos.contactoDos || "",
                 email: datos.emailAcceso.toLowerCase(),
                 id: empresaId,
                 nombre: datos.representante || datos.nombreEmpresa,
-                photoURL: null,
                 telefono: datos.telefonoEmpresa,
-                telefonoDos: datos.telefonoDos || "",
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
                 tipo: "empresa",
                 username: datos.nombreEmpresa.toUpperCase(),
@@ -143,7 +121,7 @@ useEffect(() => {
                 ...datos,
                 id: empresaId,
                 nombreEmpresa: datos.nombreEmpresa.toUpperCase(),
-                direccion: datos.direccion.toUpperCase(),
+                taxId: datos.taxId, // Guardamos el Tax ID editado
                 urlDocW9: urlW9,
                 registro: empresaAEditar ? datos.registro : {
                     usuario: user?.nombre || "Admin",
@@ -155,13 +133,6 @@ useEffect(() => {
             const batch = firestore().batch();
             const userRef = firestore().collection("users").doc(empresaId);
             const empresaRef = firestore().collection("empresas").doc(empresaId);
-
-            // Si el ID cambió (porque creamos un usuario Auth para una empresa vieja),
-            // borramos el documento viejo de la colección empresas para no dejar duplicados.
-            if (empresaAEditar && empresaAEditar.id !== empresaId) {
-                batch.delete(firestore().collection("empresas").doc(empresaAEditar.id));
-                batch.delete(firestore().collection("users").doc(empresaAEditar.id));
-            }
 
             batch.set(userRef, usuarioData, { merge: true });
             batch.set(empresaRef, empresaFinal, { merge: true });
@@ -175,7 +146,7 @@ useEffect(() => {
             }
 
             await batch.commit();
-            mostrarAviso("Datos y Acceso sincronizados", "success");
+            mostrarAviso("Empresa actualizada correctamente", "success");
             if (onSuccess) onSuccess();
 
         } catch (e) {
@@ -186,10 +157,7 @@ useEffect(() => {
         }
     };
 
-// Agregamos el signo "?" o verificamos que exista antes del .includes
-const valido = datos.nombreEmpresa?.trim() !== "" &&
-               (datos.taxId?.length >= 10) &&
-               (datos.emailAcceso?.includes("@") || false);
+    const valido = datos.nombreEmpresa?.trim() !== "" && datos.taxId?.length >= 10;
 
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative font-sans">
@@ -204,16 +172,23 @@ const valido = datos.nombreEmpresa?.trim() !== "" &&
             {/* SECCIÓN 1: DATOS FISCALES */}
             <div className="flex flex-row flex-nowrap gap-2 items-end w-full mb-3">
                 <div className="flex-grow p-1">
-                    <label className="block text-[11px] font-bold text-red-600 uppercase italic">Company Name (W-9 Line 1): *</label>
+                    <label className="block text-[11px] font-bold text-red-600 uppercase italic">Company Name: *</label>
                     <input type="text" value={datos.nombreEmpresa}
                            onChange={(e) => setDatos({ ...datos, nombreEmpresa: e.target.value })}
                            className="input input-bordered w-full input-sm bg-white text-black focus:border-blue-700 uppercase" />
                 </div>
-                <div className="w-36 p-1">
-                    <label className="block text-[11px] font-bold text-gray-600 uppercase italic">Tax ID (EIN): *</label>
-                    <input type="text" placeholder="00-0000000" value={datos.taxId} onChange={handleTaxIdChange} maxLength={10}
-                           disabled={empresaAEditar}
-                           className="input input-bordered w-full input-sm bg-white text-black font-mono disabled:bg-gray-100" />
+                <div className="w-48 p-1">
+                    <label className="block text-[11px] font-bold text-red-600 uppercase italic flex items-center gap-1">
+                        Tax ID (EIN): * {empresaAEditar && <FaExclamationTriangle className="text-orange-500" title="Editando ID existente" />}
+                    </label>
+                    <input
+                        type="text"
+                        placeholder="00-0000000"
+                        value={datos.taxId}
+                        onChange={handleTaxIdChange}
+                        maxLength={10}
+                        className="input input-bordered w-full input-sm bg-white text-black font-mono border-red-200 focus:border-red-600"
+                    />
                 </div>
             </div>
 
@@ -238,7 +213,7 @@ const valido = datos.nombreEmpresa?.trim() !== "" &&
                 </div>
             </div>
 
-            {/* SECCIÓN 3: ACCESO Y USUARIO (NUEVO) */}
+            {/* SECCIÓN 3: ACCESO */}
             <div className="flex flex-row flex-nowrap gap-2 items-end w-full border-t border-gray-100 pt-3 bg-blue-50/50 p-2 rounded-lg mb-3">
                 <div className="w-8 flex items-center justify-center text-blue-700">
                     <FaUserLock size={20} />
@@ -247,47 +222,50 @@ const valido = datos.nombreEmpresa?.trim() !== "" &&
                     <label className="block text-[11px] font-bold text-blue-700 uppercase italic">Email de Acceso: *</label>
                     <input type="email" value={datos.emailAcceso}
                            onChange={(e) => setDatos({ ...datos, emailAcceso: e.target.value })}
-                           className="input input-bordered w-full input-sm bg-white text-black" placeholder="ejemplo@correo.com" />
+                           className="input input-bordered w-full input-sm bg-white text-black" />
                 </div>
                 <div className="w-48 p-1">
-                    <label className="block text-[11px] font-bold text-blue-700 uppercase italic">Contraseña (Plana): *</label>
+                    <label className="block text-[11px] font-bold text-blue-700 uppercase italic">Contraseña: *</label>
                     <input type="text" value={datos.passwordAcceso}
                            onChange={(e) => setDatos({ ...datos, passwordAcceso: e.target.value })}
-                           className="input input-bordered w-full input-sm bg-white text-black font-mono" placeholder="Min 6 caract." />
+                           className="input input-bordered w-full input-sm bg-white text-black font-mono" />
                 </div>
             </div>
 
-            {/* BOTONES Y ARCHIVO */}
+            {/* BOTONES */}
             <div className="flex flex-row flex-nowrap gap-2 items-end w-full">
                 <div className="flex-grow p-1">
                     <label className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-lg h-8 cursor-pointer transition-colors ${archivo ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-300 hover:border-blue-500 text-gray-400'}`}>
                         <FaCloudUploadAlt />
                         <span className="text-[10px] font-black uppercase">
-                            {archivo ? archivo.name.substring(0, 15) + '...' : 'W-9 (JPG/PNG/PDF)'}
+                            {archivo ? archivo.name.substring(0, 15) + '...' : 'Actualizar W-9'}
                         </span>
-                        <input type="file" accept="image/png, image/jpeg, application/pdf" className="hidden" onChange={handleFileChange} />
+                        <input type="file" className="hidden" onChange={handleFileChange} />
                     </label>
                 </div>
 
                 <div className="p-1">
-                    <label htmlFor={valido && !loading ? "modal-confirm-empresa" : ""}
-                           className={`btn btn-sm px-8 ${valido ? (empresaAEditar ? 'btn-warning' : 'btn-info') : 'btn-disabled opacity-50'}`}>
-                        {loading ? <span className="loading loading-spinner loading-xs"></span> : (empresaAEditar ? "Actualizar Empresa" : "+ Guardar Carrier")}
-                    </label>
+                    <button
+                        onClick={() => { if(valido) document.getElementById('modal-confirm-empresa').checked = true; }}
+                        disabled={!valido || loading}
+                        className={`btn btn-sm px-8 ${empresaAEditar ? 'btn-warning' : 'btn-info'} text-white font-bold`}
+                    >
+                        {loading ? "Procesando..." : (empresaAEditar ? "Guardar Cambios" : "+ Registrar")}
+                    </button>
                 </div>
             </div>
 
-            {/* MODAL DE CONFIRMACIÓN */}
+            {/* MODAL */}
             <input type="checkbox" id="modal-confirm-empresa" className="modal-toggle" />
             <div className="modal">
-                <div className="modal-box bg-white border-t-4 border-info text-black">
-                    <h3 className="font-bold text-lg uppercase italic">{empresaAEditar ? '¿Actualizar Datos?' : 'Confirmar Registro'}</h3>
+                <div className="modal-box bg-white border-t-4 border-info">
+                    <h3 className="font-bold text-lg uppercase text-black">Confirmar Modificación</h3>
                     <p className="py-4 text-[13px] text-gray-600">
-                        Se {empresaAEditar ? 'actualizarán' : 'crearán'} los datos de <span className="font-bold text-blue-800">{datos.nombreEmpresa}</span>.
-                        Acceso con: <span className="font-bold">{datos.emailAcceso}</span>
+                        ¿Estás seguro de actualizar los datos de <span className="font-bold">{datos.nombreEmpresa}</span>?
+                        {empresaAEditar && <span className="block mt-2 text-red-600 font-bold">El Tax ID será actualizado en el sistema.</span>}
                     </p>
                     <div className="modal-action">
-                        <label htmlFor="modal-confirm-empresa" className="btn btn-sm btn-outline">Revisar</label>
+                        <label htmlFor="modal-confirm-empresa" className="btn btn-sm btn-outline">Cancelar</label>
                         <label htmlFor="modal-confirm-empresa" className="btn btn-sm btn-info text-white" onClick={ejecutarGuardado}>Confirmar</label>
                     </div>
                 </div>
