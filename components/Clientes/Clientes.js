@@ -1,52 +1,53 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import FormCliente from "./FormCliente";
 import TablaClientes from "./TablaClientes";
+import { FaTimes } from "react-icons/fa";
 
 const Clientes = ({ user }) => {
-    // Estado inicial limpio y con campos específicos para evitar colisiones
-    const [datos, setDatos] = useState({
-        cliente: "",
-        telefonoCliente: "",
-        apodo: "",
-        ciudadCliente: "",
-        estadoCliente: "",
-        rfc: null,    // Reservado
-        email: null   // Reservado
-    });
+    const [clienteAEditar, setClienteAEditar] = useState(null);
 
-    const handleGuardar = () => {
-        if (!datos.cliente || !datos.telefonoCliente) {
-            alert("Nombre y Teléfono son obligatorios para el registro.");
-            return;
-        }
+    const handleEditar = (cliente) => {
+        setClienteAEditar(cliente);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
 
-        // Estructura lista para enviar a Firebase
-        const objetoParaGuardar = {
-            ...datos,
-            registro: {
-                usuario: user.nombre,
-                idUsuario: user.id,
-                timestamp: new Date() // O firebase.firestore.FieldValue.serverTimestamp()
-            }
-        };
-
-        console.log("Objeto validado y listo para persistencia:", objetoParaGuardar);
-        // Próximo paso: Integrar tu mecánica de Folios
+    const cancelarEdicion = () => {
+        setClienteAEditar(null);
     };
 
     return (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
-            <div className="mb-4 flex items-center gap-2">
-                <div className="h-6 w-2 bg-red-600 rounded-full"></div>
-                <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wider">
-                    Directorio de Clientes
-                </h2>
+            <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className={`h-6 w-2 ${clienteAEditar ? 'bg-orange-500' : 'bg-red-600'} rounded-full transition-colors`}></div>
+                    <h2 className="text-xl font-bold text-gray-800 uppercase tracking-wider">
+                        {clienteAEditar ? `Editando: ${clienteAEditar.cliente}` : 'Directorio de Clientes'}
+                    </h2>
+                </div>
+
+                <AnimatePresence>
+                    {clienteAEditar && (
+                        <motion.button
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            onClick={cancelarEdicion}
+                            className="btn btn-xs btn-error text-white gap-1"
+                        >
+                            <FaTimes /> Cancelar Edición
+                        </motion.button>
+                    )}
+                </AnimatePresence>
             </div>
 
-            <FormCliente user={user}/>
+            <FormCliente
+                user={user}
+                clienteAEditar={clienteAEditar}
+                onSuccess={cancelarEdicion}
+            />
 
-            <TablaClientes clientes={user} />
+            <TablaClientes onEditar={handleEditar} />
         </motion.div>
     );
 };

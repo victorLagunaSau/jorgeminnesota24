@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import { firestore } from "../../firebase/firebaseIni";
 
-const FormCliente = ({ user, onSuccess }) => {
+const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
     const [loading, setLoading] = useState(false);
     const [alerta, setAlerta] = useState({ mostrar: false, mensaje: "", tipo: "" });
 
@@ -13,10 +13,22 @@ const FormCliente = ({ user, onSuccess }) => {
         apodoCliente: "",
         ciudadCliente: "",
         estadoCliente: "",
-        paisCliente: "us", // Valor inicial por defecto (Brownsville)
-        rfcCliente: null,
-        emailCliente: null
+        paisCliente: "United States",
+        rfcCliente: "",
+        emailCliente: ""
     });
+
+    useEffect(() => {
+        if (clienteAEditar) {
+            setDatos({ ...clienteAEditar });
+        } else {
+            setDatos({
+                cliente: "", telefonoCliente: "", apodoCliente: "",
+                ciudadCliente: "", estadoCliente: "", paisCliente: "United States",
+                rfcCliente: "", emailCliente: ""
+            });
+        }
+    }, [clienteAEditar]);
 
     const mostrarAviso = (mensaje, tipo = "info") => {
         setAlerta({ mostrar: true, mensaje, tipo });
@@ -31,43 +43,42 @@ const FormCliente = ({ user, onSuccess }) => {
     const ejecutarGuardado = async () => {
         setLoading(true);
         try {
-            const conRef = firestore().collection("config").doc("consecutivos");
-            const docCon = await conRef.get();
-            const nuevoFolio = (docCon.data().clientes || 0) + 1;
+            if (clienteAEditar) {
+                // LÓGICA DE ACTUALIZACIÓN
+                await firestore().collection("clientes").doc(clienteAEditar.id).update({
+                    ...datos,
+                    editado: {
+                        usuario: user?.nombre || "Admin",
+                        fecha: new Date()
+                    }
+                });
+                mostrarAviso("Cliente actualizado correctamente", "success");
+            } else {
+                // LÓGICA DE REGISTRO NUEVO
+                const conRef = firestore().collection("config").doc("consecutivos");
+                const docCon = await conRef.get();
+                const nuevoFolio = (docCon.data().clientes || 0) + 1;
 
-            const clienteFinal = {
-                folio: nuevoFolio,
-                cliente: datos.cliente,
-                telefonoCliente: datos.telefonoCliente,
-                apodoCliente: datos.apodoCliente || null,
-                ciudadCliente: datos.ciudadCliente || null,
-                estadoCliente: datos.estadoCliente || null,
-                paisCliente: datos.paisCliente, // Se guarda automáticamente
-                rfcCliente: datos.rfcCliente,
-                emailCliente: datos.emailCliente,
-                registro: {
-                    usuario: user?.nombre || "Admin",
-                    idUsuario: user?.id || user?.uid || "N/A",
-                    timestamp: new Date()
-                }
-            };
+                const clienteFinal = {
+                    ...datos,
+                    folio: nuevoFolio,
+                    registro: {
+                        usuario: user?.nombre || "Admin",
+                        idUsuario: user?.id || user?.uid || "N/A",
+                        timestamp: new Date()
+                    }
+                };
 
-            await firestore().collection("clientes").add(clienteFinal);
-            await conRef.update({ clientes: nuevoFolio });
-
-            mostrarAviso(`¡Éxito! Cliente guardado con folio #${nuevoFolio}`, "success");
-
-            setDatos({
-                cliente: "", telefonoCliente: "", apodoCliente: "",
-                ciudadCliente: "", estadoCliente: "", paisCliente: "us",
-                rfcCliente: null, emailCliente: null
-            });
+                await firestore().collection("clientes").add(clienteFinal);
+                await conRef.update({ clientes: nuevoFolio });
+                mostrarAviso(`Cliente #${nuevoFolio} guardado`, "success");
+            }
 
             if (onSuccess) onSuccess();
 
         } catch (error) {
             console.error("Error:", error);
-            mostrarAviso("Error al guardar", "error");
+            mostrarAviso("Error al procesar", "error");
         } finally {
             setLoading(false);
         }
@@ -77,10 +88,9 @@ const FormCliente = ({ user, onSuccess }) => {
 
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative">
-
             {alerta.mostrar && (
-                <div className="absolute top-[-50px] left-0 w-full z-50">
-                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 flex justify-center`}>
+                <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
+                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 px-6`}>
                         <span>{alerta.mensaje}</span>
                     </div>
                 </div>
@@ -88,40 +98,36 @@ const FormCliente = ({ user, onSuccess }) => {
 
             <div className="flex flex-row flex-nowrap gap-2 items-end w-full mb-4">
                 <div className="flex-grow p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Nombre / Razón Social:</label>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Nombre / Razón Social: *</label>
                     <input
                         type="text" name="cliente" value={datos.cliente} onChange={handleChange}
-                        className="input input-bordered w-full input-sm bg-white text-black focus:border-red-500"
+                        className="input input-bordered w-full input-sm bg-white text-black focus:border-red-500 uppercase font-bold"
                     />
                 </div>
 
                 <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono Cliente:</label>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono: *</label>
                     <PhoneInput
                         onlyCountries={['us', 'mx']}
                         country={'us'}
                         value={datos.telefonoCliente}
-                        // Aquí capturamos el país automáticamente del objeto 'country'
                         onChange={(val, country) => {
                             setDatos({
                                 ...datos,
                                 telefonoCliente: val.startsWith('+') ? val : '+' + val,
-                                paisCliente: country.name // Guarda 'United States' o 'Mexico'
+                                paisCliente: country.name
                             });
                         }}
                         inputStyle={{ paddingLeft: '48px', width: '100%' }}
-                        inputProps={{
-                            name: 'phone',
-                            className: 'input input-bordered w-full text-black-500 input-sm bg-white'
-                        }}
+                        inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white font-bold' }}
                     />
                 </div>
 
                 <div className="w-48 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Ciudad Cliente:</label>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Ciudad:</label>
                     <input
                         type="text" name="ciudadCliente" value={datos.ciudadCliente} onChange={handleChange}
-                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black"
+                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
                     />
                 </div>
 
@@ -129,7 +135,7 @@ const FormCliente = ({ user, onSuccess }) => {
                     <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Edo:</label>
                     <input
                         type="text" name="estadoCliente" value={datos.estadoCliente} onChange={handleChange}
-                        maxLength={4} className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase text-center"
+                        maxLength={4} className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase text-center font-bold"
                     />
                 </div>
             </div>
@@ -139,36 +145,29 @@ const FormCliente = ({ user, onSuccess }) => {
                     <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Referencia (Apodo):</label>
                     <input
                         type="text" name="apodoCliente" value={datos.apodoCliente} onChange={handleChange}
-                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black"
+                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
                     />
                 </div>
 
-                <div className="p-1">
-                    <label
-                        htmlFor={formularioValido && !loading ? "modal-confirmar-cliente" : ""}
-                        className={`btn btn-sm px-8 shadow-sm ${formularioValido && !loading ? 'btn-info' : 'btn-disabled opacity-50'}`}
-                        onClick={() => { if(!formularioValido) mostrarAviso("Completa nombre y teléfono", "error") }}
+                <div className="flex-grow flex justify-end p-1">
+                    <button
+                        onClick={() => { if(formularioValido) document.getElementById('modal-confirmar-cliente').checked = true; }}
+                        disabled={!formularioValido || loading}
+                        className={`btn btn-sm px-10 shadow-sm ${clienteAEditar ? 'btn-warning' : 'btn-info'} text-white font-bold`}
                     >
-                        {loading ? "Procesando..." : "+ Guardar Cliente"}
-                    </label>
+                        {loading ? "Procesando..." : (clienteAEditar ? "Guardar Cambios" : "+ Guardar Cliente")}
+                    </button>
                 </div>
             </div>
 
-            {/* MODAL DE CONFIRMACIÓN */}
             <input type="checkbox" id="modal-confirmar-cliente" className="modal-toggle" />
             <div className="modal">
                 <div className="modal-box bg-white border-t-4 border-info">
-                    <h3 className="font-bold text-lg text-black uppercase">Confirmar Registro</h3>
-                    <p className="py-4 text-gray-600 font-medium">¿Deseas registrar a <span className="font-bold text-black border-b-2 border-info">{datos.cliente}</span> de <span className="text-info">{datos.paisCliente}</span>?</p>
+                    <h3 className="font-bold text-lg text-black uppercase">{clienteAEditar ? 'Confirmar Edición' : 'Confirmar Registro'}</h3>
+                    <p className="py-4 text-gray-600 font-medium">¿Deseas guardar los cambios para <span className="font-bold text-black">{datos.cliente}</span>?</p>
                     <div className="modal-action">
-                        <label htmlFor="modal-confirmar-cliente" className="btn btn-sm btn-outline">Cerrar</label>
-                        <label
-                            htmlFor="modal-confirmar-cliente"
-                            className="btn btn-sm btn-info text-white"
-                            onClick={ejecutarGuardado}
-                        >
-                            Sí, Guardar Cliente
-                        </label>
+                        <label htmlFor="modal-confirmar-cliente" className="btn btn-sm btn-outline">Cancelar</label>
+                        <label htmlFor="modal-confirmar-cliente" className="btn btn-sm btn-info text-white" onClick={ejecutarGuardado}>Confirmar</label>
                     </div>
                 </div>
             </div>
