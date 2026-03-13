@@ -1,14 +1,13 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaTruck} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaChofer from "./HojaChofer";
 import HojaVerificacion from "./HojaVerificacion";
 import ModalLiquidacion from "./ModalLiquidacion";
 
 const TablaViajes = ({user}) => {
-    // ... (Mantener todos tus estados de viajes, clientes, loading, etc. igual)
     const [viajes, setViajes] = useState([]);
     const [clientes, setClientes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -19,6 +18,9 @@ const TablaViajes = ({user}) => {
     const [viajeAImprimir, setViajeAImprimir] = useState(null);
     const [viajeALiquidar, setViajeALiquidar] = useState(null);
     const [modal, setModal] = useState({show: false, mensaje: "", accion: null, tipo: ""});
+
+    // Estado para el Modal de Comentarios
+    const [modalComentario, setModalComentario] = useState({show: false, v: null, viajeId: null, idx: null});
 
     useEffect(() => {
         if (!user) return;
@@ -42,7 +44,6 @@ const TablaViajes = ({user}) => {
         return () => { unsubViajes(); unsubClientes(); };
     }, [user]);
 
-    // ... (Mantener handleLocalEdit y cambiarEstatus igual)
     const handleLocalEdit = (viajeId, vehiculoIdx, field, value) => {
         if (!user.admin) return;
         const nuevosViajes = viajes.map(viaje => {
@@ -57,7 +58,9 @@ const TablaViajes = ({user}) => {
                     nuevosVehiculos[vehiculoIdx].clienteId = value;
                     nuevosVehiculos[vehiculoIdx].clienteNombre = clienteEncontrado ? clienteEncontrado.nombre : "";
                     nuevosVehiculos[vehiculoIdx].clienteTelefono = clienteEncontrado ? clienteEncontrado.telefono : "";
-                } else { nuevosVehiculos[vehiculoIdx][field] = valorFinal; }
+                } else {
+                    nuevosVehiculos[vehiculoIdx][field] = valorFinal;
+                }
                 return {...viaje, vehiculos: nuevosVehiculos};
             }
             return viaje;
@@ -94,7 +97,6 @@ const TablaViajes = ({user}) => {
 
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
-            {/* COMPONENTES OCULTOS */}
             <div style={{display: "none"}}>
                 {user.admin ?
                     <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/> :
@@ -104,7 +106,7 @@ const TablaViajes = ({user}) => {
 
             {viajeALiquidar && <ModalLiquidacion viaje={viajeALiquidar} user={user} onClose={() => setViajeALiquidar(null)}/>}
 
-            {/* MODAL DE CONFIRMACIÓN */}
+            {/* MODAL DE CONFIRMACIÓN GENERAL */}
             {modal.show && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl p-8 max-w-sm w-full border-t-8 border-red-600 shadow-2xl">
@@ -118,7 +120,55 @@ const TablaViajes = ({user}) => {
                 </div>
             )}
 
-            {/* HEADER DE LA TABLA */}
+            {/* MODAL ESPECÍFICO DE COMENTARIOS */}
+            {modalComentario.show && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
+                                <FaCommentDots className="text-blue-600"/> Notas del Vehículo
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalComentario.v?.lote}</p>
+
+                            <div className="mt-6 space-y-4">
+                                {/* COMENTARIO 1 (REGISTRO) */}
+                                <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro (Origen)</p>
+                                    <p className="text-sm font-bold text-gray-700 italic">
+                                        {modalComentario.v?.comentarioRegistro || "SIN COMENTARIOS EN EL REGISTRO."}
+                                    </p>
+                                </div>
+
+                                {/* COMENTARIO 2 (RECEPCIÓN) */}
+                                <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción (Destino)</p>
+                                    {user.admin ? (
+                                        <textarea
+                                            placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
+                                            disabled={modalComentario.v?.comentarioRecepcion && (viajes.find(vj => vj.id === modalComentario.viajeId)?.estatus === "VERIFICADO")}
+                                            className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
+                                            value={modalComentario.v?.comentarioRecepcion || ""}
+                                            onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
+                                        />
+                                    ) : (
+                                        <p className="text-sm font-bold text-blue-700 italic">
+                                            {modalComentario.v?.comentarioRecepcion || "PENDIENTE DE RECEPCIÓN."}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={() => setModalComentario({show: false, v: null, viajeId: null, idx: null})}
+                                className="btn btn-sm btn-error w-full mt-6 text-white font-black uppercase"
+                            >
+                                Cerrar Ventana
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="sticky top-0 z-[50] p-6 bg-white border-b-2 border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
@@ -134,11 +184,10 @@ const TablaViajes = ({user}) => {
                 </div>
             </div>
 
-            <div className="p-4 space-y-6"> {/* Espaciado vertical entre "bloques" de viajes */}
+            <div className="p-4 space-y-6">
                 {filtrados.map((viaje, vIndex) => (
                     <div key={viaje.id} className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden transform transition-all">
 
-                        {/* SUB-HEADER POR VIAJE */}
                         <div className="bg-gray-100 p-3 flex justify-between items-center text-white">
                             <div className="flex items-center gap-4">
                                 <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg]">
@@ -172,12 +221,15 @@ const TablaViajes = ({user}) => {
                                         <th className="p-3 text-center text-gray-400">S. Peso</th>
                                         <th className="p-3 text-center text-gray-400">G. Extra</th>
                                         <th className="p-3 text-center">Título</th>
+                                        <th className="p-3 text-center bg-gray-100">Notas</th> {/* COLUMNA DE NOTAS */}
                                         <th className="p-3 text-center bg-gray-100">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {viaje.vehiculos.map((v, idx) => {
                                         const isLocked = (viaje.estatus === "EN VERIFICACION" || viaje.estatus === "VERIFICADO") && user.admin;
+                                        const tieneComentarios = (v.comentarioRegistro && v.comentarioRegistro !== "") || (v.comentarioRecepcion && v.comentarioRecepcion !== "");
+
                                         return (
                                             <tr key={`${viaje.id}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                                                 <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
@@ -231,7 +283,6 @@ const TablaViajes = ({user}) => {
                                                     )}
                                                 </td>
 
-                                                {/* COSTOS */}
                                                 {['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
                                                     <td key={field} className="p-1 text-center">
                                                         {user.admin ? (
@@ -257,7 +308,17 @@ const TablaViajes = ({user}) => {
                                                     )}
                                                 </td>
 
-                                                {/* ACCIONES (SOLO SE MUESTRAN UNA VEZ EN LA ÚLTIMA CELDA PARA EL BLOQUE, O AQUÍ INDIVIDUALMENTE SI PREFIERES) */}
+                                                {/* CELDA DE NOTAS */}
+                                                <td className="p-1 text-center bg-gray-50">
+                                                    <button
+                                                        onClick={() => setModalComentario({show: true, v, viajeId: viaje.id, idx})}
+                                                        className={`relative p-2 rounded-lg transition-all ${tieneComentarios ? 'text-blue-600 bg-blue-100' : 'text-gray-300 hover:bg-gray-200'}`}
+                                                    >
+                                                        {tieneComentarios ? <FaCommentDots size={18}/> : <FaRegCommentDots size={18}/>}
+                                                        {tieneComentarios && <span className="absolute top-1 right-1 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
+                                                    </button>
+                                                </td>
+
                                                 {idx === 0 && (
                                                     <td rowSpan={viaje.vehiculos.length} className="p-4 bg-gray-50/80 border-l-2 border-gray-100 align-middle">
                                                         <div className="flex flex-col gap-2 w-32 mx-auto">

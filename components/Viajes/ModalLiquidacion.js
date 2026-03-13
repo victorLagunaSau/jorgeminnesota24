@@ -42,6 +42,8 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
                     const movimientoRef = firestore().collection("movimientos").doc(); // ID Automático
 
+                    // --- DENTRO DE ejecutarPago -> viaje.vehiculos.forEach((v) => { ---
+
                     const dataComun = {
                         active: true,
                         almacen: v.almacen || "PENDIENTE",
@@ -54,14 +56,21 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                         clienteNombre: v.clienteNombre || "",
                         clienteTelefono: v.clienteTelefono || "",
                         comentariosChofer: null,
+
+                        // --- NUEVOS CAMPOS DE COMENTARIOS Y VINCULACIÓN ---
+                        comentarioRegistro: v.comentarioRegistro || "", // El que viene del Form
+                        comentarioRecepcion: v.comentarioRecepcion || "", // El que viene de la Tabla
+                        numViaje: viaje.numViaje, // Vinculación directa al viaje
+                        folioPago: nuevoFolioContable, // El folio PG-XXX generado en esta transacción
+                        // ------------------------------------------------
+
                         descripcion: "",
                         estado: v.estado || "",
-                        estatus: "EB", // En Bodega para la tabla de vehiculos
+                        estatus: "EB",
                         gastosExtra: parseFloat(v.gExtra || 0),
                         gatePass: "X",
                         marca: v.marca || "",
                         modelo: v.modelo || "",
-                        // Lógica Financiera: price es lo que se cobra, flete lo que se paga
                         price: String(v.precioVenta || v.flete || "0"),
                         flete: parseFloat(v.flete || 0),
                         registro: {

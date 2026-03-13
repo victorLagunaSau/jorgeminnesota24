@@ -114,7 +114,8 @@ const FormViaje = ({user}) => {
             estado: "", ciudad: "",
             flete: 0,          // Se usará para el COST (chofer)
             precioVenta: 0,    // Se usará para el PRICE (cliente) - OCULTO
-            storage: "0", sPeso: "0", gExtra: "0", titulo: "NO"
+            storage: "0", sPeso: "0", gExtra: "0", titulo: "NO",
+            comentarioRegistro: ""
         }]);
     };
 
@@ -411,6 +412,7 @@ const FormViaje = ({user}) => {
                             <th>S. Peso</th>
                             <th>G. Extra</th>
                             <th>Título</th>
+                            <th className="text-orange-600">Comentario Reg.</th>
                             <th></th>
                         </tr>
                         </thead>
@@ -482,6 +484,15 @@ const FormViaje = ({user}) => {
                                         <option value="NO">NO</option>
                                         <option value="SI">SI</option>
                                     </select>
+                                </td>
+                                <td>
+                                    <input
+                                        type="text"
+                                        value={v.comentarioRegistro}
+                                        placeholder="Nota opcional..."
+                                        onChange={(e) => handleTableChange(v.id, 'comentarioRegistro', e.target.value.toUpperCase())}
+                                        className="input input-xs w-40 bg-white-500 italic text-[10px]"
+                                    />
                                 </td>
                                 <td>
                                     <button onClick={() => setVehiculos(vehiculos.filter(veh => veh.id !== v.id))}
