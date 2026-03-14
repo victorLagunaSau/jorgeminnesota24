@@ -1,7 +1,17 @@
 import React, {useState, useEffect} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaSearch, FaTrash, FaSave, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaCheckCircle} from "react-icons/fa";
+import {
+    FaSearch,
+    FaTrash,
+    FaSave,
+    FaHistory,
+    FaCar,
+    FaMapMarkerAlt,
+    FaUser,
+    FaTimes,
+    FaCheckCircle
+} from "react-icons/fa";
 
 const ViajesAnteriores = ({user}) => {
     const [busqueda, setBusqueda] = useState("");
@@ -12,6 +22,15 @@ const ViajesAnteriores = ({user}) => {
     const [loading, setLoading] = useState(false);
     const [folioPGM, setFolioPGM] = useState(null);
     const [busquedaCliente, setBusquedaCliente] = useState({}); // Estado para el buscador de cliente por fila
+
+    const [busquedaChofer, setBusquedaChofer] = useState(""); // Texto que escribe el usuario
+    const [choferSeleccionado, setChoferSeleccionado] = useState(null); // Objeto del chofer elegido
+
+    const seleccionarChofer = (chofer) => {
+        setEncabezado({...encabezado, choferId: chofer.id});
+        setChoferSeleccionado(chofer);
+        setBusquedaChofer(""); // Limpiamos el buscador
+    };
 
     const [encabezado, setEncabezado] = useState({
         choferId: "",
@@ -188,7 +207,8 @@ const ViajesAnteriores = ({user}) => {
                 <FaHistory/> Regularización de Historial</h2>
 
             {/* ENCABEZADO */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+            <div
+                className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
                 <div>
                     <label className="text-[10px] font-black uppercase text-gray-400">Folio PGM</label>
                     <div className="text-xl font-black text-red-600">PGM-{folioPGM}</div>
@@ -198,13 +218,55 @@ const ViajesAnteriores = ({user}) => {
                     <input type="date" className="input input-bordered input-sm w-full font-bold uppercase"
                            onChange={(e) => setEncabezado({...encabezado, fechaManual: e.target.value})}/>
                 </div>
-                <div>
+                <div className="relative">
                     <label className="text-[10px] font-black uppercase text-gray-400">Chofer</label>
-                    <select className="select select-bordered select-sm w-full font-bold uppercase"
-                            onChange={(e) => setEncabezado({...encabezado, choferId: e.target.value})}>
-                        <option value="">-- Seleccionar --</option>
-                        {choferes.map(c => <option key={c.id} value={c.id}>{c.nombreChofer}</option>)}
-                    </select>
+
+                    {/* Input Buscador */}
+                    <div className="relative">
+                        <input
+    type="text"
+    className={`input input-bordered input-sm w-full font-bold uppercase ${
+        encabezado.choferId ? "bg-gray-200 text-gray-700" : "bg-white"
+    }`}
+    // Si hay chofer seleccionado, lo muestra. Si no, muestra la búsqueda.
+    value={busquedaChofer || (choferSeleccionado ? choferSeleccionado.nombreChofer : "")}
+    onChange={(e) => setBusquedaChofer(e.target.value)}
+    placeholder="BUSCAR CHOFER..."
+    readOnly={!!encabezado.choferId && !busquedaChofer}
+/>
+                        {/* Botón para borrar selección si te equivocas */}
+                        {encabezado.choferId && (
+                            <button
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500"
+                                onClick={() => {
+                                    setEncabezado({...encabezado, choferId: ""});
+                                    setChoferSeleccionado(null);
+                                }}
+                            >
+                                <FaTimes/>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Dropdown de resultados (Solo si no hay uno seleccionado y hay texto) */}
+                    {busquedaChofer && !encabezado.choferId && (
+                        <div
+                            className="absolute z-[110] w-full bg-white border-2 border-black shadow-xl rounded-md max-h-48 overflow-y-auto mt-1">
+                            {choferes
+                                .filter(c => c.nombreChofer.toLowerCase().includes(busquedaChofer.toLowerCase()))
+                                .map(c => (
+                                    <div
+                                        key={c.id}
+                                        className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-xs font-bold uppercase border-b border-gray-100"
+                                        onClick={() => seleccionarChofer(c)}
+                                    >
+                                        {c.nombreChofer} <span
+                                        className="text-[9px] opacity-70">({c.empresaNombre})</span>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -242,59 +304,71 @@ const ViajesAnteriores = ({user}) => {
                             <tr key={v.lote} className="text-[11px] font-bold border-b hover:bg-gray-50">
                                 <td className="p-2">
                                     <div className="text-blue-700 font-black">{v.lote}</div>
-                                    <div className="text-gray-500 uppercase flex items-center gap-1"><FaCar size={10}/> {v.marca} {v.modelo}</div>
-                                    <div className="text-red-700 uppercase italic text-[9px]"><FaMapMarkerAlt size={9}/> {v.ciudad}, {v.estado}</div>
+                                    <div className="text-gray-500 uppercase flex items-center gap-1"><FaCar
+                                        size={10}/> {v.marca} {v.modelo}</div>
+                                    <div className="text-red-700 uppercase italic text-[9px]"><FaMapMarkerAlt
+                                        size={9}/> {v.ciudad}, {v.estado}</div>
                                 </td>
 
                                 {/* SELECTOR DE CLIENTE INTEGRADO */}
                                 <td className="p-2">
-                                    <div className="relative w-full">
-                                        <div className="text-[8px] font-black text-blue-600 mb-1 italic uppercase">
-                                            Ref: {v.clienteAlt || "S/N"}
-                                        </div>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder="BUSCAR CLIENTE..."
-                                                className="input input-bordered input-xs w-full font-bold text-[9px] uppercase pr-6"
-                                                value={busquedaCliente[v.lote] || ""}
-                                                onChange={(e) => setBusquedaCliente({
-                                                    ...busquedaCliente,
-                                                    [v.lote]: e.target.value
-                                                })}
-                                            />
-                                            {busquedaCliente[v.lote] && (
-                                                <button className="absolute right-1 top-1 text-gray-400" onClick={() => setBusquedaCliente({...busquedaCliente, [v.lote]: ""})}>
-                                                    <FaTimes size={10}/>
-                                                </button>
-                                            )}
-                                        </div>
+    <div className="relative w-full">
+        <div className="text-[8px] font-black text-blue-600 mb-1 italic uppercase">
+            Ref: {v.clienteAlt || "S/N"}
+        </div>
+        <div className="relative">
+            <input
+                type="text"
+                placeholder="BUSCAR CLIENTE..."
+                className={`input input-bordered input-xs w-full font-bold text-[9px] uppercase pr-8 ${
+                    v.clienteNombre ? "bg-gray-200 text-gray-700" : "bg-white text-black"
+                }`}
+                value={busquedaCliente[v.lote] || (v.clienteNombre ? v.clienteNombre : "")}
+                onChange={(e) => setBusquedaCliente({
+                    ...busquedaCliente,
+                    [v.lote]: e.target.value
+                })}
+                readOnly={!!v.clienteNombre && !busquedaCliente[v.lote]}
+            />
 
-                                        {/* DROPDOWN CLIENTES */}
-                                        {busquedaCliente[v.lote] && (
-                                            <div className="absolute z-[100] w-full bg-white border shadow-xl rounded-md max-h-32 overflow-y-auto mt-1 border-blue-200">
-                                                {clientes
-                                                    .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[v.lote].toLowerCase()))
-                                                    .map(cliente => (
-                                                        <div
-                                                            key={cliente.id}
-                                                            className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[9px] font-bold uppercase border-b last:border-none"
-                                                            onClick={() => asignarClienteAFila(v.lote, cliente)}
-                                                        >
-                                                            {cliente.nombre}
-                                                        </div>
-                                                    ))
-                                                }
-                                            </div>
-                                        )}
+            {/* BOTÓN PARA EDITAR / BORRAR SELECCIÓN */}
+            {v.clienteNombre && !busquedaCliente[v.lote] && (
+                <button
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors"
+                    onClick={() => {
+                        // Limpiamos los datos del cliente en este vehículo específico
+                        const resetVehiculos = vehiculosSeleccionados.map(veh =>
+                            veh.lote === v.lote
+                            ? { ...veh, clienteId: "", clienteNombre: "", clienteTelefono: "" }
+                            : veh
+                        );
+                        setVehiculosSeleccionados(resetVehiculos);
+                    }}
+                >
+                    <FaTimes size={12} />
+                </button>
+            )}
+        </div>
 
-                                        {v.clienteNombre && !busquedaCliente[v.lote] && (
-                                            <div className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1">
-                                                <FaCheckCircle size={8}/> {v.clienteNombre}
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
+        {/* DROPDOWN DE RESULTADOS */}
+        {busquedaCliente[v.lote] && (
+            <div className="absolute z-[100] w-full bg-white border-2 shadow-xl rounded-md max-h-32 overflow-y-auto mt-1 border-blue-200">
+                {clientes
+                    .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[v.lote].toLowerCase()))
+                    .map(cliente => (
+                        <div
+                            key={cliente.id}
+                            className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[9px] font-bold uppercase border-b last:border-none"
+                            onClick={() => asignarClienteAFila(v.lote, cliente)}
+                        >
+                            {cliente.nombre}
+                        </div>
+                    ))
+                }
+            </div>
+        )}
+    </div>
+</td>
 
                                 <td className="p-2 text-right font-mono">${v.flete}</td>
                                 <td className="p-2 text-right font-mono text-gray-500">${v.storage}</td>
