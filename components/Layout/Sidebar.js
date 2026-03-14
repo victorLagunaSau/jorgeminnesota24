@@ -145,6 +145,7 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                         {/*<li><button className={getButtonClass('eliminaVehiculos')} onClick={() => onSelectModule('eliminaVehiculos')}>Elimina de Vehículos</button></li>*/}
                         {/*<li><button className={getButtonClass('eliminarMovimientosERC')} onClick={() => onSelectModule('eliminarMovimientosERC')}>Elimina de ERC</button></li>*/}
                         <li><button className={getButtonClass('reporteVehiculos')} onClick={() => onSelectModule('reporteVehiculos')}>Reporte Vehículos</button></li>
+                        <li><button className={getButtonClass('registroMasivoVehiculos')} onClick={() => onSelectModule('registroMasivoVehiculos')}>Vehículos Pendientes</button></li>
                     </div>
 
                 </ul>

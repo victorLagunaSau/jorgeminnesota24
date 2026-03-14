@@ -35,6 +35,8 @@ import Empresas from "./Empresas/Empresas";
 import Choferes from "./Choferes/Choferes";
 import ReporteViajesPagados from "./Viajes/ReporteViajesPagados";
 
+import RegistroMasivoVehiculos from "./Vehiculos/RegistroMasivoVehiculos";
+
 const Admin = () => {
     const router = useRouter();
     const [user, setUser] = useState(null);
@@ -126,6 +128,8 @@ const Admin = () => {
                 return <Cobranza user={user} />;
             case 'users':
                 return <Users />;
+            case 'registroMasivoVehiculos':
+                return <RegistroMasivoVehiculos user={user}/>;
             default:
                 return (
                     <div className="text-center mt-20">
