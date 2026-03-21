@@ -75,8 +75,9 @@ const HojaChofer = forwardRef(({ viaje }, ref) => {
                                 {v.lote || v.binNip}
                             </td>
                             <td className="border-r-2 border-black p-2 leading-tight uppercase font-bold">
-                                <div>{v.almacen}</div>
-                                <div className="text-gray-500 text-[10px]">{v.ciudad}</div>
+                                <div className="text-black">{v.almacen}</div>
+                                <div className="text-gray-600 text-[11px]">{v.ciudad}</div>
+                                <div className="text-gray-400 text-[9px] italic">{v.estado}</div>
                             </td>
                             <td className="border-r-2 border-black p-2 leading-tight uppercase">
                                 <div className="font-black">{v.marca}</div>
