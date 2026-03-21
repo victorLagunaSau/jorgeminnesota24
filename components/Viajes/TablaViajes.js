@@ -435,7 +435,7 @@ const TablaViajes = ({user}) => {
                                                                 )}
                                                                 {viaje.estatus === "VERIFICADO" && (
                                                                     <button onClick={() => setViajeALiquidar(viaje)}
-                                                                            className="btn btn-xs btn-success text-white font-black text-[10px] h-10 uppercase italic shadow-md">Liquidación</button>
+                                                                            className="btn btn-xs btn-success text-white font-black text-[10px] h-10 uppercase italic shadow-md">Pagar Flete</button>
                                                                 )}
                                                             </>
                                                         ) : null}
