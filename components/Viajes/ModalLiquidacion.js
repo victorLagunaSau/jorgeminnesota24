@@ -26,6 +26,9 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
 
     const ejecutarPago = async () => {
         setProcesando(true);
+        // Definimos el momento exacto de la operación
+        const fechaOperacionActual = new Date();
+
         try {
             const consecutivoRef = firestore().collection("config").doc("consecutivos");
 
@@ -40,9 +43,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                 // --- 1. ACTIVACIÓN DE VEHÍCULOS Y REGISTRO DE MOVIMIENTOS ---
                 viaje.vehiculos.forEach((v) => {
                     const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
-                    const movimientoRef = firestore().collection("movimientos").doc(); // ID Automático
-
-                    // --- DENTRO DE ejecutarPago -> viaje.vehiculos.forEach((v) => { ---
+                    const movimientoRef = firestore().collection("movimientos").doc();
 
                     const dataComun = {
                         active: true,
@@ -56,14 +57,10 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                         clienteNombre: v.clienteNombre || "",
                         clienteTelefono: v.clienteTelefono || "",
                         comentariosChofer: null,
-
-                        // --- NUEVOS CAMPOS DE COMENTARIOS Y VINCULACIÓN ---
-                        comentarioRegistro: v.comentarioRegistro || "", // El que viene del Form
-                        comentarioRecepcion: v.comentarioRecepcion || "", // El que viene de la Tabla
-                        numViaje: viaje.numViaje, // Vinculación directa al viaje
-                        folioPago: nuevoFolioContable, // El folio PG-XXX generado en esta transacción
-                        // ------------------------------------------------
-
+                        comentarioRegistro: v.comentarioRegistro || "",
+                        comentarioRecepcion: v.comentarioRecepcion || "",
+                        numViaje: viaje.numViaje,
+                        folioPago: nuevoFolioContable,
                         descripcion: "",
                         estado: v.estado || "",
                         estatus: "EB",
@@ -73,11 +70,20 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                         modelo: v.modelo || "",
                         price: String(v.precioVenta || v.flete || "0"),
                         flete: parseFloat(v.flete || 0),
+
+                        // --- AJUSTE DE FECHAS Y TRAZABILIDAD ---
                         registro: {
-                            idUsuario: viaje.creadoPor?.id || user?.id,
-                            timestamp: viaje.fechaCreacion,
-                            usuario: viaje.creadoPor?.nombre || user?.nombre
+                            idUsuario: user?.id || "Admin_ID",
+                            usuario: user?.nombre || "Admin",
+                            timestamp: fechaOperacionActual // FECHA DE HOY (Liquidación)
                         },
+                        datosOrigen: {
+                            idUsuario: viaje.creadoPor?.id,
+                            usuario: viaje.creadoPor?.nombre,
+                            fechaRegistro: viaje.fechaCreacion // Mantenemos la fecha de febrero para auditoría
+                        },
+                        // ---------------------------------------
+
                         sobrePeso: parseFloat(v.sPeso || 0),
                         storage: parseFloat(v.storage || 0),
                         telefonoCliente: v.clienteTelefono || "",
@@ -91,12 +97,10 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
                     transaction.set(movimientoRef, {
                         ...dataComun,
-                        idUsuario: user?.id || "Admin_ID",
-                        usuario: user?.nombre || "Admin",
-                        timestamp: new Date(), // Fecha exacta del pago
-                        tipo: "+",             // Indicador de entrada
-                        tipoRegistro: "EB",     // Proceso de Registro/Pago
-                        estatus: "EB"          // Estatus específico para el log
+                        timestamp: fechaOperacionActual,
+                        tipo: "+",
+                        tipoRegistro: "EB",
+                        estatus: "EB"
                     });
                 });
 
@@ -104,7 +108,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                 const viajePagadoData = {
                     ...viaje,
                     folioPago: nuevoFolioContable,
-                    fechaPago: new Date(),
+                    fechaPago: fechaOperacionActual,
                     pagadoPor: {id: user?.id, nombre: user?.nombre},
                     empresaLiquidada: empresaSeleccionada,
                     estatus: "PAGADO",
@@ -130,7 +134,6 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
             setPagoCompletado(true);
             setShowConfirm(false);
 
-            // Disparo de impresión automática
             setTimeout(() => {
                 if (btnPrintRef.current) btnPrintRef.current.click();
             }, 500);
