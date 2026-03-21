@@ -60,6 +60,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                         comentarioRegistro: v.comentarioRegistro || "",
                         comentarioRecepcion: v.comentarioRecepcion || "",
                         numViaje: viaje.numViaje,
+                        empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
                         folioPago: nuevoFolioContable,
                         descripcion: "",
                         estado: v.estado || "",
@@ -70,6 +71,8 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                         modelo: v.modelo || "",
                         price: String(v.precioVenta || v.flete || "0"),
                         flete: parseFloat(v.flete || 0),
+
+
 
                         // --- AJUSTE DE FECHAS Y TRAZABILIDAD ---
                         registro: {
@@ -109,6 +112,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     ...viaje,
                     folioPago: nuevoFolioContable,
                     fechaPago: fechaOperacionActual,
+                    empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
                     pagadoPor: {id: user?.id, nombre: user?.nombre},
                     empresaLiquidada: empresaSeleccionada,
                     estatus: "PAGADO",
