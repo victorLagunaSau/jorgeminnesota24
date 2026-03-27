@@ -142,33 +142,34 @@ const ReportePendientesPago = () => {
     const componentRef = useRef(null);
 
     const handleGenerar = async () => {
-    setErrorMessage("");
-    setData([]); // Limpiamos datos previos
-
-    try {
-        // 1. Quitamos los .where() para traer toda la colección
-        const snapshot = await firestore()
-            .collection("vehiculos")
-            .get();
-
-        // 2. Mapeamos los resultados
-        const results = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-
-        // 3. Guardamos todo en el estado sin filtrar por estatus "PR"
-        setData(results);
-
-        if (results.length === 0) {
-            setErrorMessage("No se encontraron vehículos en la base de datos.");
+        if (!iniDate || !endDate) {
+            setErrorMessage("Selecciona ambas fechas.");
+            return;
         }
 
-    } catch (error) {
-        console.error("Error al traer vehículos:", error);
-        setErrorMessage("Hubo un error al generar el reporte completo.");
-    }
-};
+        setErrorMessage("");
+        const start = new Date(iniDate).setHours(0, 0, 0, 0);
+        const end = new Date(endDate).setHours(23, 59, 59, 999);
+
+        try {
+            const snapshot = await firestore()
+                .collection("vehiculos")
+                .where("registro.timestamp", ">=", new Date(start))
+                .where("registro.timestamp", "<=", new Date(end))
+                .get();
+
+            const rawResults = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+
+            const results = rawResults.filter(v => v.estatus === "PR");
+
+
+            setData(results);
+        } catch (error) {
+
+            setErrorMessage("Hubo un error al generar el reporte.");
+        }
+    };
 
 
     return (
