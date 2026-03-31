@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { firestore } from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import { FaSearch, FaFileExcel, FaTruck, FaBuilding, FaFileInvoice, FaLayerGroup } from "react-icons/fa";
@@ -6,24 +6,43 @@ import * as XLSX from "xlsx";
 import moment from "moment";
 
 const ReporteViajesPagados = ({ user }) => {
-    const [fechas, setFechas] = useState({ inicio: "", fin: "" });
+    const [periodoSeleccionado, setPeriodoSeleccionado] = useState('semana');
     const [viajes, setViajes] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    const consultarViajes = async () => {
-        if (!fechas.inicio || !fechas.fin) return alert("Selecciona el rango de fechas");
+    const calcularFechas = (periodo) => {
+        const hoy = new Date();
+        let fechaInicio = new Date();
+
+        if (periodo === 'semana') {
+            fechaInicio.setDate(hoy.getDate() - 7);
+        } else if (periodo === 'quincena') {
+            fechaInicio.setDate(hoy.getDate() - 15);
+        } else if (periodo === 'mensual') {
+            fechaInicio.setMonth(hoy.getMonth() - 1);
+        }
+
+        return { inicio: fechaInicio, fin: hoy };
+    };
+
+    const consultarViajes = async (periodo) => {
+        setPeriodoSeleccionado(periodo);
         setLoading(true);
         try {
-            const start = new Date(fechas.inicio + "T00:00:00");
-            const end = new Date(fechas.fin + "T23:59:59");
+            const { inicio, fin } = calcularFechas(periodo);
             const snap = await firestore().collection("viajesPagados")
-                .where("fechaPago", ">=", firebase.firestore.Timestamp.fromDate(start))
-                .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(end))
+                .where("fechaPago", ">=", firebase.firestore.Timestamp.fromDate(inicio))
+                .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
                 .orderBy("fechaPago", "asc")
                 .get();
             setViajes(snap.docs.map(doc => doc.data()));
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
+
+    // Cargar automáticamente el historial de 1 semana al iniciar
+    useEffect(() => {
+        consultarViajes('semana');
+    }, []);
 
     const exportarExcel = () => {
         const dataExcel = viajes.flatMap(viaje =>
@@ -45,119 +64,144 @@ const ReporteViajesPagados = ({ user }) => {
         XLSX.writeFile(wb, `Reporte_Logistica.xlsx`);
     };
 
-    // Agrupación para la tabla visual
-    const viajesAgrupados = viajes.reduce((acc, viaje) => {
-        const fecha = moment(viaje.fechaPago.toDate()).format("DD/MM/YYYY");
-        if (!acc[fecha]) acc[fecha] = {};
-
-        const choferKey = `${viaje.chofer?.nombre} - ${viaje.empresaLiquidada}`;
-        if (!acc[fecha][choferKey]) acc[fecha][choferKey] = [];
-
-        acc[fecha][choferKey].push(viaje);
-        return acc;
-    }, {});
-
     const totalGeneral = viajes.reduce((acc, v) => acc + (v.resumenFinanciero?.granTotal || 0), 0);
 
     return (
-        <div className="p-6 bg-white rounded-xl shadow-md font-sans text-black">
-            <h2 className="text-2xl font-black uppercase italic mb-8 border-b-4 border-red-600 pb-2 flex items-center gap-3">
-                <FaFileInvoice className="text-red-600" /> Reporte Consolidado de Viajes
-            </h2>
+        <div className="bg-gray-100 min-h-screen font-sans text-black">
+            <div className="sticky top-0 z-50 p-6 bg-white border-b-2 border-gray-200 shadow-sm">
+                <div className="flex justify-between items-center mb-4">
+                    <div>
+                        <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
+                            Historial de Viajes
+                        </h2>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                            Viajes Liquidados y Pagados
+                        </p>
+                    </div>
+                    {viajes.length > 0 && (
+                        <div className="bg-white border-2 border-black p-4 rounded-xl text-black text-center shadow-lg">
+                            <h4 className="text-[10px] font-black uppercase opacity-60 italic">Total Período</h4>
+                            <span className="text-2xl font-black italic">${totalGeneral.toLocaleString()}</span>
+                        </div>
+                    )}
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-gray-50 p-6 rounded-xl border mb-8 items-end text-black">
-                <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400">Desde:</label>
-                    <input type="date" className="input input-bordered input-sm w-full font-bold" value={fechas.inicio} onChange={e => setFechas({...fechas, inicio: e.target.value})} />
+                <div className="bg-gray-50 p-4 rounded-xl border">
+                    <div className="flex justify-between items-center gap-4">
+                        <div className="flex gap-3 flex-wrap">
+                            <button
+                                onClick={() => consultarViajes('semana')}
+                                className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'semana' ? 'btn-error text-white' : 'btn-outline'}`}
+                            >
+                                1 Semana (Predeterminado)
+                            </button>
+                            <button
+                                onClick={() => consultarViajes('quincena')}
+                                className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'quincena' ? 'btn-error text-white' : 'btn-outline'}`}
+                            >
+                                15 Días
+                            </button>
+                            <button
+                                onClick={() => consultarViajes('mensual')}
+                                className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'mensual' ? 'btn-error text-white' : 'btn-outline'}`}
+                            >
+                                Mensual
+                            </button>
+                        </div>
+                        <button onClick={exportarExcel} disabled={viajes.length === 0} className="btn btn-sm btn-success text-white font-black uppercase gap-2">
+                            <FaFileExcel /> Exportar Excel
+                        </button>
+                    </div>
                 </div>
-                <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400">Hasta:</label>
-                    <input type="date" className="input input-bordered input-sm w-full font-bold" value={fechas.fin} onChange={e => setFechas({...fechas, fin: e.target.value})} />
-                </div>
-                <button onClick={consultarViajes} className="btn btn-sm btn-error text-white font-black uppercase">Consultar</button>
-                <button onClick={exportarExcel} className="btn btn-sm btn-outline font-black uppercase gap-2"><FaFileExcel /> Excel</button>
             </div>
 
-            {viajes.length > 0 && (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                        <div className="bg-red-600/5 p-4 border-l-8 border-red-600 rounded shadow-sm">
-                            <h4 className="text-[10px] font-black uppercase text-gray-400 mb-2">Resumen Choferes</h4>
-                            {Object.entries(viajes.reduce((acc, v) => { acc[v.chofer?.nombre] = (acc[v.chofer?.nombre] || 0) + v.resumenFinanciero.granTotal; return acc; }, {})).map(([n, t]) => (
-                                <div key={n} className="flex justify-between text-[11px] font-bold border-b py-1"><span>{n}</span><span>${t.toLocaleString()}</span></div>
-                            ))}
-                        </div>
-                        <div className="bg-red-600/5 p-4 border-l-8 border-black rounded shadow-sm">
-                            <h4 className="text-[10px] font-black uppercase text-gray-400 mb-2">Resumen Empresas</h4>
-                            {Object.entries(viajes.reduce((acc, v) => { acc[v.empresaLiquidada] = (acc[v.empresaLiquidada] || 0) + v.resumenFinanciero.granTotal; return acc; }, {})).map(([e, t]) => (
-                                <div key={e} className="flex justify-between text-[11px] font-bold border-b py-1"><span>{e}</span><span>${t.toLocaleString()}</span></div>
-                            ))}
-                        </div>
-                        <div className="bg-white border-2 border-black p-6 rounded-xl text-black flex flex-col justify-center text-center shadow-xl">
-                            <h4 className="text-[12px] font-black uppercase opacity-60 mb-2 italic">Total Global Pagado</h4>
-                            <span className="text-4xl font-black italic">${totalGeneral.toLocaleString()}</span>
-                        </div>
+            <div className="p-4 space-y-4">
+                {viajes.length === 0 ? (
+                    <div className="text-center py-20">
+                        <p className="text-gray-400 font-bold uppercase">No hay viajes pagados en este período</p>
                     </div>
+                ) : (
+                    viajes.map((viaje, vIndex) => (
+                        <div key={vIndex} className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden transform transition-all">
+                            <div className="bg-gray-100 p-3 flex justify-between items-center">
+                                <div className="flex items-center gap-4">
+                                    <div className="bg-green-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] text-white">
+                                        VIAJE #{viaje.numViaje}
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>
+                                        <p className="text-sm font-black uppercase italic leading-none text-gray-800">{viaje.chofer?.nombre}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Empresa</p>
+                                        <p className="text-sm font-black uppercase italic leading-none text-gray-800">{viaje.empresaLiquidada}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Fecha de Pago</p>
+                                        <p className="text-sm font-black uppercase italic leading-none text-gray-800">
+                                            {moment(viaje.fechaPago.toDate()).format("DD/MM/YYYY")}
+                                        </p>
+                                    </div>
+                                    <span className="text-[10px] font-black uppercase px-4 py-1 rounded-full bg-green-500 text-white">
+                                        PAGADO
+                                    </span>
+                                </div>
+                            </div>
 
-                    <div className="overflow-x-auto border rounded-xl shadow-lg">
-                        <table className="table table-compact w-full text-[11px]">
-                            <thead className="bg-gray-800 text-white uppercase italic">
-                                <tr>
-                                    <th className="w-32">Folio</th>
-                                    <th>Lote / Vehículo</th>
-                                    <th className="text-right">Flete</th>
-                                    <th className="text-right">Gastos</th>
-                                    <th className="text-right bg-red-700">Total Unitario</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {Object.entries(viajesAgrupados).map(([fecha, choferesGroup]) => (
-                                    <React.Fragment key={fecha}>
-                                        <tr className="bg-gray-200 border-y-2 border-gray-400">
-                                            <td colSpan="5" className="p-2 font-black text-gray-700 uppercase italic">
-                                                Día: {fecha}
-                                            </td>
+                            <div className="overflow-x-auto">
+                                <table className="table w-full border-collapse">
+                                    <thead>
+                                        <tr className="text-[10px] uppercase text-gray-500 bg-gray-50 border-b-2 border-gray-200 italic font-black">
+                                            <th className="p-3">Lote</th>
+                                            <th className="p-3">Vehículo</th>
+                                            <th className="p-3">Ciudad / Almacén</th>
+                                            <th className="p-3">Cliente</th>
+                                            <th className="p-3 text-center text-blue-800">Flete</th>
+                                            <th className="p-3 text-center">Storage</th>
+                                            <th className="p-3 text-center text-gray-400">S. Peso</th>
+                                            <th className="p-3 text-center text-gray-400">G. Extra</th>
+                                            <th className="p-3 text-center bg-green-100 text-green-700">Total</th>
                                         </tr>
-                                        {Object.entries(choferesGroup).map(([choferInfo, viajesList]) => {
-                                            const subtotalChofer = viajesList.reduce((sum, v) => sum + v.resumenFinanciero.granTotal, 0);
+                                    </thead>
+                                    <tbody>
+                                        {viaje.vehiculos.map((v, idx) => {
+                                            const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
                                             return (
-                                                <React.Fragment key={choferInfo}>
-                                                    <tr className="bg-gray-50 border-b">
-                                                        <td colSpan="5" className="p-2 font-black text-red-700 uppercase flex items-center gap-2">
-                                                            <FaTruck size={12}/> {choferInfo}
-                                                        </td>
-                                                    </tr>
-                                                    {viajesList.map(viaje =>
-                                                        viaje.vehiculos.map((v, idx) => {
-                                                            const unitario = v.flete + (parseFloat(v.storage||0) + parseFloat(v.sPeso||0) + parseFloat(v.gExtra||0));
-                                                            return (
-                                                                <tr key={`${viaje.numViaje}-${v.lote}`} className="border-b hover:bg-white transition-colors">
-                                                                    <td className="font-black text-blue-700 pl-6">#{viaje.numViaje}</td>
-                                                                    <td className="uppercase">
-                                                                        <span className="font-black">{v.lote}</span> | {v.marca} {v.modelo}
-                                                                        <div className="text-[9px] text-gray-400 italic">Cliente: {v.clienteNombre || v.clienteAlt}</div>
-                                                                    </td>
-                                                                    <td className="text-right font-mono">${v.flete}</td>
-                                                                    <td className="text-right font-mono">${(parseFloat(v.storage||0) + parseFloat(v.sPeso||0) + parseFloat(v.gExtra||0))}</td>
-                                                                    <td className="text-right font-black bg-red-50 text-red-700">${unitario.toLocaleString()}</td>
-                                                                </tr>
-                                                            )
-                                                        })
-                                                    )}
-                                                    <tr className="bg-white border-b-2">
-                                                        <td colSpan="4" className="text-right font-black uppercase p-2 text-gray-400">Subtotal {choferInfo.split('-')[0]}:</td>
-                                                        <td className="text-right font-black p-2 text-sm border-l-4 border-red-600">${subtotalChofer.toLocaleString()}</td>
-                                                    </tr>
-                                                </React.Fragment>
+                                                <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                                    <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
+                                                    <td className="p-3 text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</td>
+                                                    <td className="p-3">
+                                                        <div className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
+                                                        <div className="text-[9px] font-bold text-gray-400 mt-1 uppercase italic">{v.almacen}</div>
+                                                    </td>
+                                                    <td className="p-3">
+                                                        <div className="text-[10px] font-bold uppercase text-gray-800">{v.clienteNombre || v.clienteAlt}</div>
+                                                    </td>
+                                                    <td className="p-3 text-center font-mono text-[11px] font-black">${v.flete}</td>
+                                                    <td className="p-3 text-center font-mono text-[11px] font-black">${v.storage || 0}</td>
+                                                    <td className="p-3 text-center font-mono text-[11px] font-black">${v.sPeso || 0}</td>
+                                                    <td className="p-3 text-center font-mono text-[11px] font-black">${v.gExtra || 0}</td>
+                                                    <td className="p-3 text-center font-black bg-green-50 text-green-700">${total.toLocaleString()}</td>
+                                                </tr>
                                             );
                                         })}
-                                    </React.Fragment>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </>
-            )}
+                                        <tr className="bg-gray-50 border-t-2 border-gray-300">
+                                            <td colSpan="8" className="p-3 text-right font-black uppercase text-gray-600">
+                                                Total del Viaje:
+                                            </td>
+                                            <td className="p-3 text-center font-black text-lg bg-green-100 text-green-700 border-l-4 border-green-600">
+                                                ${viaje.resumenFinanciero?.granTotal?.toLocaleString() || '0'}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
         </div>
     );
 };
