@@ -12,17 +12,32 @@ const ReporteViajesPagados = ({ user }) => {
 
     const calcularFechas = (periodo) => {
         const hoy = new Date();
-        let fechaInicio = new Date();
+        const diaSemana = hoy.getDay(); // 0 = domingo, 1 = lunes, ..., 6 = sábado
+
+        // Calcular el sábado de esta semana
+        let diasHastaSabado = 6 - diaSemana;
+        if (diaSemana === 0) diasHastaSabado = -1; // Si es domingo, el sábado fue ayer
+        const sabadoActual = new Date(hoy);
+        sabadoActual.setDate(hoy.getDate() + diasHastaSabado);
+        sabadoActual.setHours(23, 59, 59, 999);
+
+        // Calcular el lunes según el período
+        let lunesInicio = new Date(sabadoActual);
 
         if (periodo === 'semana') {
-            fechaInicio.setDate(hoy.getDate() - 7);
+            // Lunes de esta semana
+            lunesInicio.setDate(sabadoActual.getDate() - 5);
         } else if (periodo === 'quincena') {
-            fechaInicio.setDate(hoy.getDate() - 15);
+            // Lunes de hace 2 semanas
+            lunesInicio.setDate(sabadoActual.getDate() - 12);
         } else if (periodo === 'mensual') {
-            fechaInicio.setMonth(hoy.getMonth() - 1);
+            // Lunes de hace 4 semanas (aproximadamente 1 mes)
+            lunesInicio.setDate(sabadoActual.getDate() - 26);
         }
 
-        return { inicio: fechaInicio, fin: hoy };
+        lunesInicio.setHours(0, 0, 0, 0);
+
+        return { inicio: lunesInicio, fin: sabadoActual };
     };
 
     const consultarViajes = async (periodo) => {
@@ -93,19 +108,19 @@ const ReporteViajesPagados = ({ user }) => {
                                 onClick={() => consultarViajes('semana')}
                                 className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'semana' ? 'btn-error text-white' : 'btn-outline'}`}
                             >
-                                1 Semana (Predeterminado)
+                                1 Semana (Lun-Sáb)
                             </button>
                             <button
                                 onClick={() => consultarViajes('quincena')}
                                 className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'quincena' ? 'btn-error text-white' : 'btn-outline'}`}
                             >
-                                15 Días
+                                2 Semanas (Lun-Sáb)
                             </button>
                             <button
                                 onClick={() => consultarViajes('mensual')}
                                 className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'mensual' ? 'btn-error text-white' : 'btn-outline'}`}
                             >
-                                Mensual
+                                1 Mes (Lun-Sáb)
                             </button>
                         </div>
                         <button onClick={exportarExcel} disabled={viajes.length === 0} className="btn btn-sm btn-success text-white font-black uppercase gap-2">
