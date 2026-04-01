@@ -10,6 +10,11 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
     const filasVacias = Math.max(0, 10 - (viajeData.vehiculos?.length || 0));
     const vehiculosConVacios = [...(viajeData.vehiculos || []), ...Array(filasVacias).fill(null)];
 
+    // Calcular total de flete y storage
+    const totalFleteStorage = (viajeData.vehiculos || []).reduce((sum, v) => {
+        return sum + (parseFloat(v.flete || 0) + parseFloat(v.storage || 0));
+    }, 0);
+
     return (
         <div ref={ref} className="bg-white text-black" style={{
             padding: "0.5cm",
@@ -47,12 +52,6 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         overflow: hidden;
                     }
                 }
-                .header-rojo {
-                    background-color: #FF0000 !important;
-                    -webkit-print-color-adjust: exact !important;
-                    print-color-adjust: exact !important;
-                    color-adjust: exact !important;
-                }
                 .modern-border {
                     border: 1.5px solid #e11d48 !important;
                 }
@@ -67,48 +66,54 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
             <title>{folioLabel}</title>
 
             {/* HEADER MODERNIZADO */}
-            <div className="flex justify-between items-center header-rojo" style={{
-                marginBottom: "4px",
-                padding: "12px 16px",
-                borderRadius: "8px",
+            <div className="flex justify-between items-center" style={{
+                marginBottom: "3px",
+                padding: "12px 18px",
+                borderRadius: "12px",
                 flexShrink: 0,
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+                boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.15)',
+                backgroundColor: "#ffffff",
+                border: "3px solid #1f2937"
             }}>
                 <div className="flex-shrink-0 flex items-center gap-2" style={{ width: "160px" }}>
-                    <div className="bg-white rounded-lg p-2 subtle-shadow">
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
                         <img src="/assets/Logoprint.png" alt="Logo" style={{ width: "120px", height: "auto" }} />
                     </div>
                 </div>
 
-                <div className="text-center flex-1" style={{ padding: "0 20px" }}>
+                <div className="text-center flex-1" style={{ padding: "0 24px" }}>
                     <h1 className="font-black tracking-tight" style={{
-                        fontSize: "44px",
-                        marginBottom: "4px",
-                        color: "#ffffff",
-                        textShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                        letterSpacing: '2px'
+                        fontSize: "42px",
+                        color: "#000000",
+                        letterSpacing: '2.5px',
+                        fontFamily: "'Bebas Neue', 'Oswald', 'Raleway', sans-serif",
+                        lineHeight: '1',
+                        margin: "0"
                     }}>
                         BILL OF LADING
                     </h1>
-                    <div className="text-[14px] font-semibold" style={{ lineHeight: '1.4', color: "#ffe4e6" }}>
-                        <div style={{ marginBottom: "2px" }}>Jorge Minnesota Logistic LLC</div>
-                        <div>932 N. Minnesota Ave. • Brownsville TX, 78521</div>
-                        <div className="font-black" style={{ fontSize: "16px", color: "#ffffff", marginTop: "3px" }}>
-                            ☎ (956) 371-8314 • www.jorgeminnesota.com
+                    <div className="font-black" style={{
+                        fontSize: "18px",
+                        color: "#1f2937",
+                        fontWeight: "800",
+                        lineHeight: '1',
+                        margin: "4px 0 2px 0"
+                    }}>
+                        Jorge Minnesota Logistic LLC
+                    </div>
+                    <div className="font-semibold" style={{ lineHeight: '1.1', color: "#4b5563", letterSpacing: '0.3px', fontSize: "13px" }}>
+                        <div style={{ margin: "2px 0" }}>932 N. Minnesota Ave.</div>
+                        <div style={{ margin: "2px 0" }}>Brownsville, Texas, 78521</div>
+                        <div className="font-bold" style={{ fontSize: "14px", color: "#1f2937", margin: "2px 0", letterSpacing: '0.5px' }}>
+                            +1 (956) 371-8314
                         </div>
                     </div>
                 </div>
 
-                <div className="flex gap-3" style={{ width: "160px" }}>
-                    <div className="bg-white rounded-lg p-2 subtle-shadow flex-1">
-                        <div className="text-[8px] font-black text-center" style={{ color: "#be123c", marginBottom: "2px" }}>WORK ORDER</div>
-                        <div className="text-center font-black" style={{ fontSize: "16px", color: "#1f2937", letterSpacing: '0.5px' }}>
-                            #{viajeData.numViaje}
-                        </div>
-                    </div>
-                    <div className="bg-white rounded-lg p-2 subtle-shadow flex-1">
-                        <div className="text-[8px] font-black text-center" style={{ color: "#be123c", marginBottom: "2px" }}>DATE</div>
-                        <div className="text-center font-bold" style={{ fontSize: "11px", color: "#1f2937" }}>
+                <div className="flex flex-col" style={{ width: "180px" }}>
+                    <div className="bg-gray-50 rounded-xl p-4 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <div className="text-[10px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "6px", letterSpacing: '1.5px' }}>Date</div>
+                        <div className="text-center font-black" style={{ fontSize: "32px", color: "#1f2937", letterSpacing: '0.5px', lineHeight: '1' }}>
                             {moment().format('MM/DD/YY')}
                         </div>
                     </div>
@@ -117,7 +122,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
 
             {/* DRIVER INFO MODERNIZADO */}
             <div className="modern-shadow" style={{
-                marginBottom: "4px",
+                marginBottom: "3px",
                 background: 'linear-gradient(to right, #ffffff, #fef2f2)',
                 padding: "4px 8px",
                 borderRadius: "6px",
@@ -142,14 +147,14 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
                     </div>
                     <div className="flex items-center">
-                        <span className="font-black text-[10px]" style={{ width: "50px", color: "#be123c", fontWeight: "900" }}>PICKUP:</span>
+                        <span className="font-black text-[10px]" style={{ width: "65px", color: "#be123c", fontWeight: "900" }}>COMPANY:</span>
                         <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
                     </div>
                 </div>
             </div>
 
             {/* TABLA MODERNIZADA */}
-            <div className="modern-shadow" style={{ borderRadius: "6px", overflow: "hidden", marginBottom: "4px", flex: "1 1 auto", minHeight: "0" }}>
+            <div className="modern-shadow" style={{ borderRadius: "6px", overflow: "hidden", marginBottom: "3px", flex: "1 1 auto", minHeight: "0" }}>
                 <table className="w-full border-collapse" style={{ tableLayout: "fixed", height: "100%" }}>
                     <thead>
                         <tr className="font-black text-[9px]" style={{
@@ -299,41 +304,59 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                             </tr>
                         ))}
                     </tbody>
+                    <tfoot>
+                        <tr style={{ backgroundColor: "#1e293b", borderTop: "3px solid #1e293b" }}>
+                            <td colSpan="8" className="text-right px-2 font-black text-[10px]" style={{
+                                color: "#ffffff",
+                                padding: "8px",
+                                letterSpacing: '0.5px'
+                            }}>
+                                TOTAL FLETE + STORAGE:
+                            </td>
+                            <td colSpan="2" className="text-center px-2 font-black text-[12px]" style={{
+                                color: "#ffffff",
+                                padding: "8px",
+                                letterSpacing: '0.5px'
+                            }}>
+                                ${totalFleteStorage.toFixed(2)}
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
 
                 {/* SUB-TOTAL Y TOTAL INTEGRADOS EN LA TABLA */}
-                <div className="flex justify-end gap-2" style={{ padding: "8px", backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
+                <div className="flex justify-end gap-2" style={{ padding: "4px", backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
                     <div className="space-y-1">
                         <div className="bg-white rounded p-2 subtle-shadow" style={{ border: "1px solid #e2e8f0" }}>
-                            <div className="font-black text-[9px] text-center" style={{
-                                marginBottom: "3px",
+                            <div className="font-black text-[8px] text-center" style={{
+                                marginBottom: "2px",
                                 color: "#64748b",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
                             }}>
                                 SUB-TOTAL
                             </div>
-                            <div className="flex gap-2 items-center" style={{ marginBottom: "3px" }}>
-                                <span className="font-bold text-[9px]" style={{ width: "50px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>CHEQUE</span>
+                            <div className="flex gap-2 items-center" style={{ marginBottom: "2px" }}>
+                                <span className="font-bold text-[8px]" style={{ width: "48px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>CHEQUE</span>
                                 <div className="bg-gray-50 rounded" style={{
-                                    width: "65px",
-                                    height: "14px",
+                                    width: "60px",
+                                    height: "12px",
                                     border: "1px solid #cbd5e1"
                                 }}></div>
                             </div>
                             <div className="flex gap-2 items-center">
-                                <span className="font-bold text-[9px]" style={{ width: "50px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>EFECTIVO</span>
+                                <span className="font-bold text-[8px]" style={{ width: "48px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>EFECTIVO</span>
                                 <div className="bg-gray-50 rounded" style={{
-                                    width: "65px",
-                                    height: "14px",
+                                    width: "60px",
+                                    height: "12px",
                                     border: "1px solid #cbd5e1"
                                 }}></div>
                             </div>
                         </div>
                     </div>
                     <div className="modern-shadow rounded overflow-hidden" style={{ border: "2px solid #10b981" }}>
-                        <div className="bg-white" style={{ padding: "3px", borderBottom: "1px solid #d1fae5" }}>
-                            <div className="text-center font-black text-[9px]" style={{
+                        <div className="bg-white" style={{ padding: "2px", borderBottom: "1px solid #d1fae5" }}>
+                            <div className="text-center font-black text-[8px]" style={{
                                 color: "#065f46",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
@@ -342,8 +365,8 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                             </div>
                         </div>
                         <div style={{
-                            width: "75px",
-                            height: "42px",
+                            width: "70px",
+                            height: "36px",
                             background: "linear-gradient(135deg, #d1fae5, #a7f3d0)"
                         }}></div>
                     </div>
@@ -351,8 +374,9 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
             </div>
 
             {/* FOOTER MODERNIZADO */}
-            <div className="flex items-end gap-8" style={{ flexShrink: 0, paddingTop: "8px" }}>
+            <div className="flex items-end" style={{ flexShrink: 0, paddingTop: "6px" }}>
                 <div>
+                    <div style={{ height: "50px", marginBottom: "4px" }}></div>
                     <div className="font-black text-[11px]" style={{
                         color: "#64748b",
                         letterSpacing: '0.5px',
@@ -361,19 +385,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     }}>
                         DRIVER SIGNATURE
                     </div>
-                    <div style={{ borderTop: "2px solid #64748b", width: "200px", marginTop: "4px" }}></div>
-                </div>
-
-                <div>
-                    <div className="font-black text-[11px]" style={{
-                        color: "#64748b",
-                        letterSpacing: '0.5px',
-                        textAlign: "center",
-                        fontWeight: "900"
-                    }}>
-                        COMPANY SIGNATURE
-                    </div>
-                    <div style={{ borderTop: "2px solid #64748b", width: "200px", marginTop: "4px" }}></div>
+                    <div style={{ borderTop: "3px solid #1f2937", width: "300px", marginTop: "4px" }}></div>
                 </div>
             </div>
 
