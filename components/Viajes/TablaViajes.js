@@ -1,11 +1,9 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
-import HojaChofer from "./HojaChofer";
 import HojaVerificacion from "./HojaVerificacion";
-import ModalLiquidacion from "./ModalLiquidacion";
 
 const TablaViajes = ({user}) => {
     const [viajes, setViajes] = useState([]);
@@ -16,8 +14,10 @@ const TablaViajes = ({user}) => {
 
     const componentRef = useRef();
     const [viajeAImprimir, setViajeAImprimir] = useState(null);
-    const [viajeALiquidar, setViajeALiquidar] = useState(null);
     const [modal, setModal] = useState({show: false, mensaje: "", accion: null, tipo: ""});
+    const [procesandoPago, setProcesandoPago] = useState(false);
+    const btnPrintRef = useRef();
+    const [estadoOrigen, setEstadoOrigen] = useState("");
 
     // Estado para el Modal de Comentarios
     const [modalComentario, setModalComentario] = useState({show: false, v: null, viajeId: null, idx: null});
@@ -25,14 +25,27 @@ const TablaViajes = ({user}) => {
     useEffect(() => {
         if (!user) return;
         let q = firestore().collection("viajesPendientes");
-        if (!user.admin) {
-            q = q.where("empresaId", "==", user.id);
-        } else {
+        if (user.admin) {
             q = q.orderBy("fechaCreacion", "desc");
         }
 
         const unsubViajes = q.onSnapshot(snap => {
-            setViajes(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
+            let viajesData = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+            // Filtrar viajes para usuarios no-admin: mostrar viajes propios O donde es líder
+            if (!user.admin) {
+                viajesData = viajesData.filter(viaje =>
+                    viaje.empresaId === user.id || viaje.empresaLiderId === user.id
+                );
+                // Ordenar del más nuevo al más viejo para carriers
+                viajesData.sort((a, b) => {
+                    const fechaA = a.fechaCreacion?.toDate ? a.fechaCreacion.toDate() : new Date(a.fechaCreacion);
+                    const fechaB = b.fechaCreacion?.toDate ? b.fechaCreacion.toDate() : new Date(b.fechaCreacion);
+                    return fechaB - fechaA; // Descendente (más nuevo primero)
+                });
+            }
+
+            setViajes(viajesData);
             setLoading(false);
         });
 
@@ -50,8 +63,12 @@ const TablaViajes = ({user}) => {
         };
     }, [user]);
 
-    const handleLocalEdit = (viajeId, vehiculoIdx, field, value) => {
-        if (!user.admin) return;
+    const handleLocalEdit = async (viajeId, vehiculoIdx, field, value) => {
+        // Verificar si el usuario tiene permisos (admin o líder de ruta)
+        const viaje = viajes.find(v => v.id === viajeId);
+        const esLiderRuta = viaje && viaje.empresaLiderId === user.id;
+        if (!user.admin && !esLiderRuta) return;
+
         const nuevosViajes = viajes.map(viaje => {
             if (viaje.id === viajeId) {
                 const nuevosVehiculos = [...viaje.vehiculos];
@@ -72,29 +89,20 @@ const TablaViajes = ({user}) => {
             return viaje;
         });
         setViajes(nuevosViajes);
-    };
 
-    const cambiarEstatus = async (viajeId, nuevoEstatus) => {
-        const viaje = viajes.find(v => v.id === viajeId);
+        // Guardar automáticamente en Firestore
         try {
-            const updateData = {estatus: nuevoEstatus, vehiculos: viaje.vehiculos};
-            if (nuevoEstatus === "VERIFICADO") {
-                const registro = {
-                    usuario: user?.nombre || "Admin",
-                    fecha: new Date(),
-                    cambioVehiculos: viaje.vehiculos.map(v => ({
-                        lote: v.lote, flete: v.flete, clienteConfirmado: v.clienteNombre || "Sin asignar"
-                    }))
-                };
-                updateData.historialEdiciones = firebase.firestore.FieldValue.arrayUnion(registro);
-                updateData.verificado = true;
+            const viajeActualizado = nuevosViajes.find(v => v.id === viajeId);
+            if (viajeActualizado) {
+                await firestore().collection("viajesPendientes").doc(viajeId).update({
+                    vehiculos: viajeActualizado.vehiculos
+                });
             }
-            await firestore().collection("viajesPendientes").doc(viajeId).update(updateData);
-            setModal({show: false});
         } catch (error) {
-            setModal({show: true, mensaje: "Error al actualizar estatus", tipo: "error"});
+            console.error("Error al guardar cambios:", error);
         }
     };
+
 
     const filtrados = viajes.filter(v =>
         v.numViaje.toLowerCase().includes(filtroGeneral.toLowerCase()) ||
@@ -124,99 +132,386 @@ const TablaViajes = ({user}) => {
             setModal({show: true, mensaje: "Error al guardar la nota", tipo: "error"});
         }
     };
+
+    const eliminarViaje = async (viajeId) => {
+        const viaje = viajes.find(v => v.id === viajeId);
+        if (!viaje) return;
+
+        try {
+            // Eliminar viaje de viajesPendientes
+            await firestore().collection("viajesPendientes").doc(viajeId).delete();
+
+            // Eliminar todos los lotes en tránsito asociados
+            const batch = firestore().batch();
+            viaje.vehiculos.forEach(v => {
+                const loteRef = firestore().collection("lotesEnTransito").doc(v.lote);
+                batch.delete(loteRef);
+            });
+            await batch.commit();
+
+            setModal({show: false});
+        } catch (error) {
+            console.error("Error al eliminar viaje:", error);
+            setModal({show: true, mensaje: "Error al eliminar el viaje", tipo: "error"});
+        }
+    };
+
+    const ejecutarPago = async (viaje) => {
+        setProcesandoPago(true);
+        const fechaOperacionActual = new Date();
+        const empresaSeleccionada = viaje.empresaNombre || viaje.chofer?.empresa || "";
+
+        // CÁLCULO DE TOTALES
+        const totalFletes = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.flete) || 0), 0);
+        const totalStorage = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) || 0), 0);
+        const totalSobrepeso = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.sPeso) || 0), 0);
+        const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
+        const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
+
+        try {
+            const consecutivoRef = firestore().collection("config").doc("consecutivos");
+
+            // VERIFICAR LOTES YA PAGADOS
+            const lotesExistentes = [];
+            for (const v of viaje.vehiculos) {
+                const docExistente = await firestore().collection("vehiculos").doc(v.lote).get();
+                if (docExistente.exists) {
+                    lotesExistentes.push(v.lote);
+                }
+            }
+
+            // Si hay lotes pagados, mostrar confirmación
+            if (lotesExistentes.length > 0) {
+                const confirmar = window.confirm(
+                    `⚠️ ADVERTENCIA: Los siguientes lotes YA ESTÁN PAGADOS:\n\n${lotesExistentes.join(', ')}\n\n` +
+                    `Solo se actualizarán los precios (Storage, Sobrepeso, Gastos Extras) sin crear un nuevo pago.\n\n` +
+                    `¿Desea continuar?`
+                );
+                if (!confirmar) {
+                    setProcesandoPago(false);
+                    return;
+                }
+            }
+
+            await firestore().runTransaction(async (transaction) => {
+                const conDoc = await transaction.get(consecutivoRef);
+                if (!conDoc.exists) throw "El documento de consecutivos no existe";
+
+                const ultimoFolio = conDoc.data()["Viajes pagados"] || 0;
+                const proximoFolio = ultimoFolio + 1;
+                const nuevoFolioContable = `PG-${proximoFolio}`;
+
+                // --- 1. ACTIVACIÓN DE VEHÍCULOS Y REGISTRO DE MOVIMIENTOS ---
+                viaje.vehiculos.forEach((v) => {
+                    const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
+                    const movimientoRef = firestore().collection("movimientos").doc();
+
+                    // Verificar si el lote ya está pagado
+                    const yaPagado = lotesExistentes.includes(v.lote);
+
+                    if (yaPagado) {
+                        // LOTE YA PAGADO - Solo actualizar precios
+                        transaction.update(vehiculoRef, {
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            ultimaActualizacionPrecios: {
+                                fecha: fechaOperacionActual,
+                                usuario: user?.nombre || "Admin",
+                                viajeRelacionado: viaje.numViaje
+                            }
+                        });
+
+                        // Registrar movimiento de actualización
+                        transaction.set(movimientoRef, {
+                            binNip: v.lote,
+                            timestamp: fechaOperacionActual,
+                            tipo: "ACTUALIZACIÓN",
+                            tipoRegistro: "ACTUALIZACIÓN PRECIOS",
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            numViaje: viaje.numViaje,
+                            usuario: user?.nombre || "Admin",
+                            nota: "Actualización de precios - Lote ya pagado previamente"
+                        });
+
+                    } else {
+                        // LOTE NUEVO - Crear registro completo
+                        const dataComun = {
+                            active: true,
+                            almacen: v.almacen || "PENDIENTE",
+                            asignado: false,
+                            binNip: v.lote,
+                            ciudad: v.ciudad || "",
+                            cliente: v.clienteNombre || v.clienteAlt || "SIN ASIGNAR",
+                            clienteAlt: v.clienteAlt || "",
+                            clienteId: v.clienteId || "",
+                            clienteNombre: v.clienteNombre || "",
+                            clienteTelefono: v.clienteTelefono || "",
+                            comentariosChofer: null,
+                            comentarioRegistro: v.comentarioRegistro || "",
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            numViaje: viaje.numViaje,
+                            empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
+                            folioPago: nuevoFolioContable,
+                            descripcion: "",
+                            estado: v.estado || "",
+                            estatus: "EB",
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            gatePass: "X",
+                            marca: v.marca || "",
+                            modelo: v.modelo || "",
+                            price: String(v.precioVenta || v.flete || "0"),
+                            flete: parseFloat(v.flete || 0),
+
+                            registro: {
+                                idUsuario: user?.id || "Admin_ID",
+                                usuario: user?.nombre || "Admin",
+                                timestamp: fechaOperacionActual
+                            },
+                            datosOrigen: {
+                                idUsuario: viaje.creadoPor?.id,
+                                usuario: viaje.creadoPor?.nombre,
+                                fechaRegistro: viaje.fechaCreacion
+                            },
+
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            storage: parseFloat(v.storage || 0),
+                            telefonoCliente: v.clienteTelefono || "",
+                            tipoVehiculo: "",
+                            titulo: v.titulo || "NO"
+                        };
+
+                        // Guardar en la colección de VEHICULOS (Inventario activo)
+                        transaction.set(vehiculoRef, dataComun);
+
+                        // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
+                        transaction.set(movimientoRef, {
+                            ...dataComun,
+                            timestamp: fechaOperacionActual,
+                            tipo: "+",
+                            tipoRegistro: "EB",
+                            estatus: "EB"
+                        });
+                    }
+                });
+
+                // --- 2. HISTORIAL DE PAGADOS (Expediente del Viaje) ---
+                const viajePagadoData = {
+                    ...viaje,
+                    folioPago: nuevoFolioContable,
+                    fechaPago: fechaOperacionActual,
+                    empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
+                    pagadoPor: {id: user?.id, nombre: user?.nombre},
+                    empresaLiquidada: empresaSeleccionada,
+                    estadoOrigen: estadoOrigen,
+                    estatus: "PAGADO",
+                    resumenFinanciero: {
+                        ...viaje.resumenFinanciero,
+                        totalFletes,
+                        totalStorage,
+                        totalSobrepeso,
+                        totalGastosExtra,
+                        granTotal: granTotalReal
+                    }
+                };
+
+                transaction.set(firestore().collection("viajesPagados").doc(nuevoFolioContable), viajePagadoData);
+
+                // --- 3. LIMPIEZA Y ACTUALIZACIÓN DE CONSECUTIVO ---
+                transaction.delete(firestore().collection("viajesPendientes").doc(viaje.id));
+                transaction.update(consecutivoRef, {"Viajes pagados": proximoFolio});
+            });
+
+            // Mostrar mensaje de éxito
+            setModal({
+                show: true,
+                mensaje: `Pago procesado exitosamente. El PDF se imprimirá automáticamente.`,
+                tipo: "success"
+            });
+
+            // Preparar el PDF para imprimir con el estado de origen
+            setViajeAImprimir({...viaje, estadoOrigen: estadoOrigen});
+
+            // Imprimir automáticamente después de un pequeño delay
+            setTimeout(() => {
+                if (btnPrintRef.current) {
+                    btnPrintRef.current.click();
+                }
+                setModal({show: false});
+                setEstadoOrigen(""); // Limpiar el estado para el próximo pago
+            }, 1000);
+
+        } catch (error) {
+            console.error("Error en pago:", error);
+            setModal({show: true, mensaje: "Error al procesar el pago: " + error, tipo: "error"});
+        } finally {
+            setProcesandoPago(false);
+        }
+    };
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
             <div style={{display: "none"}}>
-                {user.admin ?
-                    <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/> :
-                    <HojaChofer ref={componentRef} viaje={viajeAImprimir}/>
-                }
+                <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/>
             </div>
 
-            {viajeALiquidar &&
-                <ModalLiquidacion viaje={viajeALiquidar} user={user} onClose={() => setViajeALiquidar(null)}/>}
+            {/* Botón oculto para imprimir después del pago */}
+            <ReactToPrint
+                trigger={() => <button ref={btnPrintRef} style={{display: 'none'}}>Print</button>}
+                content={() => componentRef.current}
+                documentTitle={`Hoja Pago - Folio ${viajeAImprimir?.numViaje}`}
+            />
 
             {/* MODAL DE CONFIRMACIÓN GENERAL */}
             {modal.show && (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl p-8 max-w-sm w-full border-t-8 border-red-600 shadow-2xl">
-                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Confirmar Acción</h3>
-                        <p className="text-sm mt-3 font-bold text-gray-600 uppercase leading-tight italic">{modal.mensaje}</p>
+                    <div className={`bg-white rounded-xl p-8 max-w-sm w-full border-t-8 shadow-2xl ${
+                        modal.tipo === 'eliminar' ? 'border-red-700' :
+                        modal.tipo === 'pago' ? 'border-green-600' :
+                        modal.tipo === 'success' ? 'border-green-600' :
+                        'border-red-600'
+                    }`}>
+                        <h3 className={`text-xl font-black uppercase italic tracking-tighter ${
+                            modal.tipo === 'eliminar' ? 'text-red-700 flex items-center gap-2' :
+                            modal.tipo === 'pago' ? 'text-green-700' :
+                            modal.tipo === 'success' ? 'text-green-700 flex items-center gap-2' :
+                            ''
+                        }`}>
+                            {modal.tipo === 'eliminar' && <FaTrash />}
+                            {modal.tipo === 'success' && <FaCheckCircle />}
+                            {modal.tipo === 'eliminar' ? 'Confirmar Eliminación' :
+                             modal.tipo === 'pago' ? 'Confirmar Pago' :
+                             modal.tipo === 'success' ? 'Pago Exitoso' :
+                             'Confirmar Acción'}
+                        </h3>
+                        <p className="text-sm mt-3 font-bold text-gray-600 leading-tight italic">{modal.mensaje}</p>
+                        {modal.tipo === 'eliminar' && (
+                            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-700 rounded">
+                                <p className="text-[10px] font-black text-red-700 uppercase flex items-center gap-1">
+                                    ⚠️ ADVERTENCIA: Esta acción no se puede deshacer
+                                </p>
+                            </div>
+                        )}
+                        {modal.tipo === 'pago' && (
+                            <>
+                                <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-700 rounded">
+                                    <label className="text-[9px] font-black text-blue-700 uppercase block mb-2">
+                                        Estado de Origen del Viaje:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={estadoOrigen}
+                                        onChange={(e) => setEstadoOrigen(e.target.value.toUpperCase())}
+                                        placeholder="EJEMPLO: TEXAS, CALIFORNIA, ETC."
+                                        className="w-full px-3 py-2 border-2 border-blue-300 rounded-md text-sm font-bold uppercase focus:border-blue-600 focus:outline-none"
+                                        maxLength={30}
+                                    />
+                                </div>
+                                <div className="mt-3 p-3 bg-green-50 border-l-4 border-green-700 rounded">
+                                    <p className="text-[10px] font-black text-green-700 uppercase flex items-center gap-1">
+                                        ✓ Se procesará el pago y se generará el PDF
+                                    </p>
+                                </div>
+                            </>
+                        )}
                         <div className="flex justify-end gap-3 mt-8">
-                            <button onClick={() => setModal({show: false})}
-                                    className="btn btn-sm btn-ghost font-black uppercase text-[10px]">Cerrar
-                            </button>
-                            {modal.accion && <button onClick={modal.accion}
-                                                     className="btn btn-sm btn-error text-white font-black uppercase text-[10px]">Continuar</button>}
+                            {modal.tipo !== 'success' && (
+                                <button onClick={() => {
+                                    setModal({show: false});
+                                    if (modal.tipo === 'pago') setEstadoOrigen("");
+                                }}
+                                        className="btn btn-sm btn-ghost font-black uppercase text-[10px]">
+                                    {modal.accion ? 'Cancelar' : 'Cerrar'}
+                                </button>
+                            )}
+                            {modal.accion && <button
+                                onClick={modal.accion}
+                                disabled={modal.tipo === 'pago' && !estadoOrigen.trim()}
+                                className={`btn btn-sm text-white font-black uppercase text-[10px] ${
+                                    modal.tipo === 'eliminar' ? 'btn-error' :
+                                    modal.tipo === 'pago' ? 'btn-success' :
+                                    'btn-error'
+                                } ${modal.tipo === 'pago' && !estadoOrigen.trim() ? 'btn-disabled' : ''}`}>
+                                {modal.tipo === 'eliminar' ? 'Eliminar Viaje' :
+                                 modal.tipo === 'pago' ? 'Confirmar Pago' :
+                                 'Continuar'}
+                            </button>}
                         </div>
                     </div>
                 </div>
             )}
 
             {/* MODAL ESPECÍFICO DE COMENTARIOS */}
-            {modalComentario.show && (
-                <div
-                    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-                    <div
-                        className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
-                        <div className="p-6">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
-                                <FaCommentDots className="text-blue-600"/> Notas del Vehículo
-                            </h3>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalComentario.v?.lote}</p>
+            {modalComentario.show && (() => {
+                const viajeModal = viajes.find(vj => vj.id === modalComentario.viajeId);
+                const esLiderRutaModal = viajeModal && viajeModal.empresaLiderId === user.id;
+                const puedeEditarModal = user.admin || esLiderRutaModal;
 
-                            <div className="mt-6 space-y-4">
-                                {/* COMENTARIO 1 (REGISTRO) */}
-                                <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro
-                                        (Origen)</p>
-                                    <p className="text-sm font-bold text-gray-700 italic">
-                                        {modalComentario.v?.comentarioRegistro || "SIN COMENTARIOS EN EL REGISTRO."}
-                                    </p>
+                return (
+                    <div
+                        className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                        <div
+                            className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
+                            <div className="p-6">
+                                <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
+                                    <FaCommentDots className="text-blue-600"/> Notas del Vehículo
+                                </h3>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalComentario.v?.lote}</p>
+
+                                <div className="mt-6 space-y-4">
+                                    {/* COMENTARIO 1 (REGISTRO) */}
+                                    <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro
+                                            (Origen)</p>
+                                        <p className="text-sm font-bold text-gray-700 italic">
+                                            {modalComentario.v?.comentarioRegistro || "SIN COMENTARIOS EN EL REGISTRO."}
+                                        </p>
+                                    </div>
+
+                                    {/* COMENTARIO 2 (RECEPCIÓN) */}
+                                    <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                                        <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción
+                                            (Destino)</p>
+                                        {puedeEditarModal ? (
+                                            <textarea
+                                                placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
+                                                className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
+                                                value={modalComentario.v?.comentarioRecepcion || ""}
+                                                onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
+                                            />
+                                        ) : (
+                                            <p className="text-sm font-bold text-blue-700 italic">
+                                                {modalComentario.v?.comentarioRecepcion || "PENDIENTE DE RECEPCIÓN."}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* COMENTARIO 2 (RECEPCIÓN) */}
-                                <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción
-                                        (Destino)</p>
-                                    {user.admin ? (
-                                        <textarea
-                                            placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
-                                            disabled={modalComentario.v?.comentarioRecepcion && (viajes.find(vj => vj.id === modalComentario.viajeId)?.estatus === "VERIFICADO")}
-                                            className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
-                                            value={modalComentario.v?.comentarioRecepcion || ""}
-                                            onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
-                                        />
-                                    ) : (
-                                        <p className="text-sm font-bold text-blue-700 italic">
-                                            {modalComentario.v?.comentarioRecepcion || "PENDIENTE DE RECEPCIÓN."}
-                                        </p>
+                                <div className="flex gap-2 mt-6">
+                                    <button
+                                        onClick={() => setModalComentario({show: false, v: null, viajeId: null, idx: null})}
+                                        className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
+                                    >
+                                        Cancelar
+                                    </button>
+
+                                    {puedeEditarModal && (
+                                        <button
+                                            onClick={guardarComentarioRecepcion}
+                                            className="btn btn-sm btn-info flex-1 text-white font-black uppercase text-[10px]"
+                                        >
+                                            Guardar Nota
+                                        </button>
                                     )}
                                 </div>
                             </div>
-
-                            <div className="flex gap-2 mt-6">
-                                <button
-                                    onClick={() => setModalComentario({show: false, v: null, viajeId: null, idx: null})}
-                                    className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
-                                >
-                                    Cancelar
-                                </button>
-
-                                {user.admin && (
-                                    <button
-                                        onClick={guardarComentarioRecepcion}
-                                        className="btn btn-sm btn-info flex-1 text-white font-black uppercase text-[10px]"
-                                    >
-                                        Guardar Nota
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             <div
                 className="sticky top-0 z-[50] p-6 bg-white border-b-2 border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
@@ -252,6 +547,11 @@ const TablaViajes = ({user}) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
+                                {user.admin && viaje.vehiculos.some(v => v.yaPagado) && (
+                                    <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-yellow-500 text-black flex items-center gap-1">
+                                        ⚠️ CONTIENE LOTES PAGADOS
+                                    </span>
+                                )}
                                 <span className={`text-[10px] font-black uppercase px-4 py-1 rounded-full ${
                                     viaje.estatus === 'PENDIENTE' ? 'bg-yellow-500 text-black' :
                                         viaje.estatus === 'VERIFICADO' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
@@ -282,14 +582,62 @@ const TablaViajes = ({user}) => {
                                 </thead>
                                 <tbody>
                                 {viaje.vehiculos.map((v, idx) => {
-                                    const isLocked = (viaje.estatus === "EN VERIFICACION" || viaje.estatus === "VERIFICADO") && user.admin;
+                                    const esLiderRuta = viaje.empresaLiderId === user.id;
+                                    const puedeEditar = user.admin || esLiderRuta;
                                     const tieneComentarios = (v.comentarioRegistro && v.comentarioRegistro !== "") || (v.comentarioRecepcion && v.comentarioRecepcion !== "");
 
                                     return (
                                         <tr key={`${viaje.id}-${idx}`}
-                                            className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
-                                            <td className="p-3 text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</td>
+                                            className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${user.admin && v.yaPagado ? 'bg-yellow-50' : ''}`}>
+                                            <td className="p-3">
+                                                {puedeEditar ? (
+                                                    <div>
+                                                        <input
+                                                            type="text"
+                                                            value={v.lote || ""}
+                                                            maxLength={8}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
+                                                            className={`w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono py-1 focus:border-blue-500 ${user.admin && v.yaPagado ? 'text-yellow-700 border-yellow-500' : 'text-blue-700'}`}
+                                                        />
+                                                        {user.admin && v.yaPagado && (
+                                                            <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1 flex items-center gap-1">
+                                                                ⚠️ YA PAGADO
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <span className={`font-mono text-xs font-black ${user.admin && v.yaPagado ? 'text-yellow-700' : 'text-blue-700'}`}>{v.lote}</span>
+                                                        {user.admin && v.yaPagado && (
+                                                            <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1">
+                                                                ⚠️ YA PAGADO
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                {puedeEditar ? (
+                                                    <div className="flex gap-1">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="MARCA"
+                                                            value={v.marca || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'marca', e.target.value.toUpperCase())}
+                                                            className="w-20 bg-gray-50 rounded border border-gray-200 outline-none text-[10px] uppercase font-bold text-gray-600 px-1 py-1 focus:border-blue-500"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="MODELO"
+                                                            value={v.modelo || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'modelo', e.target.value.toUpperCase())}
+                                                            className="w-20 bg-gray-50 rounded border border-gray-200 outline-none text-[10px] uppercase font-bold text-gray-600 px-1 py-1 focus:border-blue-500"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</span>
+                                                )}
+                                            </td>
                                             <td className="p-3">
                                                 <div
                                                     className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
@@ -301,12 +649,18 @@ const TablaViajes = ({user}) => {
                                             <td className="p-2">
                                                 {user.admin ? (
                                                     <div className="relative group">
-                                                        <div
-                                                            className="text-[8px] font-black text-blue-600 mb-1 italic">Ref: {v.clienteAlt}</div>
+                                                        <div className="text-[8px] font-black text-blue-600 mb-1 italic flex items-center gap-1">
+                                                            Ref:
+                                                            <input
+                                                                type="text"
+                                                                value={v.clienteAlt || ""}
+                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
+                                                                className="w-24 bg-gray-50 rounded border border-gray-200 outline-none text-[8px] font-black text-blue-600 px-1 focus:border-blue-500"
+                                                            />
+                                                        </div>
                                                         <div className="relative">
                                                             <input
                                                                 type="text"
-                                                                disabled={isLocked}
                                                                 placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
                                                                 className="input input-bordered input-xs w-full font-bold text-[10px] uppercase bg-gray-50 focus:bg-white"
                                                                 value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
@@ -325,7 +679,7 @@ const TablaViajes = ({user}) => {
                                                                 </button>
                                                             )}
                                                         </div>
-                                                        {busquedaCliente[`${viaje.id}-${idx}`] && !isLocked && (
+                                                        {busquedaCliente[`${viaje.id}-${idx}`] && (
                                                             <div
                                                                 className="absolute z-[100] w-full bg-white border-2 border-blue-500 shadow-2xl rounded-md max-h-40 overflow-y-auto mt-1">
                                                                 {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).map(cliente => (
@@ -350,6 +704,14 @@ const TablaViajes = ({user}) => {
                                                             </div>
                                                         )}
                                                     </div>
+                                                ) : puedeEditar ? (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="REFERENCIA"
+                                                        value={v.clienteAlt || ""}
+                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
+                                                        className="w-full bg-gray-50 rounded border border-gray-200 outline-none text-[10px] font-bold uppercase text-gray-600 px-2 py-1 focus:border-blue-500"
+                                                    />
                                                 ) : (
                                                     <div
                                                         className="text-[10px] font-bold uppercase text-gray-500 italic">{v.clienteAlt}</div>
@@ -358,8 +720,8 @@ const TablaViajes = ({user}) => {
 
                                             {['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
                                                 <td key={field} className="p-1 text-center">
-                                                    {user.admin ? (
-                                                        <input type="number" disabled={isLocked} value={v[field]}
+                                                    {puedeEditar ? (
+                                                        <input type="number" value={v[field]}
                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
                                                                className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
                                                     ) : (
@@ -369,8 +731,8 @@ const TablaViajes = ({user}) => {
                                             ))}
 
                                             <td className="p-1 text-center">
-                                                {user.admin ? (
-                                                    <select disabled={isLocked} value={v.titulo || "NO"}
+                                                {puedeEditar ? (
+                                                    <select value={v.titulo || "NO"}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'titulo', e.target.value)}
                                                             className="select select-bordered select-xs font-black text-[10px]">
                                                         <option value="NO">NO</option>
@@ -407,36 +769,36 @@ const TablaViajes = ({user}) => {
                                                     <div className="flex flex-col gap-2 w-32 mx-auto">
                                                         {user.admin ? (
                                                             <>
-                                                                {viaje.estatus === "PENDIENTE" && (
-                                                                    <button onClick={() => {
-                                                                        const faltan = viaje.vehiculos.some(veh => !veh.clienteId);
-                                                                        if (faltan) setModal({
-                                                                            show: true,
-                                                                            mensaje: "Asigna todos los clientes primero.",
-                                                                            tipo: "error"
-                                                                        });
-                                                                        else setModal({
-                                                                            show: true,
-                                                                            mensaje: "¿Iniciar verificación física?",
-                                                                            accion: () => cambiarEstatus(viaje.id, "EN VERIFICACION")
-                                                                        });
-                                                                    }}
-                                                                            className="btn btn-xs btn-error text-white font-black text-[9px] uppercase h-10 shadow-md">Iniciar
-                                                                        Verificación</button>
-                                                                )}
-                                                                {viaje.estatus === "EN VERIFICACION" && (
-                                                                    <button onClick={() => setModal({
-                                                                        show: true,
-                                                                        mensaje: "¿Confirmar descarga?",
-                                                                        accion: () => cambiarEstatus(viaje.id, "VERIFICADO")
-                                                                    })}
-                                                                            className="btn btn-xs btn-info text-white font-black text-[9px] uppercase h-10 shadow-md">Confirmar
-                                                                        Descarga</button>
-                                                                )}
-                                                                {viaje.estatus === "VERIFICADO" && (
-                                                                    <button onClick={() => setViajeALiquidar(viaje)}
-                                                                            className="btn btn-xs btn-success text-white font-black text-[10px] h-10 uppercase italic shadow-md">Pagar Flete</button>
-                                                                )}
+                                                                {(() => {
+                                                                    const faltanClientes = viaje.vehiculos.some(veh => !veh.clienteNombre);
+                                                                    return (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (faltanClientes) {
+                                                                                    setModal({
+                                                                                        show: true,
+                                                                                        mensaje: "Debes asignar todos los nombres de clientes antes de pagar el flete.",
+                                                                                        tipo: "error"
+                                                                                    });
+                                                                                } else {
+                                                                                    setEstadoOrigen(""); // Limpiar estado anterior
+                                                                                    setModal({
+                                                                                        show: true,
+                                                                                        mensaje: `¿Confirmar pago del viaje #${viaje.numViaje}? Completa el estado de origen y se procesará el pago generando el PDF automáticamente.`,
+                                                                                        accion: () => ejecutarPago(viaje),
+                                                                                        tipo: "pago"
+                                                                                    });
+                                                                                }
+                                                                            }}
+                                                                            disabled={faltanClientes || procesandoPago}
+                                                                            className={`btn btn-xs text-white font-black text-[10px] h-10 uppercase italic shadow-md ${
+                                                                                faltanClientes || procesandoPago ? 'btn-disabled bg-gray-400' : 'btn-success'
+                                                                            }`}
+                                                                        >
+                                                                            {procesandoPago ? 'Procesando...' : 'Pagar Flete'}
+                                                                        </button>
+                                                                    );
+                                                                })()}
                                                             </>
                                                         ) : null}
 
@@ -452,17 +814,17 @@ const TablaViajes = ({user}) => {
                                                             content={() => componentRef.current}
                                                         />
 
-                                                        {user.admin && viaje.estatus !== "PENDIENTE" && (
+                                                        {puedeEditar && (
                                                             <button onClick={() => {
-                                                                const anterior = viaje.estatus === "VERIFICADO" ? "EN VERIFICACION" : "PENDIENTE";
                                                                 setModal({
                                                                     show: true,
-                                                                    mensaje: `¿Regresar a edición? El estatus cambiará a ${anterior}`,
-                                                                    accion: () => cambiarEstatus(viaje.id, anterior)
+                                                                    mensaje: `¿Eliminar viaje #${viaje.numViaje}? Esta acción eliminará el viaje y ${viaje.vehiculos.length} vehículo(s) asociado(s). NO SE PUEDE DESHACER.`,
+                                                                    accion: () => eliminarViaje(viaje.id),
+                                                                    tipo: "eliminar"
                                                                 });
                                                             }}
-                                                                    className="text-[8px] font-black uppercase text-red-500 underline hover:text-red-700 transition-all mt-1">
-                                                                Habilitar Edición
+                                                                    className="btn btn-xs btn-error text-white font-black text-[9px] uppercase h-8 w-full flex items-center justify-center gap-2 transition-all shadow-md mt-2">
+                                                                <FaTrash size={10}/> ELIMINAR
                                                             </button>
                                                         )}
                                                     </div>

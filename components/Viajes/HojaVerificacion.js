@@ -4,143 +4,479 @@ import moment from 'moment';
 const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
     if (!viajeData) return null;
 
-    const folioLabel = `Hoja Chofer - Folio: ${viajeData.numViaje}`;
+    const folioLabel = `Bill of Lading - Folio: ${viajeData.numViaje}`;
+
+    // Rellenar hasta 10 filas
+    const filasVacias = Math.max(0, 10 - (viajeData.vehiculos?.length || 0));
+    const vehiculosConVacios = [...(viajeData.vehiculos || []), ...Array(filasVacias).fill(null)];
+
+    // Calcular totales separados
+    const totalFlete = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.flete || 0), 0);
+    const totalStorage = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.storage || 0), 0);
+    const totalSobrepeso = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.sPeso || 0), 0);
+    const totalGastosExtra = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.gExtra || 0), 0);
+    const subtotal = totalFlete + totalStorage + totalSobrepeso + totalGastosExtra;
+    const total = subtotal;
 
     return (
-        <div ref={ref} className="p-6 bg-white text-black font-sans w-full"
-             style={{ minWidth: "27.9cm" }}>
-
-            {/* CONFIGURACIÓN DE IMPRESIÓN */}
+        <div ref={ref} className="bg-white text-black" style={{
+            padding: "0.5cm",
+            width: "27.94cm",
+            height: "21.59cm",
+            fontFamily: "'Raleway', 'Montserrat', 'Poppins', sans-serif",
+            boxSizing: 'border-box',
+            background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+            display: 'flex',
+            flexDirection: 'column',
+            pageBreakAfter: 'always',
+            pageBreakInside: 'avoid'
+        }}>
             <style dangerouslySetInnerHTML={{ __html: `
                 @media print {
-                    @page { 
-                        size: letter landscape; 
-                        margin: 0.5cm; 
+                    @page {
+                        size: letter landscape;
+                        margin: 0;
                     }
-                    body { 
-                        -webkit-print-color-adjust: exact; 
-                        print-color-adjust: exact;
+                    body {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
                     }
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                        color-adjust: exact !important;
+                    }
+                    html, body {
+                        height: 100%;
+                        overflow: hidden;
+                    }
+                }
+                .modern-border {
+                    border: 1.5px solid #e11d48 !important;
+                }
+                .modern-shadow {
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                }
+                .subtle-shadow {
+                    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
                 }
             ` }} />
 
-            {/* Título oculto para que el navegador lo detecte como título de página */}
             <title>{folioLabel}</title>
 
-            {/* ENCABEZADO */}
-            <div className="flex justify-between items-center border-b-4 border-red-600 pb-2 mb-4">
-                <div className="flex gap-4 items-center">
-                    <img src="/assets/Logoprint.png" className="w-20" alt="Logo"/>
-                    <div>
-                        <h1 className="text-3xl font-black uppercase tracking-tighter italic leading-none">
-                            Hoja Chofer
-                        </h1>
-                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                            Control de Recepción en Patio y Auditoría de Gastos
-                        </p>
+            {/* HEADER MODERNIZADO */}
+            <div className="flex justify-between items-center" style={{
+                marginBottom: "3px",
+                padding: "12px 18px",
+                borderRadius: "12px",
+                flexShrink: 0,
+                boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.15)',
+                backgroundColor: "#ffffff",
+                border: "3px solid #1f2937"
+            }}>
+                <div className="flex-shrink-0 flex items-center gap-2" style={{ width: "160px" }}>
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <img src="/assets/Logoprint.png" alt="Logo" style={{ width: "120px", height: "auto" }} />
                     </div>
                 </div>
-                <div className="flex gap-4">
-                    <div className="text-right border-r-2 border-gray-200 pr-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Emisión</p>
-                        <p className="text-sm font-bold uppercase">{moment().format('DD/MM/YYYY HH:mm')}</p>
+
+                <div className="text-center flex-1" style={{ padding: "0 24px" }}>
+                    <h1 className="font-black tracking-tight" style={{
+                        fontSize: "42px",
+                        color: "#000000",
+                        letterSpacing: '2.5px',
+                        fontFamily: "'Bebas Neue', 'Oswald', 'Raleway', sans-serif",
+                        lineHeight: '1',
+                        margin: "0"
+                    }}>
+                        BILL OF LADING
+                    </h1>
+                    <div className="font-black" style={{
+                        fontSize: "18px",
+                        color: "#1f2937",
+                        fontWeight: "800",
+                        lineHeight: '1',
+                        margin: "4px 0 2px 0"
+                    }}>
+                        Jorge Minnesota Logistic LLC
                     </div>
-                    <div className="text-right">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Folio de Viaje</p>
-                        <p className="text-3xl font-black text-red-600 leading-none italic">#{viajeData.numViaje}</p>
+                    <div className="font-semibold" style={{ lineHeight: '1.1', color: "#4b5563", letterSpacing: '0.3px', fontSize: "13px" }}>
+                        <div style={{ margin: "2px 0" }}>932 N. Minnesota Ave.</div>
+                        <div style={{ margin: "2px 0" }}>Brownsville, Texas, 78521</div>
+                        <div className="font-bold" style={{ fontSize: "14px", color: "#1f2937", margin: "2px 0", letterSpacing: '0.5px' }}>
+                            +1 (956) 371-8314
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-3" style={{ width: "180px" }}>
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Viaje</div>
+                        <div className="text-center font-black" style={{ fontSize: "28px", color: "#1f2937", letterSpacing: '1px', lineHeight: '1' }}>
+                            #{viajeData.numViaje}
+                        </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Date</div>
+                        <div className="text-center font-black" style={{ fontSize: "22px", color: "#1f2937", letterSpacing: '0.5px', lineHeight: '1' }}>
+                            {moment().format('MM/DD/YY')}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* DATOS DE TRANSPORTE */}
-            <div className="grid grid-cols-3 gap-4 mb-4 bg-gray-100 px-4 py-3 rounded border-2 border-black text-[11px]">
-                <div>
-                    <span className="font-black text-gray-500 uppercase block text-[9px]">Transportista:</span>
-                    <span className="font-black text-lg uppercase">{viajeData.chofer?.nombre}</span>
-                </div>
-                <div>
-                    <span className="font-black text-gray-500 uppercase block text-[9px]">Empresa / Propietario:</span>
-                    <span className="font-bold text-lg uppercase italic">{viajeData.chofer?.empresa}</span>
-                </div>
-                <div className="text-right border-l-2 border-gray-300">
-                    <span className="font-black text-gray-500 uppercase block text-[9px]">Total de Carga:</span>
-                    <span className="font-black text-2xl">{viajeData.vehiculos?.length} UNIDADES</span>
+            {/* ESTADO DEL VIAJE */}
+            <div className="modern-shadow" style={{
+                marginBottom: "3px",
+                background: 'linear-gradient(to right, #fef2f2, #fee2e2)',
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #fecdd3",
+                flexShrink: 0
+            }}>
+                <div className="flex items-center justify-center">
+                    <span className="font-black text-[10px]" style={{ color: "#be123c", fontWeight: "900", marginRight: "8px" }}>ESTADO:</span>
+                    <div className="flex-1 text-center font-black text-[14px] uppercase" style={{
+                        color: "#991b1b",
+                        fontWeight: "900",
+                        letterSpacing: '1px'
+                    }}>
+                        {viajeData.estadoOrigen || ""}
+                    </div>
                 </div>
             </div>
 
-            {/* TABLA */}
-            <table className="w-full border-collapse border-2 border-black">
-                <thead>
-                    <tr className="bg-black text-white text-[9px] uppercase font-black italic">
-                        <th className="border border-white p-2 w-8">#</th>
-                        <th className="border border-white p-2 text-left w-56">Vehículo / Lote</th>
-                        <th className="border border-white p-2 text-left">Cliente Oficial</th>
-                        <th className="border border-white p-2">Flete</th>
-                        <th className="border border-white p-2">Storage</th>
-                        <th className="border border-white p-2">S.Peso</th>
-                        <th className="border border-white p-2">G.Extra</th>
-                        <th className="border border-white p-2 bg-red-700">Total</th>
-                        <th className="border border-white p-2 w-12 text-center">Tít.</th>
-                        <th className="border border-white p-2 w-20 text-center">CHECK</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {viajeData.vehiculos?.map((v, index) => {
-                    const totalUnidad = (parseFloat(v.flete) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0);
-                    return (
-                        <tr key={index} className="text-[10px] border-b-2 border-black h-12">
-                            <td className="border-r-2 border-black text-center font-black bg-gray-100">{index + 1}</td>
-                            <td className="border-r-2 border-black p-1 px-3 leading-tight">
-                                <div className="font-black text-blue-900 text-sm tracking-tight">{v.lote}</div>
-                                <div className="uppercase font-black text-black">{v.marca} {v.modelo}</div>
-                                <div className="text-[8px] text-gray-500 font-bold uppercase">{v.almacen} - {v.ciudad}</div>
+            {/* DRIVER INFO MODERNIZADO */}
+            <div className="modern-shadow" style={{
+                marginBottom: "3px",
+                background: 'linear-gradient(to right, #ffffff, #fef2f2)',
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #fecdd3",
+                flexShrink: 0
+            }}>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="flex items-center">
+                        <span className="font-black text-[10px]" style={{ width: "50px", color: "#be123c", fontWeight: "900" }}>DRIVER:</span>
+                        <div className="flex-1 border-b-2 pl-2 font-bold text-[10px] uppercase" style={{
+                            height: "16px",
+                            paddingTop: "2px",
+                            borderColor: "#fda4af",
+                            color: "#1f2937",
+                            fontWeight: "800"
+                        }}>
+                            {viajeData.chofer?.nombre || ""}
+                        </div>
+                    </div>
+                    <div className="flex items-center">
+                        <span className="font-black text-[10px]" style={{ width: "48px", color: "#be123c", fontWeight: "900" }}>PHONE:</span>
+                        <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
+                    </div>
+                    <div className="flex items-center">
+                        <span className="font-black text-[10px]" style={{ width: "65px", color: "#be123c", fontWeight: "900" }}>COMPANY:</span>
+                        <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* TABLA MODERNIZADA */}
+            <div className="modern-shadow" style={{ borderRadius: "6px", overflow: "hidden", marginBottom: "3px", flex: "1 1 auto", minHeight: "0" }}>
+                <table className="w-full border-collapse" style={{ tableLayout: "fixed", height: "100%" }}>
+                    <thead>
+                        <tr className="font-black text-[11px]" style={{
+                            letterSpacing: '0.5px',
+                            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+                            color: "#ffffff",
+                            fontWeight: "900"
+                        }}>
+                            <th className="text-center" style={{ width: "22px", borderRight: "1px solid #475569", fontWeight: "900" }}>★</th>
+                            <th className="text-left px-2" style={{ width: "120px", borderRight: "1px solid #475569", fontWeight: "900" }}>CUSTOMER</th>
+                            <th className="text-left px-2" style={{ width: "60px", borderRight: "1px solid #475569", fontWeight: "900" }}>STOCK#</th>
+                            <th className="text-left px-2" style={{ width: "100px", borderRight: "1px solid #475569", fontWeight: "900" }}>VEHICLE</th>
+                            <th className="text-left px-2" style={{ width: "75px", borderRight: "1px solid #475569", fontWeight: "900" }}>CITY</th>
+                            <th className="text-left px-2" style={{ width: "70px", borderRight: "1px solid #475569", fontWeight: "900" }}>AUCTION</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>FLETE</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>STORAGE</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>S.PESO</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>G.EXTRA</th>
+                            <th className="text-center" style={{ width: "50px", borderRight: "1px solid #475569", fontWeight: "900" }}>TOTAL</th>
+                            <th className="text-center" style={{ width: "35px", fontWeight: "900" }}>TITLE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {vehiculosConVacios.map((v, i) => (
+                            <tr key={i} style={{
+                                backgroundColor: i % 2 === 0 ? "#ffffff" : "#f8fafc",
+                                borderBottom: "1px solid #e2e8f0",
+                                height: "18px"
+                            }}>
+                                <td className="text-center font-black text-[12px]" style={{
+                                    backgroundColor: v ? "linear-gradient(135deg, #fecdd3, #fda4af)" : "#f8fafc",
+                                    color: "#be123c",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "900"
+                                }}>
+                                    {v ? i + 1 : ""}
+                                </td>
+                                <td className="px-2 text-[11px] font-bold uppercase" style={{
+                                    color: "#1f2937",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    verticalAlign: "middle",
+                                    fontWeight: "700"
+                                }}>
+                                    {v ? (v.clienteNombre || v.clienteAlt || "") : ""}
+                                </td>
+                                <td className="px-2 text-[11px] font-black" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "900"
+                                }}>
+                                    {v ? v.lote : ""}
+                                </td>
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
+                                    color: "#1f2937",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    verticalAlign: "middle",
+                                    fontWeight: "700"
+                                }}>
+                                    {v ? `${v.marca} ${v.modelo}` : ""}
+                                </td>
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
+                                    color: "#1f2937",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    verticalAlign: "middle",
+                                    fontWeight: "700"
+                                }}>
+                                    {v ? v.ciudad : ""}
+                                </td>
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
+                                    color: "#1f2937",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                    verticalAlign: "middle",
+                                    fontWeight: "700"
+                                }}>
+                                    {v ? v.almacen : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.flete}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.storage || 0}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.sPeso || 0}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.gExtra || 0}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-black" style={{
+                                    background: v ? "linear-gradient(135deg, #d1fae5, #a7f3d0)" : "transparent",
+                                    color: "#065f46",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "900"
+                                }}>
+                                    {v ? `$${(parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0))}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-black" style={{
+                                    color: "#be123c",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "900"
+                                }}>
+                                    {v && v.titulo === "SI" ? "SI" : v ? "X" : ""}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    <tfoot>
+                        {/* Fila única de Totales por columna */}
+                        <tr style={{ backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
+                            <td colSpan="6"></td>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalFlete.toFixed(2)}
                             </td>
-                            <td className="border-r-2 border-black p-1 px-2 uppercase leading-none">
-                                <div className="font-black text-[11px] text-red-700">{v.clienteNombre || 'SIN ASIGNAR'}</div>
-                                <div className="text-[8px] text-gray-400 font-bold mt-1">Ref: {v.clienteAlt || 'N/A'}</div>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalStorage.toFixed(2)}
                             </td>
-                            <td className="border-r-2 border-black p-1 text-center font-bold">${v.flete}</td>
-                            <td className="border-r-2 border-black p-1 text-center font-bold text-gray-500">${v.storage}</td>
-                            <td className="border-r-2 border-black p-1 text-center font-bold text-gray-500">${v.sPeso}</td>
-                            <td className="border-r-2 border-black p-1 text-center font-bold text-gray-500">${v.gExtra}</td>
-                            <td className="border-r-2 border-black p-1 text-center font-black bg-red-50 text-sm">${totalUnidad.toLocaleString()}</td>
-                            <td className="border-r-2 border-black p-1 text-center font-black text-sm">{v.titulo === "SI" ? "☑" : "☐"}</td>
-                            <td className="p-1">
-                                <div className="w-12 h-8 border-2 border-dashed border-gray-400 mx-auto rounded"></div>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalSobrepeso.toFixed(2)}
+                            </td>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalGastosExtra.toFixed(2)}
+                            </td>
+                            <td colSpan="2"></td>
+                        </tr>
+
+                        {/* Fila de Subtotal */}
+                        <tr style={{ backgroundColor: "#1e293b", borderTop: "2px solid #475569" }}>
+                            <td colSpan="10" className="text-right px-2 font-black text-[10px]" style={{
+                                color: "#ffffff",
+                                padding: "6px 8px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                SUBTOTAL:
+                            </td>
+                            <td className="text-center px-2 font-black text-[11px]" style={{
+                                color: "#ffffff",
+                                padding: "6px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                ${subtotal.toFixed(2)}
+                            </td>
+                            <td colSpan="1"></td>
+                        </tr>
+
+                        {/* Fila de Total con Cheque y Efectivo */}
+                        <tr style={{ backgroundColor: "#10b981", borderTop: "3px solid #059669" }}>
+                            <td colSpan="8" className="text-right px-2 font-black text-[11px]" style={{
+                                color: "#ffffff",
+                                padding: "8px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                TOTAL:
+                            </td>
+                            <td colSpan="2" className="text-center px-2 font-black text-[13px]" style={{
+                                color: "#ffffff",
+                                padding: "8px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                ${total.toFixed(2)}
+                            </td>
+                            <td colSpan="2" style={{ padding: "4px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>CHEQUE:</span>
+                                        <div className="bg-white rounded" style={{
+                                            flex: 1,
+                                            height: "12px",
+                                            border: "1px solid #059669"
+                                        }}></div>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>EFECTIVO:</span>
+                                        <div className="bg-white rounded" style={{
+                                            flex: 1,
+                                            height: "12px",
+                                            border: "1px solid #059669"
+                                        }}></div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
-                    );
-                })}
-                </tbody>
-            </table>
+                    </tfoot>
+                </table>
+            </div>
 
-            {/* FIRMAS */}
-            <div className="mt-4 grid grid-cols-3 gap-6">
-                <div className="col-span-1 border-2 border-black p-2 rounded h-24">
-                    <p className="text-[9px] font-black uppercase text-gray-400 border-b border-gray-200 mb-1">Notas de Patio:</p>
-                </div>
-                <div className="col-span-2 grid grid-cols-2 gap-10 items-end px-10">
-                    <div className="text-center">
-                        <div className="border-t-4 border-black pt-1">
-                            <p className="text-[11px] font-black uppercase">{viajeData.chofer?.nombre}</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase italic leading-none">Transportista (Entrega)</p>
-                        </div>
+            {/* FOOTER MODERNIZADO */}
+            <div className="flex items-end" style={{ flexShrink: 0, paddingTop: "6px" }}>
+                <div>
+                    <div style={{ height: "50px", marginBottom: "4px" }}></div>
+                    <div className="font-black text-[11px]" style={{
+                        color: "#64748b",
+                        letterSpacing: '0.5px',
+                        textAlign: "center",
+                        fontWeight: "900"
+                    }}>
+                        DRIVER SIGNATURE
                     </div>
-                    <div className="text-center">
-                        <div className="border-t-4 border-black pt-1">
-                            <p className="text-[11px] font-black uppercase">___________________________</p>
-                            <p className="text-[9px] text-gray-500 font-bold uppercase italic leading-none">Recibido en Patio (Verifica)</p>
-                        </div>
-                    </div>
+                    <div style={{ borderTop: "3px solid #1f2937", width: "300px", marginTop: "4px" }}></div>
                 </div>
             </div>
 
-            {/* PIE DE PÁGINA */}
-            <div className="mt-6 text-center border-t border-gray-200 pt-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase italic tracking-[0.3em]">
-                    Logística Jorge Minnesota - Matamoros Custom Office - System Verified
-                </p>
-            </div>
         </div>
     );
 });

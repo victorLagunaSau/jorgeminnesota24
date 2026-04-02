@@ -96,7 +96,11 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                                         Control de Viajes
                                     </button>
                                 </li>
-
+                                <li>
+                                    <button className={getButtonClass('reporteViajesPago')} onClick={() => onSelectModule('reporteViajesPago')}>
+                                        Historial
+                                    </button>
+                                </li>
                                 <li>
                                     <button className={getButtonClass('choferes')} onClick={() => onSelectModule('choferes')}>
                                         Choferes
@@ -111,11 +115,6 @@ const Sidebar = ({onSelectModule, selectedModule}) => {
                                 <li>
                                     <button className={getButtonClass('viajesAnteriores')} onClick={() => onSelectModule('viajesAnteriores')}>
                                         Regularización
-                                    </button>
-                                </li>
-                                <li>
-                                    <button className={getButtonClass('reporteViajesPago')} onClick={() => onSelectModule('reporteViajesPago')}>
-                                        Viajes Pagados
                                     </button>
                                 </li>
                             </ul>

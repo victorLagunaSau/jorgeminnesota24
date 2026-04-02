@@ -5,7 +5,7 @@ import {
     FaTrash, FaCheckCircle, FaExclamationCircle,
     FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink
 } from "react-icons/fa";
-import HojaChofer from "./HojaChofer";
+import HojaVerificacion from "./HojaVerificacion";
 
 const FormViaje = ({user}) => {
     // --- ESTADOS DE CONTROL ---
@@ -112,10 +112,11 @@ const FormViaje = ({user}) => {
             lote: "", marca: "", modelo: "", clienteAlt: "",
             almacen: "Copart",
             estado: "", ciudad: "",
-            flete: 0,          // Se usará para el COST (chofer)
+            flete: "0",        // Se usará para el COST (chofer) - Editable
             precioVenta: 0,    // Se usará para el PRICE (cliente) - OCULTO
             storage: "0", sPeso: "0", gExtra: "0", titulo: "NO",
-            comentarioRegistro: ""
+            comentarioRegistro: "",
+            yaPagado: false    // Indica si el lote ya existe en vehiculos (pagado)
         }]);
     };
 
@@ -123,7 +124,7 @@ const FormViaje = ({user}) => {
         const nuevosVehiculos = vehiculos.map(v => {
             if (v.id === id) {
                 let valorFinal = value;
-                if (['storage', 'sPeso', 'gExtra'].includes(field)) {
+                if (['storage', 'sPeso', 'gExtra', 'flete'].includes(field)) {
                     valorFinal = value === "" ? "0" : parseFloat(value).toString();
                 }
 
@@ -134,11 +135,11 @@ const FormViaje = ({user}) => {
                     if (estadoData && estadoData.regions?.length > 0) {
                         actualizacion.ciudad = estadoData.regions[0].city;
                         // LOGICA DE COSTO VS PRECIO
-                        actualizacion.flete = parseFloat(estadoData.regions[0].cost || 0);
+                        actualizacion.flete = (estadoData.regions[0].cost || 0).toString();
                         actualizacion.precioVenta = parseFloat(estadoData.regions[0].price || 0);
                     } else {
                         actualizacion.ciudad = "";
-                        actualizacion.flete = 0;
+                        actualizacion.flete = "0";
                         actualizacion.precioVenta = 0;
                     }
                 }
@@ -148,10 +149,10 @@ const FormViaje = ({user}) => {
                     const regionData = estadoData?.regions?.find(r => r.city === value);
                     if (regionData) {
                         // LOGICA DE COSTO VS PRECIO
-                        actualizacion.flete = parseFloat(regionData.cost || 0);
+                        actualizacion.flete = (regionData.cost || 0).toString();
                         actualizacion.precioVenta = parseFloat(regionData.price || 0);
                     } else {
-                        actualizacion.flete = 0;
+                        actualizacion.flete = "0";
                         actualizacion.precioVenta = 0;
                     }
                 }
@@ -170,10 +171,23 @@ const FormViaje = ({user}) => {
                 firestore().collection("vehiculos").doc(loteLimpio).get(),
                 firestore().collection("lotesEnTransito").doc(loteLimpio).get()
             ]);
-            if (docV.exists || docT.exists) {
-                setAlertMessage({msg: `Lote ${loteLimpio} duplicado o en tránsito`, tipo: 'error'});
+
+            if (docV.exists) {
+                // Lote YA PAGADO - Permitir pero marcar como advertencia
+                // Solo mostrar alerta visual si es admin
+                if (user.admin) {
+                    setAlertMessage({msg: `⚠️ ADVERTENCIA: Lote ${loteLimpio} ya está pagado. Se registrará para actualizar precios.`, tipo: 'warning'});
+                    setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                }
+                setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: true} : v));
+            } else if (docT.exists) {
+                // Lote en tránsito - No permitir
+                setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito`, tipo: 'error'});
                 setVehiculos(vehiculos.map(v => v.id === id ? {...v, lote: ""} : v));
                 setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+            } else {
+                // Lote nuevo - Limpiar marca de pagado si existía
+                setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
             }
         } catch (e) {
             console.error(e);
@@ -181,7 +195,7 @@ const FormViaje = ({user}) => {
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && v.flete > 0
+        v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
     );
 
     // --- ACCIÓN FINALIZAR CON TRANSACCIÓN ---
@@ -196,7 +210,7 @@ const FormViaje = ({user}) => {
                 const proximoFolio = (conDoc.data()["viajesPendientes"] || 0) + 1;
                 const numViajeFinal = String(proximoFolio);
 
-                const tFlete = vehiculos.reduce((acc, v) => acc + v.flete, 0);
+                const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
                 const choferData = choferes.find(c => c.id === encabezado.choferId);
 
                 const viajeData = {
@@ -236,10 +250,6 @@ const FormViaje = ({user}) => {
             setMostrarModalExito(true);
             setGuardando(false);
 
-            setTimeout(() => {
-                if (btnPrintRef.current) btnPrintRef.current.click();
-            }, 600);
-
         } catch (e) {
             setAlertMessage({msg: "Error al guardar viaje: " + e.message, tipo: 'error'});
             setGuardando(false);
@@ -250,7 +260,7 @@ const FormViaje = ({user}) => {
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 font-sans text-black">
 
             <div style={{display: "none"}}>
-                <HojaChofer ref={componenteRef} viaje={viajeReciente}/>
+                <HojaVerificacion ref={componenteRef} viajeData={viajeReciente}/>
             </div>
 
             {/* MODAL DE ÉXITO */}
@@ -275,7 +285,7 @@ const FormViaje = ({user}) => {
                             trigger={() => (
                                 <button ref={btnPrintRef}
                                         className="btn btn-info text-white w-full h-14 uppercase font-black tracking-widest gap-2">
-                                    <FaPrint/> Imprimir Hoja Chofer
+                                    <FaPrint/> Imprimir PDF
                                 </button>
                             )}
                             content={() => componenteRef.current}
@@ -295,7 +305,11 @@ const FormViaje = ({user}) => {
 
             {alertMessage.msg && (
                 <div
-                    className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 text-white font-bold text-[12px]`}>
+                    className={`alert ${
+                        alertMessage.tipo === 'success' ? 'alert-success' :
+                        alertMessage.tipo === 'warning' ? 'alert-warning' :
+                        'alert-error'
+                    } mb-4 font-bold text-[12px] ${alertMessage.tipo === 'warning' ? 'text-gray-800' : 'text-white'}`}>
                     <FaExclamationCircle/> <span>{alertMessage.msg}</span>
                 </div>
             )}
@@ -418,7 +432,7 @@ const FormViaje = ({user}) => {
                         </thead>
                         <tbody className="bg-white">
                         {vehiculos.map((v, i) => (
-                            <tr key={v.id} className="bg-gray-200">
+                            <tr key={v.id} className={`${user.admin && v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
                                 <td className="font-mono text-[10px] text-gray-400 italic">{i + 1}</td>
                                 <td>
                                     <input
@@ -427,9 +441,15 @@ const FormViaje = ({user}) => {
                                         maxLength={8}
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
                                         onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
-                                        className={`input input-xs w-full font-black ${v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'}`}
+                                        className={`input input-xs w-full font-black ${
+                                            user.admin && v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
+                                            v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'
+                                        }`}
                                         placeholder="8 dígitos"
                                     />
+                                    {user.admin && v.yaPagado && (
+                                        <span className="text-[8px] font-black text-yellow-700 uppercase italic block mt-1">YA PAGADO</span>
+                                    )}
                                 </td>
                                 <td><input type="text" value={v.marca}
                                            onChange={(e) => handleTableChange(v.id, 'marca', e.target.value.toUpperCase())}
@@ -467,7 +487,15 @@ const FormViaje = ({user}) => {
                                             <option key={idx} value={r.city}>{r.city}</option>))}
                                     </select>
                                 </td>
-                                <td className="font-black text-blue-900 text-center">${v.flete}</td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        value={v.flete}
+                                        onChange={(e) => handleTableChange(v.id, 'flete', e.target.value)}
+                                        className="input input-xs w-20 text-center font-black text-blue-900 bg-blue-50"
+                                        placeholder="0"
+                                    />
+                                </td>
                                 <td><input type="number" value={v.storage}
                                            onChange={(e) => handleTableChange(v.id, 'storage', e.target.value)}
                                            className="input input-xs w-16 text-center"/></td>
