@@ -37,6 +37,12 @@ const TablaViajes = ({user}) => {
                 viajesData = viajesData.filter(viaje =>
                     viaje.empresaId === user.id || viaje.empresaLiderId === user.id
                 );
+                // Ordenar del más nuevo al más viejo para carriers
+                viajesData.sort((a, b) => {
+                    const fechaA = a.fechaCreacion?.toDate ? a.fechaCreacion.toDate() : new Date(a.fechaCreacion);
+                    const fechaB = b.fechaCreacion?.toDate ? b.fechaCreacion.toDate() : new Date(b.fechaCreacion);
+                    return fechaB - fechaA; // Descendente (más nuevo primero)
+                });
             }
 
             setViajes(viajesData);

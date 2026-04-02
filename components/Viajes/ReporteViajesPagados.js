@@ -48,7 +48,7 @@ const ReporteViajesPagados = ({ user }) => {
             const snap = await firestore().collection("viajesPagados")
                 .where("fechaPago", ">=", firebase.firestore.Timestamp.fromDate(inicio))
                 .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
-                .orderBy("fechaPago", "asc")
+                .orderBy("fechaPago", "desc")
                 .get();
             setViajes(snap.docs.map(doc => doc.data()));
         } catch (e) { console.error(e); } finally { setLoading(false); }
