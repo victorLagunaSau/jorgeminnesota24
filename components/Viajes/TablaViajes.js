@@ -96,27 +96,6 @@ const TablaViajes = ({user}) => {
         }
     };
 
-    const cambiarEstatus = async (viajeId, nuevoEstatus) => {
-        const viaje = viajes.find(v => v.id === viajeId);
-        try {
-            const updateData = {estatus: nuevoEstatus, vehiculos: viaje.vehiculos};
-            if (nuevoEstatus === "VERIFICADO") {
-                const registro = {
-                    usuario: user?.nombre || "Admin",
-                    fecha: new Date(),
-                    cambioVehiculos: viaje.vehiculos.map(v => ({
-                        lote: v.lote, flete: v.flete, clienteConfirmado: v.clienteNombre || "Sin asignar"
-                    }))
-                };
-                updateData.historialEdiciones = firebase.firestore.FieldValue.arrayUnion(registro);
-                updateData.verificado = true;
-            }
-            await firestore().collection("viajesPendientes").doc(viajeId).update(updateData);
-            setModal({show: false});
-        } catch (error) {
-            setModal({show: true, mensaje: "Error al actualizar estatus", tipo: "error"});
-        }
-    };
 
     const filtrados = viajes.filter(v =>
         v.numViaje.toLowerCase().includes(filtroGeneral.toLowerCase()) ||
@@ -213,7 +192,6 @@ const TablaViajes = ({user}) => {
                 const viajeModal = viajes.find(vj => vj.id === modalComentario.viajeId);
                 const esLiderRutaModal = viajeModal && viajeModal.empresaLiderId === user.id;
                 const puedeEditarModal = user.admin || esLiderRutaModal;
-                const estaVerificado = viajeModal?.estatus === "VERIFICADO";
 
                 return (
                     <div
@@ -243,7 +221,6 @@ const TablaViajes = ({user}) => {
                                         {puedeEditarModal ? (
                                             <textarea
                                                 placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
-                                                disabled={modalComentario.v?.comentarioRecepcion && estaVerificado}
                                                 className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
                                                 value={modalComentario.v?.comentarioRecepcion || ""}
                                                 onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
@@ -350,7 +327,6 @@ const TablaViajes = ({user}) => {
                                 {viaje.vehiculos.map((v, idx) => {
                                     const esLiderRuta = viaje.empresaLiderId === user.id;
                                     const puedeEditar = user.admin || esLiderRuta;
-                                    const isLocked = (viaje.estatus === "EN VERIFICACION" || viaje.estatus === "VERIFICADO") && puedeEditar;
                                     const tieneComentarios = (v.comentarioRegistro && v.comentarioRegistro !== "") || (v.comentarioRecepcion && v.comentarioRecepcion !== "");
 
                                     return (
@@ -361,7 +337,6 @@ const TablaViajes = ({user}) => {
                                                     <div>
                                                         <input
                                                             type="text"
-                                                            disabled={isLocked}
                                                             value={v.lote || ""}
                                                             maxLength={8}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
@@ -389,7 +364,6 @@ const TablaViajes = ({user}) => {
                                                     <div className="flex gap-1">
                                                         <input
                                                             type="text"
-                                                            disabled={isLocked}
                                                             placeholder="MARCA"
                                                             value={v.marca || ""}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'marca', e.target.value.toUpperCase())}
@@ -397,7 +371,6 @@ const TablaViajes = ({user}) => {
                                                         />
                                                         <input
                                                             type="text"
-                                                            disabled={isLocked}
                                                             placeholder="MODELO"
                                                             value={v.modelo || ""}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'modelo', e.target.value.toUpperCase())}
@@ -423,7 +396,6 @@ const TablaViajes = ({user}) => {
                                                             Ref:
                                                             <input
                                                                 type="text"
-                                                                disabled={isLocked}
                                                                 value={v.clienteAlt || ""}
                                                                 onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
                                                                 className="w-24 bg-gray-50 rounded border border-gray-200 outline-none text-[8px] font-black text-blue-600 px-1 focus:border-blue-500"
@@ -432,7 +404,6 @@ const TablaViajes = ({user}) => {
                                                         <div className="relative">
                                                             <input
                                                                 type="text"
-                                                                disabled={isLocked}
                                                                 placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
                                                                 className="input input-bordered input-xs w-full font-bold text-[10px] uppercase bg-gray-50 focus:bg-white"
                                                                 value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
@@ -451,7 +422,7 @@ const TablaViajes = ({user}) => {
                                                                 </button>
                                                             )}
                                                         </div>
-                                                        {busquedaCliente[`${viaje.id}-${idx}`] && !isLocked && (
+                                                        {busquedaCliente[`${viaje.id}-${idx}`] && (
                                                             <div
                                                                 className="absolute z-[100] w-full bg-white border-2 border-blue-500 shadow-2xl rounded-md max-h-40 overflow-y-auto mt-1">
                                                                 {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).map(cliente => (
@@ -479,7 +450,6 @@ const TablaViajes = ({user}) => {
                                                 ) : puedeEditar ? (
                                                     <input
                                                         type="text"
-                                                        disabled={isLocked}
                                                         placeholder="REFERENCIA"
                                                         value={v.clienteAlt || ""}
                                                         onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
@@ -494,7 +464,7 @@ const TablaViajes = ({user}) => {
                                             {['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
                                                 <td key={field} className="p-1 text-center">
                                                     {puedeEditar ? (
-                                                        <input type="number" disabled={isLocked} value={v[field]}
+                                                        <input type="number" value={v[field]}
                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
                                                                className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
                                                     ) : (
@@ -505,7 +475,7 @@ const TablaViajes = ({user}) => {
 
                                             <td className="p-1 text-center">
                                                 {puedeEditar ? (
-                                                    <select disabled={isLocked} value={v.titulo || "NO"}
+                                                    <select value={v.titulo || "NO"}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'titulo', e.target.value)}
                                                             className="select select-bordered select-xs font-black text-[10px]">
                                                         <option value="NO">NO</option>
@@ -542,36 +512,30 @@ const TablaViajes = ({user}) => {
                                                     <div className="flex flex-col gap-2 w-32 mx-auto">
                                                         {user.admin ? (
                                                             <>
-                                                                {viaje.estatus === "PENDIENTE" && (
-                                                                    <button onClick={() => {
-                                                                        const faltan = viaje.vehiculos.some(veh => !veh.clienteId);
-                                                                        if (faltan) setModal({
-                                                                            show: true,
-                                                                            mensaje: "Asigna todos los clientes primero.",
-                                                                            tipo: "error"
-                                                                        });
-                                                                        else setModal({
-                                                                            show: true,
-                                                                            mensaje: "¿Iniciar verificación física?",
-                                                                            accion: () => cambiarEstatus(viaje.id, "EN VERIFICACION")
-                                                                        });
-                                                                    }}
-                                                                            className="btn btn-xs btn-error text-white font-black text-[9px] uppercase h-10 shadow-md">Iniciar
-                                                                        Verificación</button>
-                                                                )}
-                                                                {viaje.estatus === "EN VERIFICACION" && (
-                                                                    <button onClick={() => setModal({
-                                                                        show: true,
-                                                                        mensaje: "¿Confirmar descarga?",
-                                                                        accion: () => cambiarEstatus(viaje.id, "VERIFICADO")
-                                                                    })}
-                                                                            className="btn btn-xs btn-info text-white font-black text-[9px] uppercase h-10 shadow-md">Confirmar
-                                                                        Descarga</button>
-                                                                )}
-                                                                {viaje.estatus === "VERIFICADO" && (
-                                                                    <button onClick={() => setViajeALiquidar(viaje)}
-                                                                            className="btn btn-xs btn-success text-white font-black text-[10px] h-10 uppercase italic shadow-md">Pagar Flete</button>
-                                                                )}
+                                                                {(() => {
+                                                                    const faltanClientes = viaje.vehiculos.some(veh => !veh.clienteNombre);
+                                                                    return (
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                if (faltanClientes) {
+                                                                                    setModal({
+                                                                                        show: true,
+                                                                                        mensaje: "Debes asignar todos los nombres de clientes antes de pagar el flete.",
+                                                                                        tipo: "error"
+                                                                                    });
+                                                                                } else {
+                                                                                    setViajeALiquidar(viaje);
+                                                                                }
+                                                                            }}
+                                                                            disabled={faltanClientes}
+                                                                            className={`btn btn-xs text-white font-black text-[10px] h-10 uppercase italic shadow-md ${
+                                                                                faltanClientes ? 'btn-disabled bg-gray-400' : 'btn-success'
+                                                                            }`}
+                                                                        >
+                                                                            Pagar Flete
+                                                                        </button>
+                                                                    );
+                                                                })()}
                                                             </>
                                                         ) : null}
 
@@ -587,21 +551,7 @@ const TablaViajes = ({user}) => {
                                                             content={() => componentRef.current}
                                                         />
 
-                                                        {user.admin && viaje.estatus !== "PENDIENTE" && (
-                                                            <button onClick={() => {
-                                                                const anterior = viaje.estatus === "VERIFICADO" ? "EN VERIFICACION" : "PENDIENTE";
-                                                                setModal({
-                                                                    show: true,
-                                                                    mensaje: `¿Regresar a edición? El estatus cambiará a ${anterior}`,
-                                                                    accion: () => cambiarEstatus(viaje.id, anterior)
-                                                                });
-                                                            }}
-                                                                    className="text-[8px] font-black uppercase text-red-500 underline hover:text-red-700 transition-all mt-1">
-                                                                Habilitar Edición
-                                                            </button>
-                                                        )}
-
-                                                        {puedeEditar && viaje.estatus !== "VERIFICADO" && (
+                                                        {puedeEditar && (
                                                             <button onClick={() => {
                                                                 setModal({
                                                                     show: true,
