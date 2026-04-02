@@ -112,7 +112,7 @@ const FormViaje = ({user}) => {
             lote: "", marca: "", modelo: "", clienteAlt: "",
             almacen: "Copart",
             estado: "", ciudad: "",
-            flete: 0,          // Se usará para el COST (chofer)
+            flete: "0",        // Se usará para el COST (chofer) - Editable
             precioVenta: 0,    // Se usará para el PRICE (cliente) - OCULTO
             storage: "0", sPeso: "0", gExtra: "0", titulo: "NO",
             comentarioRegistro: ""
@@ -123,7 +123,7 @@ const FormViaje = ({user}) => {
         const nuevosVehiculos = vehiculos.map(v => {
             if (v.id === id) {
                 let valorFinal = value;
-                if (['storage', 'sPeso', 'gExtra'].includes(field)) {
+                if (['storage', 'sPeso', 'gExtra', 'flete'].includes(field)) {
                     valorFinal = value === "" ? "0" : parseFloat(value).toString();
                 }
 
@@ -134,11 +134,11 @@ const FormViaje = ({user}) => {
                     if (estadoData && estadoData.regions?.length > 0) {
                         actualizacion.ciudad = estadoData.regions[0].city;
                         // LOGICA DE COSTO VS PRECIO
-                        actualizacion.flete = parseFloat(estadoData.regions[0].cost || 0);
+                        actualizacion.flete = (estadoData.regions[0].cost || 0).toString();
                         actualizacion.precioVenta = parseFloat(estadoData.regions[0].price || 0);
                     } else {
                         actualizacion.ciudad = "";
-                        actualizacion.flete = 0;
+                        actualizacion.flete = "0";
                         actualizacion.precioVenta = 0;
                     }
                 }
@@ -148,10 +148,10 @@ const FormViaje = ({user}) => {
                     const regionData = estadoData?.regions?.find(r => r.city === value);
                     if (regionData) {
                         // LOGICA DE COSTO VS PRECIO
-                        actualizacion.flete = parseFloat(regionData.cost || 0);
+                        actualizacion.flete = (regionData.cost || 0).toString();
                         actualizacion.precioVenta = parseFloat(regionData.price || 0);
                     } else {
-                        actualizacion.flete = 0;
+                        actualizacion.flete = "0";
                         actualizacion.precioVenta = 0;
                     }
                 }
@@ -181,7 +181,7 @@ const FormViaje = ({user}) => {
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && v.flete > 0
+        v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
     );
 
     // --- ACCIÓN FINALIZAR CON TRANSACCIÓN ---
@@ -196,7 +196,7 @@ const FormViaje = ({user}) => {
                 const proximoFolio = (conDoc.data()["viajesPendientes"] || 0) + 1;
                 const numViajeFinal = String(proximoFolio);
 
-                const tFlete = vehiculos.reduce((acc, v) => acc + v.flete, 0);
+                const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
                 const choferData = choferes.find(c => c.id === encabezado.choferId);
 
                 const viajeData = {
@@ -467,7 +467,15 @@ const FormViaje = ({user}) => {
                                             <option key={idx} value={r.city}>{r.city}</option>))}
                                     </select>
                                 </td>
-                                <td className="font-black text-blue-900 text-center">${v.flete}</td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        value={v.flete}
+                                        onChange={(e) => handleTableChange(v.id, 'flete', e.target.value)}
+                                        className="input input-xs w-20 text-center font-black text-blue-900 bg-blue-50"
+                                        placeholder="0"
+                                    />
+                                </td>
                                 <td><input type="number" value={v.storage}
                                            onChange={(e) => handleTableChange(v.id, 'storage', e.target.value)}
                                            className="input input-xs w-16 text-center"/></td>

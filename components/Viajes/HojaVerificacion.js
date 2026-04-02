@@ -110,10 +110,16 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     </div>
                 </div>
 
-                <div className="flex flex-col" style={{ width: "180px" }}>
-                    <div className="bg-gray-50 rounded-xl p-4 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
-                        <div className="text-[10px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "6px", letterSpacing: '1.5px' }}>Date</div>
-                        <div className="text-center font-black" style={{ fontSize: "32px", color: "#1f2937", letterSpacing: '0.5px', lineHeight: '1' }}>
+                <div className="flex flex-col gap-3" style={{ width: "180px" }}>
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Viaje</div>
+                        <div className="text-center font-black" style={{ fontSize: "28px", color: "#1f2937", letterSpacing: '1px', lineHeight: '1' }}>
+                            #{viajeData.numViaje}
+                        </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                        <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Date</div>
+                        <div className="text-center font-black" style={{ fontSize: "22px", color: "#1f2937", letterSpacing: '0.5px', lineHeight: '1' }}>
                             {moment().format('MM/DD/YY')}
                         </div>
                     </div>

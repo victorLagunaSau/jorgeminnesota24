@@ -25,14 +25,21 @@ const TablaViajes = ({user}) => {
     useEffect(() => {
         if (!user) return;
         let q = firestore().collection("viajesPendientes");
-        if (!user.admin) {
-            q = q.where("empresaId", "==", user.id);
-        } else {
+        if (user.admin) {
             q = q.orderBy("fechaCreacion", "desc");
         }
 
         const unsubViajes = q.onSnapshot(snap => {
-            setViajes(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
+            let viajesData = snap.docs.map(doc => ({id: doc.id, ...doc.data()}));
+
+            // Filtrar viajes para usuarios no-admin: mostrar viajes propios O donde es líder
+            if (!user.admin) {
+                viajesData = viajesData.filter(viaje =>
+                    viaje.empresaId === user.id || viaje.empresaLiderId === user.id
+                );
+            }
+
+            setViajes(viajesData);
             setLoading(false);
         });
 
@@ -50,8 +57,12 @@ const TablaViajes = ({user}) => {
         };
     }, [user]);
 
-    const handleLocalEdit = (viajeId, vehiculoIdx, field, value) => {
-        if (!user.admin) return;
+    const handleLocalEdit = async (viajeId, vehiculoIdx, field, value) => {
+        // Verificar si el usuario tiene permisos (admin o líder de ruta)
+        const viaje = viajes.find(v => v.id === viajeId);
+        const esLiderRuta = viaje && viaje.empresaLiderId === user.id;
+        if (!user.admin && !esLiderRuta) return;
+
         const nuevosViajes = viajes.map(viaje => {
             if (viaje.id === viajeId) {
                 const nuevosVehiculos = [...viaje.vehiculos];
@@ -72,6 +83,18 @@ const TablaViajes = ({user}) => {
             return viaje;
         });
         setViajes(nuevosViajes);
+
+        // Guardar automáticamente en Firestore
+        try {
+            const viajeActualizado = nuevosViajes.find(v => v.id === viajeId);
+            if (viajeActualizado) {
+                await firestore().collection("viajesPendientes").doc(viajeId).update({
+                    vehiculos: viajeActualizado.vehiculos
+                });
+            }
+        } catch (error) {
+            console.error("Error al guardar cambios:", error);
+        }
     };
 
     const cambiarEstatus = async (viajeId, nuevoEstatus) => {
@@ -155,68 +178,75 @@ const TablaViajes = ({user}) => {
             )}
 
             {/* MODAL ESPECÍFICO DE COMENTARIOS */}
-            {modalComentario.show && (
-                <div
-                    className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
-                    <div
-                        className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
-                        <div className="p-6">
-                            <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
-                                <FaCommentDots className="text-blue-600"/> Notas del Vehículo
-                            </h3>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalComentario.v?.lote}</p>
+            {modalComentario.show && (() => {
+                const viajeModal = viajes.find(vj => vj.id === modalComentario.viajeId);
+                const esLiderRutaModal = viajeModal && viajeModal.empresaLiderId === user.id;
+                const puedeEditarModal = user.admin || esLiderRutaModal;
+                const estaVerificado = viajeModal?.estatus === "VERIFICADO";
 
-                            <div className="mt-6 space-y-4">
-                                {/* COMENTARIO 1 (REGISTRO) */}
-                                <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro
-                                        (Origen)</p>
-                                    <p className="text-sm font-bold text-gray-700 italic">
-                                        {modalComentario.v?.comentarioRegistro || "SIN COMENTARIOS EN EL REGISTRO."}
-                                    </p>
+                return (
+                    <div
+                        className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                        <div
+                            className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
+                            <div className="p-6">
+                                <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
+                                    <FaCommentDots className="text-blue-600"/> Notas del Vehículo
+                                </h3>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalComentario.v?.lote}</p>
+
+                                <div className="mt-6 space-y-4">
+                                    {/* COMENTARIO 1 (REGISTRO) */}
+                                    <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro
+                                            (Origen)</p>
+                                        <p className="text-sm font-bold text-gray-700 italic">
+                                            {modalComentario.v?.comentarioRegistro || "SIN COMENTARIOS EN EL REGISTRO."}
+                                        </p>
+                                    </div>
+
+                                    {/* COMENTARIO 2 (RECEPCIÓN) */}
+                                    <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                                        <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción
+                                            (Destino)</p>
+                                        {puedeEditarModal ? (
+                                            <textarea
+                                                placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
+                                                disabled={modalComentario.v?.comentarioRecepcion && estaVerificado}
+                                                className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
+                                                value={modalComentario.v?.comentarioRecepcion || ""}
+                                                onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
+                                            />
+                                        ) : (
+                                            <p className="text-sm font-bold text-blue-700 italic">
+                                                {modalComentario.v?.comentarioRecepcion || "PENDIENTE DE RECEPCIÓN."}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* COMENTARIO 2 (RECEPCIÓN) */}
-                                <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                                    <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción
-                                        (Destino)</p>
-                                    {user.admin ? (
-                                        <textarea
-                                            placeholder="ESCRIBE AQUÍ EL COMENTARIO DE LLEGADA..."
-                                            disabled={modalComentario.v?.comentarioRecepcion && (viajes.find(vj => vj.id === modalComentario.viajeId)?.estatus === "VERIFICADO")}
-                                            className="w-full bg-transparent border-none outline-none text-sm font-bold text-blue-900 placeholder:text-blue-200 resize-none h-20 uppercase"
-                                            value={modalComentario.v?.comentarioRecepcion || ""}
-                                            onChange={(e) => handleLocalEdit(modalComentario.viajeId, modalComentario.idx, 'comentarioRecepcion', e.target.value.toUpperCase())}
-                                        />
-                                    ) : (
-                                        <p className="text-sm font-bold text-blue-700 italic">
-                                            {modalComentario.v?.comentarioRecepcion || "PENDIENTE DE RECEPCIÓN."}
-                                        </p>
+                                <div className="flex gap-2 mt-6">
+                                    <button
+                                        onClick={() => setModalComentario({show: false, v: null, viajeId: null, idx: null})}
+                                        className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
+                                    >
+                                        Cancelar
+                                    </button>
+
+                                    {puedeEditarModal && (
+                                        <button
+                                            onClick={guardarComentarioRecepcion}
+                                            className="btn btn-sm btn-info flex-1 text-white font-black uppercase text-[10px]"
+                                        >
+                                            Guardar Nota
+                                        </button>
                                     )}
                                 </div>
                             </div>
-
-                            <div className="flex gap-2 mt-6">
-                                <button
-                                    onClick={() => setModalComentario({show: false, v: null, viajeId: null, idx: null})}
-                                    className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
-                                >
-                                    Cancelar
-                                </button>
-
-                                {user.admin && (
-                                    <button
-                                        onClick={guardarComentarioRecepcion}
-                                        className="btn btn-sm btn-info flex-1 text-white font-black uppercase text-[10px]"
-                                    >
-                                        Guardar Nota
-                                    </button>
-                                )}
-                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                );
+            })()}
 
             <div
                 className="sticky top-0 z-[50] p-6 bg-white border-b-2 border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
@@ -282,14 +312,52 @@ const TablaViajes = ({user}) => {
                                 </thead>
                                 <tbody>
                                 {viaje.vehiculos.map((v, idx) => {
-                                    const isLocked = (viaje.estatus === "EN VERIFICACION" || viaje.estatus === "VERIFICADO") && user.admin;
+                                    const esLiderRuta = viaje.empresaLiderId === user.id;
+                                    const puedeEditar = user.admin || esLiderRuta;
+                                    const isLocked = (viaje.estatus === "EN VERIFICACION" || viaje.estatus === "VERIFICADO") && puedeEditar;
                                     const tieneComentarios = (v.comentarioRegistro && v.comentarioRegistro !== "") || (v.comentarioRecepcion && v.comentarioRecepcion !== "");
 
                                     return (
                                         <tr key={`${viaje.id}-${idx}`}
                                             className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                            <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
-                                            <td className="p-3 text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</td>
+                                            <td className="p-3">
+                                                {puedeEditar ? (
+                                                    <input
+                                                        type="text"
+                                                        disabled={isLocked}
+                                                        value={v.lote || ""}
+                                                        maxLength={8}
+                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
+                                                        className="w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono text-blue-700 py-1 focus:border-blue-500"
+                                                    />
+                                                ) : (
+                                                    <span className="font-mono text-xs font-black text-blue-700">{v.lote}</span>
+                                                )}
+                                            </td>
+                                            <td className="p-3">
+                                                {puedeEditar ? (
+                                                    <div className="flex gap-1">
+                                                        <input
+                                                            type="text"
+                                                            disabled={isLocked}
+                                                            placeholder="MARCA"
+                                                            value={v.marca || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'marca', e.target.value.toUpperCase())}
+                                                            className="w-20 bg-gray-50 rounded border border-gray-200 outline-none text-[10px] uppercase font-bold text-gray-600 px-1 py-1 focus:border-blue-500"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            disabled={isLocked}
+                                                            placeholder="MODELO"
+                                                            value={v.modelo || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'modelo', e.target.value.toUpperCase())}
+                                                            className="w-20 bg-gray-50 rounded border border-gray-200 outline-none text-[10px] uppercase font-bold text-gray-600 px-1 py-1 focus:border-blue-500"
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</span>
+                                                )}
+                                            </td>
                                             <td className="p-3">
                                                 <div
                                                     className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
@@ -301,8 +369,16 @@ const TablaViajes = ({user}) => {
                                             <td className="p-2">
                                                 {user.admin ? (
                                                     <div className="relative group">
-                                                        <div
-                                                            className="text-[8px] font-black text-blue-600 mb-1 italic">Ref: {v.clienteAlt}</div>
+                                                        <div className="text-[8px] font-black text-blue-600 mb-1 italic flex items-center gap-1">
+                                                            Ref:
+                                                            <input
+                                                                type="text"
+                                                                disabled={isLocked}
+                                                                value={v.clienteAlt || ""}
+                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
+                                                                className="w-24 bg-gray-50 rounded border border-gray-200 outline-none text-[8px] font-black text-blue-600 px-1 focus:border-blue-500"
+                                                            />
+                                                        </div>
                                                         <div className="relative">
                                                             <input
                                                                 type="text"
@@ -350,6 +426,15 @@ const TablaViajes = ({user}) => {
                                                             </div>
                                                         )}
                                                     </div>
+                                                ) : puedeEditar ? (
+                                                    <input
+                                                        type="text"
+                                                        disabled={isLocked}
+                                                        placeholder="REFERENCIA"
+                                                        value={v.clienteAlt || ""}
+                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
+                                                        className="w-full bg-gray-50 rounded border border-gray-200 outline-none text-[10px] font-bold uppercase text-gray-600 px-2 py-1 focus:border-blue-500"
+                                                    />
                                                 ) : (
                                                     <div
                                                         className="text-[10px] font-bold uppercase text-gray-500 italic">{v.clienteAlt}</div>
@@ -358,7 +443,7 @@ const TablaViajes = ({user}) => {
 
                                             {['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
                                                 <td key={field} className="p-1 text-center">
-                                                    {user.admin ? (
+                                                    {puedeEditar ? (
                                                         <input type="number" disabled={isLocked} value={v[field]}
                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
                                                                className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
@@ -369,7 +454,7 @@ const TablaViajes = ({user}) => {
                                             ))}
 
                                             <td className="p-1 text-center">
-                                                {user.admin ? (
+                                                {puedeEditar ? (
                                                     <select disabled={isLocked} value={v.titulo || "NO"}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'titulo', e.target.value)}
                                                             className="select select-bordered select-xs font-black text-[10px]">
