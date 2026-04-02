@@ -17,6 +17,7 @@ const TablaViajes = ({user}) => {
     const [modal, setModal] = useState({show: false, mensaje: "", accion: null, tipo: ""});
     const [procesandoPago, setProcesandoPago] = useState(false);
     const btnPrintRef = useRef();
+    const [estadoOrigen, setEstadoOrigen] = useState("");
 
     // Estado para el Modal de Comentarios
     const [modalComentario, setModalComentario] = useState({show: false, v: null, viajeId: null, idx: null});
@@ -299,6 +300,7 @@ const TablaViajes = ({user}) => {
                     empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
                     pagadoPor: {id: user?.id, nombre: user?.nombre},
                     empresaLiquidada: empresaSeleccionada,
+                    estadoOrigen: estadoOrigen,
                     estatus: "PAGADO",
                     resumenFinanciero: {
                         ...viaje.resumenFinanciero,
@@ -324,8 +326,8 @@ const TablaViajes = ({user}) => {
                 tipo: "success"
             });
 
-            // Preparar el PDF para imprimir
-            setViajeAImprimir(viaje);
+            // Preparar el PDF para imprimir con el estado de origen
+            setViajeAImprimir({...viaje, estadoOrigen: estadoOrigen});
 
             // Imprimir automáticamente después de un pequeño delay
             setTimeout(() => {
@@ -333,6 +335,7 @@ const TablaViajes = ({user}) => {
                     btnPrintRef.current.click();
                 }
                 setModal({show: false});
+                setEstadoOrigen(""); // Limpiar el estado para el próximo pago
             }, 1000);
 
         } catch (error) {
@@ -387,25 +390,45 @@ const TablaViajes = ({user}) => {
                             </div>
                         )}
                         {modal.tipo === 'pago' && (
-                            <div className="mt-4 p-3 bg-green-50 border-l-4 border-green-700 rounded">
-                                <p className="text-[10px] font-black text-green-700 uppercase flex items-center gap-1">
-                                    ✓ Se procesará el pago y se generará el PDF
-                                </p>
-                            </div>
+                            <>
+                                <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-700 rounded">
+                                    <label className="text-[9px] font-black text-blue-700 uppercase block mb-2">
+                                        Estado de Origen del Viaje:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={estadoOrigen}
+                                        onChange={(e) => setEstadoOrigen(e.target.value.toUpperCase())}
+                                        placeholder="EJEMPLO: TEXAS, CALIFORNIA, ETC."
+                                        className="w-full px-3 py-2 border-2 border-blue-300 rounded-md text-sm font-bold uppercase focus:border-blue-600 focus:outline-none"
+                                        maxLength={30}
+                                    />
+                                </div>
+                                <div className="mt-3 p-3 bg-green-50 border-l-4 border-green-700 rounded">
+                                    <p className="text-[10px] font-black text-green-700 uppercase flex items-center gap-1">
+                                        ✓ Se procesará el pago y se generará el PDF
+                                    </p>
+                                </div>
+                            </>
                         )}
                         <div className="flex justify-end gap-3 mt-8">
                             {modal.tipo !== 'success' && (
-                                <button onClick={() => setModal({show: false})}
+                                <button onClick={() => {
+                                    setModal({show: false});
+                                    if (modal.tipo === 'pago') setEstadoOrigen("");
+                                }}
                                         className="btn btn-sm btn-ghost font-black uppercase text-[10px]">
                                     {modal.accion ? 'Cancelar' : 'Cerrar'}
                                 </button>
                             )}
-                            {modal.accion && <button onClick={modal.accion}
-                                                     className={`btn btn-sm text-white font-black uppercase text-[10px] ${
-                                                         modal.tipo === 'eliminar' ? 'btn-error' :
-                                                         modal.tipo === 'pago' ? 'btn-success' :
-                                                         'btn-error'
-                                                     }`}>
+                            {modal.accion && <button
+                                onClick={modal.accion}
+                                disabled={modal.tipo === 'pago' && !estadoOrigen.trim()}
+                                className={`btn btn-sm text-white font-black uppercase text-[10px] ${
+                                    modal.tipo === 'eliminar' ? 'btn-error' :
+                                    modal.tipo === 'pago' ? 'btn-success' :
+                                    'btn-error'
+                                } ${modal.tipo === 'pago' && !estadoOrigen.trim() ? 'btn-disabled' : ''}`}>
                                 {modal.tipo === 'eliminar' ? 'Eliminar Viaje' :
                                  modal.tipo === 'pago' ? 'Confirmar Pago' :
                                  'Continuar'}
@@ -752,9 +775,10 @@ const TablaViajes = ({user}) => {
                                                                                         tipo: "error"
                                                                                     });
                                                                                 } else {
+                                                                                    setEstadoOrigen(""); // Limpiar estado anterior
                                                                                     setModal({
                                                                                         show: true,
-                                                                                        mensaje: `¿Confirmar pago del viaje #${viaje.numViaje}? Esta acción procesará el pago y generará el PDF automáticamente.`,
+                                                                                        mensaje: `¿Confirmar pago del viaje #${viaje.numViaje}? Completa el estado de origen y se procesará el pago generando el PDF automáticamente.`,
                                                                                         accion: () => ejecutarPago(viaje),
                                                                                         tipo: "pago"
                                                                                     });

@@ -10,10 +10,13 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
     const filasVacias = Math.max(0, 10 - (viajeData.vehiculos?.length || 0));
     const vehiculosConVacios = [...(viajeData.vehiculos || []), ...Array(filasVacias).fill(null)];
 
-    // Calcular total de flete y storage
-    const totalFleteStorage = (viajeData.vehiculos || []).reduce((sum, v) => {
-        return sum + (parseFloat(v.flete || 0) + parseFloat(v.storage || 0));
-    }, 0);
+    // Calcular totales separados
+    const totalFlete = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.flete || 0), 0);
+    const totalStorage = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.storage || 0), 0);
+    const totalSobrepeso = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.sPeso || 0), 0);
+    const totalGastosExtra = (viajeData.vehiculos || []).reduce((sum, v) => sum + parseFloat(v.gExtra || 0), 0);
+    const subtotal = totalFlete + totalStorage + totalSobrepeso + totalGastosExtra;
+    const total = subtotal;
 
     return (
         <div ref={ref} className="bg-white text-black" style={{
@@ -126,6 +129,27 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                 </div>
             </div>
 
+            {/* ESTADO DEL VIAJE */}
+            <div className="modern-shadow" style={{
+                marginBottom: "3px",
+                background: 'linear-gradient(to right, #fef2f2, #fee2e2)',
+                padding: "4px 8px",
+                borderRadius: "6px",
+                border: "1px solid #fecdd3",
+                flexShrink: 0
+            }}>
+                <div className="flex items-center justify-center">
+                    <span className="font-black text-[10px]" style={{ color: "#be123c", fontWeight: "900", marginRight: "8px" }}>ESTADO:</span>
+                    <div className="flex-1 text-center font-black text-[14px] uppercase" style={{
+                        color: "#991b1b",
+                        fontWeight: "900",
+                        letterSpacing: '1px'
+                    }}>
+                        {viajeData.estadoOrigen || ""}
+                    </div>
+                </div>
+            </div>
+
             {/* DRIVER INFO MODERNIZADO */}
             <div className="modern-shadow" style={{
                 marginBottom: "3px",
@@ -163,22 +187,24 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
             <div className="modern-shadow" style={{ borderRadius: "6px", overflow: "hidden", marginBottom: "3px", flex: "1 1 auto", minHeight: "0" }}>
                 <table className="w-full border-collapse" style={{ tableLayout: "fixed", height: "100%" }}>
                     <thead>
-                        <tr className="font-black text-[9px]" style={{
+                        <tr className="font-black text-[11px]" style={{
                             letterSpacing: '0.5px',
                             background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
                             color: "#ffffff",
                             fontWeight: "900"
                         }}>
                             <th className="text-center" style={{ width: "22px", borderRight: "1px solid #475569", fontWeight: "900" }}>★</th>
-                            <th className="text-left px-2" style={{ width: "140px", borderRight: "1px solid #475569", fontWeight: "900" }}>CUSTOMER</th>
-                            <th className="text-left px-2" style={{ width: "70px", borderRight: "1px solid #475569", fontWeight: "900" }}>STOCK#</th>
-                            <th className="text-left px-2" style={{ width: "120px", borderRight: "1px solid #475569", fontWeight: "900" }}>VEHICLE</th>
-                            <th className="text-left px-2" style={{ width: "90px", borderRight: "1px solid #475569", fontWeight: "900" }}>CITY</th>
-                            <th className="text-left px-2" style={{ width: "80px", borderRight: "1px solid #475569", fontWeight: "900" }}>AUCTION</th>
-                            <th className="text-center" style={{ width: "50px", borderRight: "1px solid #475569", fontWeight: "900" }}>FLETE</th>
-                            <th className="text-center" style={{ width: "55px", borderRight: "1px solid #475569", fontWeight: "900" }}>STORAGE</th>
+                            <th className="text-left px-2" style={{ width: "120px", borderRight: "1px solid #475569", fontWeight: "900" }}>CUSTOMER</th>
+                            <th className="text-left px-2" style={{ width: "60px", borderRight: "1px solid #475569", fontWeight: "900" }}>STOCK#</th>
+                            <th className="text-left px-2" style={{ width: "100px", borderRight: "1px solid #475569", fontWeight: "900" }}>VEHICLE</th>
+                            <th className="text-left px-2" style={{ width: "75px", borderRight: "1px solid #475569", fontWeight: "900" }}>CITY</th>
+                            <th className="text-left px-2" style={{ width: "70px", borderRight: "1px solid #475569", fontWeight: "900" }}>AUCTION</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>FLETE</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>STORAGE</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>S.PESO</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>G.EXTRA</th>
                             <th className="text-center" style={{ width: "50px", borderRight: "1px solid #475569", fontWeight: "900" }}>TOTAL</th>
-                            <th className="text-center" style={{ width: "40px", fontWeight: "900" }}>TITLE</th>
+                            <th className="text-center" style={{ width: "35px", fontWeight: "900" }}>TITLE</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -186,25 +212,25 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                             <tr key={i} style={{
                                 backgroundColor: i % 2 === 0 ? "#ffffff" : "#f8fafc",
                                 borderBottom: "1px solid #e2e8f0",
-                                height: "16px"
+                                height: "18px"
                             }}>
-                                <td className="text-center font-black text-[10px]" style={{
+                                <td className="text-center font-black text-[12px]" style={{
                                     backgroundColor: v ? "linear-gradient(135deg, #fecdd3, #fda4af)" : "#f8fafc",
                                     color: "#be123c",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "900"
                                 }}>
                                     {v ? i + 1 : ""}
                                 </td>
-                                <td className="px-2 text-[9px] font-bold uppercase" style={{
+                                <td className="px-2 text-[11px] font-bold uppercase" style={{
                                     color: "#1f2937",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
@@ -213,22 +239,22 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 }}>
                                     {v ? (v.clienteNombre || v.clienteAlt || "") : ""}
                                 </td>
-                                <td className="px-2 text-[9px] font-black" style={{
+                                <td className="px-2 text-[11px] font-black" style={{
                                     color: "#0f172a",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "900"
                                 }}>
                                     {v ? v.lote : ""}
                                 </td>
-                                <td className="px-2 text-[8px] font-bold uppercase" style={{
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
                                     color: "#1f2937",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
@@ -237,11 +263,11 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 }}>
                                     {v ? `${v.marca} ${v.modelo}` : ""}
                                 </td>
-                                <td className="px-2 text-[8px] font-bold uppercase" style={{
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
                                     color: "#1f2937",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
@@ -250,11 +276,11 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 }}>
                                     {v ? v.ciudad : ""}
                                 </td>
-                                <td className="px-2 text-[8px] font-bold uppercase" style={{
+                                <td className="px-2 text-[10px] font-bold uppercase" style={{
                                     color: "#1f2937",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
@@ -263,44 +289,66 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 }}>
                                     {v ? v.almacen : ""}
                                 </td>
-                                <td className="text-center text-[9px] font-bold" style={{
+                                <td className="text-center text-[11px] font-bold" style={{
                                     color: "#0f172a",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "800"
                                 }}>
                                     {v ? `$${v.flete}` : ""}
                                 </td>
-                                <td className="text-center text-[9px] font-bold" style={{
+                                <td className="text-center text-[11px] font-bold" style={{
                                     color: "#0f172a",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "800"
                                 }}>
                                     {v ? `$${v.storage || 0}` : ""}
                                 </td>
-                                <td className="text-center text-[9px] font-black" style={{
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.sPeso || 0}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-bold" style={{
+                                    color: "#0f172a",
+                                    borderRight: "1px solid #e2e8f0",
+                                    height: "18px",
+                                    maxHeight: "18px",
+                                    overflow: "hidden",
+                                    verticalAlign: "middle",
+                                    fontWeight: "800"
+                                }}>
+                                    {v ? `$${v.gExtra || 0}` : ""}
+                                </td>
+                                <td className="text-center text-[11px] font-black" style={{
                                     background: v ? "linear-gradient(135deg, #d1fae5, #a7f3d0)" : "transparent",
                                     color: "#065f46",
                                     borderRight: "1px solid #e2e8f0",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "900"
                                 }}>
                                     {v ? `$${(parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0))}` : ""}
                                 </td>
-                                <td className="text-center text-[9px] font-black" style={{
+                                <td className="text-center text-[11px] font-black" style={{
                                     color: "#be123c",
-                                    height: "16px",
-                                    maxHeight: "16px",
+                                    height: "18px",
+                                    maxHeight: "18px",
                                     overflow: "hidden",
                                     verticalAlign: "middle",
                                     fontWeight: "900"
@@ -311,72 +359,106 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         ))}
                     </tbody>
                     <tfoot>
-                        <tr style={{ backgroundColor: "#1e293b", borderTop: "3px solid #1e293b" }}>
-                            <td colSpan="8" className="text-right px-2 font-black text-[10px]" style={{
-                                color: "#ffffff",
-                                padding: "8px",
-                                letterSpacing: '0.5px'
+                        {/* Fila única de Totales por columna */}
+                        <tr style={{ backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
+                            <td colSpan="6"></td>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
                             }}>
-                                TOTAL FLETE + STORAGE:
+                                ${totalFlete.toFixed(2)}
                             </td>
-                            <td colSpan="2" className="text-center px-2 font-black text-[12px]" style={{
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalStorage.toFixed(2)}
+                            </td>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalSobrepeso.toFixed(2)}
+                            </td>
+                            <td className="text-center px-2 font-black text-[10px]" style={{
+                                color: "#0f172a",
+                                padding: "6px 4px",
+                                fontWeight: "900",
+                                borderRight: "1px solid #e2e8f0"
+                            }}>
+                                ${totalGastosExtra.toFixed(2)}
+                            </td>
+                            <td colSpan="2"></td>
+                        </tr>
+
+                        {/* Fila de Subtotal */}
+                        <tr style={{ backgroundColor: "#1e293b", borderTop: "2px solid #475569" }}>
+                            <td colSpan="10" className="text-right px-2 font-black text-[10px]" style={{
+                                color: "#ffffff",
+                                padding: "6px 8px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                SUBTOTAL:
+                            </td>
+                            <td className="text-center px-2 font-black text-[11px]" style={{
+                                color: "#ffffff",
+                                padding: "6px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                ${subtotal.toFixed(2)}
+                            </td>
+                            <td colSpan="1"></td>
+                        </tr>
+
+                        {/* Fila de Total con Cheque y Efectivo */}
+                        <tr style={{ backgroundColor: "#10b981", borderTop: "3px solid #059669" }}>
+                            <td colSpan="8" className="text-right px-2 font-black text-[11px]" style={{
                                 color: "#ffffff",
                                 padding: "8px",
-                                letterSpacing: '0.5px'
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
                             }}>
-                                ${totalFleteStorage.toFixed(2)}
+                                TOTAL:
+                            </td>
+                            <td colSpan="2" className="text-center px-2 font-black text-[13px]" style={{
+                                color: "#ffffff",
+                                padding: "8px",
+                                letterSpacing: '0.5px',
+                                fontWeight: "900"
+                            }}>
+                                ${total.toFixed(2)}
+                            </td>
+                            <td colSpan="2" style={{ padding: "4px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>CHEQUE:</span>
+                                        <div className="bg-white rounded" style={{
+                                            flex: 1,
+                                            height: "12px",
+                                            border: "1px solid #059669"
+                                        }}></div>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>EFECTIVO:</span>
+                                        <div className="bg-white rounded" style={{
+                                            flex: 1,
+                                            height: "12px",
+                                            border: "1px solid #059669"
+                                        }}></div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                     </tfoot>
                 </table>
-
-                {/* SUB-TOTAL Y TOTAL INTEGRADOS EN LA TABLA */}
-                <div className="flex justify-end gap-2" style={{ padding: "4px", backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
-                    <div className="space-y-1">
-                        <div className="bg-white rounded p-2 subtle-shadow" style={{ border: "1px solid #e2e8f0" }}>
-                            <div className="font-black text-[8px] text-center" style={{
-                                marginBottom: "2px",
-                                color: "#64748b",
-                                letterSpacing: '0.5px',
-                                fontWeight: "900"
-                            }}>
-                                SUB-TOTAL
-                            </div>
-                            <div className="flex gap-2 items-center" style={{ marginBottom: "2px" }}>
-                                <span className="font-bold text-[8px]" style={{ width: "48px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>CHEQUE</span>
-                                <div className="bg-gray-50 rounded" style={{
-                                    width: "60px",
-                                    height: "12px",
-                                    border: "1px solid #cbd5e1"
-                                }}></div>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <span className="font-bold text-[8px]" style={{ width: "48px", textAlign: "right", color: "#64748b", fontWeight: "800" }}>EFECTIVO</span>
-                                <div className="bg-gray-50 rounded" style={{
-                                    width: "60px",
-                                    height: "12px",
-                                    border: "1px solid #cbd5e1"
-                                }}></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="modern-shadow rounded overflow-hidden" style={{ border: "2px solid #10b981" }}>
-                        <div className="bg-white" style={{ padding: "2px", borderBottom: "1px solid #d1fae5" }}>
-                            <div className="text-center font-black text-[8px]" style={{
-                                color: "#065f46",
-                                letterSpacing: '0.5px',
-                                fontWeight: "900"
-                            }}>
-                                TOTAL
-                            </div>
-                        </div>
-                        <div style={{
-                            width: "70px",
-                            height: "36px",
-                            background: "linear-gradient(135deg, #d1fae5, #a7f3d0)"
-                        }}></div>
-                    </div>
-                </div>
             </div>
 
             {/* FOOTER MODERNIZADO */}
