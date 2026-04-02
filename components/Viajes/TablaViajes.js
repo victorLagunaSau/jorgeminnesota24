@@ -4,7 +4,6 @@ import firebase from "firebase/app";
 import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaVerificacion from "./HojaVerificacion";
-import ModalLiquidacion from "./ModalLiquidacion";
 
 const TablaViajes = ({user}) => {
     const [viajes, setViajes] = useState([]);
@@ -15,8 +14,9 @@ const TablaViajes = ({user}) => {
 
     const componentRef = useRef();
     const [viajeAImprimir, setViajeAImprimir] = useState(null);
-    const [viajeALiquidar, setViajeALiquidar] = useState(null);
     const [modal, setModal] = useState({show: false, mensaje: "", accion: null, tipo: ""});
+    const [procesandoPago, setProcesandoPago] = useState(false);
+    const btnPrintRef = useRef();
 
     // Estado para el Modal de Comentarios
     const [modalComentario, setModalComentario] = useState({show: false, v: null, viajeId: null, idx: null});
@@ -148,23 +148,235 @@ const TablaViajes = ({user}) => {
             setModal({show: true, mensaje: "Error al eliminar el viaje", tipo: "error"});
         }
     };
+
+    const ejecutarPago = async (viaje) => {
+        setProcesandoPago(true);
+        const fechaOperacionActual = new Date();
+        const empresaSeleccionada = viaje.empresaNombre || viaje.chofer?.empresa || "";
+
+        // CÁLCULO DE TOTALES
+        const totalFletes = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.flete) || 0), 0);
+        const totalStorage = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) || 0), 0);
+        const totalSobrepeso = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.sPeso) || 0), 0);
+        const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
+        const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
+
+        try {
+            const consecutivoRef = firestore().collection("config").doc("consecutivos");
+
+            // VERIFICAR LOTES YA PAGADOS
+            const lotesExistentes = [];
+            for (const v of viaje.vehiculos) {
+                const docExistente = await firestore().collection("vehiculos").doc(v.lote).get();
+                if (docExistente.exists) {
+                    lotesExistentes.push(v.lote);
+                }
+            }
+
+            // Si hay lotes pagados, mostrar confirmación
+            if (lotesExistentes.length > 0) {
+                const confirmar = window.confirm(
+                    `⚠️ ADVERTENCIA: Los siguientes lotes YA ESTÁN PAGADOS:\n\n${lotesExistentes.join(', ')}\n\n` +
+                    `Solo se actualizarán los precios (Storage, Sobrepeso, Gastos Extras) sin crear un nuevo pago.\n\n` +
+                    `¿Desea continuar?`
+                );
+                if (!confirmar) {
+                    setProcesandoPago(false);
+                    return;
+                }
+            }
+
+            await firestore().runTransaction(async (transaction) => {
+                const conDoc = await transaction.get(consecutivoRef);
+                if (!conDoc.exists) throw "El documento de consecutivos no existe";
+
+                const ultimoFolio = conDoc.data()["Viajes pagados"] || 0;
+                const proximoFolio = ultimoFolio + 1;
+                const nuevoFolioContable = `PG-${proximoFolio}`;
+
+                // --- 1. ACTIVACIÓN DE VEHÍCULOS Y REGISTRO DE MOVIMIENTOS ---
+                viaje.vehiculos.forEach((v) => {
+                    const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
+                    const movimientoRef = firestore().collection("movimientos").doc();
+
+                    // Verificar si el lote ya está pagado
+                    const yaPagado = lotesExistentes.includes(v.lote);
+
+                    if (yaPagado) {
+                        // LOTE YA PAGADO - Solo actualizar precios
+                        transaction.update(vehiculoRef, {
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            ultimaActualizacionPrecios: {
+                                fecha: fechaOperacionActual,
+                                usuario: user?.nombre || "Admin",
+                                viajeRelacionado: viaje.numViaje
+                            }
+                        });
+
+                        // Registrar movimiento de actualización
+                        transaction.set(movimientoRef, {
+                            binNip: v.lote,
+                            timestamp: fechaOperacionActual,
+                            tipo: "ACTUALIZACIÓN",
+                            tipoRegistro: "ACTUALIZACIÓN PRECIOS",
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            numViaje: viaje.numViaje,
+                            usuario: user?.nombre || "Admin",
+                            nota: "Actualización de precios - Lote ya pagado previamente"
+                        });
+
+                    } else {
+                        // LOTE NUEVO - Crear registro completo
+                        const dataComun = {
+                            active: true,
+                            almacen: v.almacen || "PENDIENTE",
+                            asignado: false,
+                            binNip: v.lote,
+                            ciudad: v.ciudad || "",
+                            cliente: v.clienteNombre || v.clienteAlt || "SIN ASIGNAR",
+                            clienteAlt: v.clienteAlt || "",
+                            clienteId: v.clienteId || "",
+                            clienteNombre: v.clienteNombre || "",
+                            clienteTelefono: v.clienteTelefono || "",
+                            comentariosChofer: null,
+                            comentarioRegistro: v.comentarioRegistro || "",
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            numViaje: viaje.numViaje,
+                            empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
+                            folioPago: nuevoFolioContable,
+                            descripcion: "",
+                            estado: v.estado || "",
+                            estatus: "EB",
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            gatePass: "X",
+                            marca: v.marca || "",
+                            modelo: v.modelo || "",
+                            price: String(v.precioVenta || v.flete || "0"),
+                            flete: parseFloat(v.flete || 0),
+
+                            registro: {
+                                idUsuario: user?.id || "Admin_ID",
+                                usuario: user?.nombre || "Admin",
+                                timestamp: fechaOperacionActual
+                            },
+                            datosOrigen: {
+                                idUsuario: viaje.creadoPor?.id,
+                                usuario: viaje.creadoPor?.nombre,
+                                fechaRegistro: viaje.fechaCreacion
+                            },
+
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            storage: parseFloat(v.storage || 0),
+                            telefonoCliente: v.clienteTelefono || "",
+                            tipoVehiculo: "",
+                            titulo: v.titulo || "NO"
+                        };
+
+                        // Guardar en la colección de VEHICULOS (Inventario activo)
+                        transaction.set(vehiculoRef, dataComun);
+
+                        // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
+                        transaction.set(movimientoRef, {
+                            ...dataComun,
+                            timestamp: fechaOperacionActual,
+                            tipo: "+",
+                            tipoRegistro: "EB",
+                            estatus: "EB"
+                        });
+                    }
+                });
+
+                // --- 2. HISTORIAL DE PAGADOS (Expediente del Viaje) ---
+                const viajePagadoData = {
+                    ...viaje,
+                    folioPago: nuevoFolioContable,
+                    fechaPago: fechaOperacionActual,
+                    empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
+                    pagadoPor: {id: user?.id, nombre: user?.nombre},
+                    empresaLiquidada: empresaSeleccionada,
+                    estatus: "PAGADO",
+                    resumenFinanciero: {
+                        ...viaje.resumenFinanciero,
+                        totalFletes,
+                        totalStorage,
+                        totalSobrepeso,
+                        totalGastosExtra,
+                        granTotal: granTotalReal
+                    }
+                };
+
+                transaction.set(firestore().collection("viajesPagados").doc(nuevoFolioContable), viajePagadoData);
+
+                // --- 3. LIMPIEZA Y ACTUALIZACIÓN DE CONSECUTIVO ---
+                transaction.delete(firestore().collection("viajesPendientes").doc(viaje.id));
+                transaction.update(consecutivoRef, {"Viajes pagados": proximoFolio});
+            });
+
+            // Mostrar mensaje de éxito
+            setModal({
+                show: true,
+                mensaje: `Pago procesado exitosamente. El PDF se imprimirá automáticamente.`,
+                tipo: "success"
+            });
+
+            // Preparar el PDF para imprimir
+            setViajeAImprimir(viaje);
+
+            // Imprimir automáticamente después de un pequeño delay
+            setTimeout(() => {
+                if (btnPrintRef.current) {
+                    btnPrintRef.current.click();
+                }
+                setModal({show: false});
+            }, 1000);
+
+        } catch (error) {
+            console.error("Error en pago:", error);
+            setModal({show: true, mensaje: "Error al procesar el pago: " + error, tipo: "error"});
+        } finally {
+            setProcesandoPago(false);
+        }
+    };
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
             <div style={{display: "none"}}>
                 <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/>
             </div>
 
-            {viajeALiquidar &&
-                <ModalLiquidacion viaje={viajeALiquidar} user={user} onClose={() => setViajeALiquidar(null)}/>}
+            {/* Botón oculto para imprimir después del pago */}
+            <ReactToPrint
+                trigger={() => <button ref={btnPrintRef} style={{display: 'none'}}>Print</button>}
+                content={() => componentRef.current}
+                documentTitle={`Hoja Pago - Folio ${viajeAImprimir?.numViaje}`}
+            />
 
             {/* MODAL DE CONFIRMACIÓN GENERAL */}
             {modal.show && (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className={`bg-white rounded-xl p-8 max-w-sm w-full border-t-8 shadow-2xl ${modal.tipo === 'eliminar' ? 'border-red-700' : 'border-red-600'}`}>
-                        <h3 className={`text-xl font-black uppercase italic tracking-tighter ${modal.tipo === 'eliminar' ? 'text-red-700 flex items-center gap-2' : ''}`}>
+                    <div className={`bg-white rounded-xl p-8 max-w-sm w-full border-t-8 shadow-2xl ${
+                        modal.tipo === 'eliminar' ? 'border-red-700' :
+                        modal.tipo === 'pago' ? 'border-green-600' :
+                        modal.tipo === 'success' ? 'border-green-600' :
+                        'border-red-600'
+                    }`}>
+                        <h3 className={`text-xl font-black uppercase italic tracking-tighter ${
+                            modal.tipo === 'eliminar' ? 'text-red-700 flex items-center gap-2' :
+                            modal.tipo === 'pago' ? 'text-green-700' :
+                            modal.tipo === 'success' ? 'text-green-700 flex items-center gap-2' :
+                            ''
+                        }`}>
                             {modal.tipo === 'eliminar' && <FaTrash />}
-                            Confirmar {modal.tipo === 'eliminar' ? 'Eliminación' : 'Acción'}
+                            {modal.tipo === 'success' && <FaCheckCircle />}
+                            {modal.tipo === 'eliminar' ? 'Confirmar Eliminación' :
+                             modal.tipo === 'pago' ? 'Confirmar Pago' :
+                             modal.tipo === 'success' ? 'Pago Exitoso' :
+                             'Confirmar Acción'}
                         </h3>
                         <p className="text-sm mt-3 font-bold text-gray-600 leading-tight italic">{modal.mensaje}</p>
                         {modal.tipo === 'eliminar' && (
@@ -174,13 +386,29 @@ const TablaViajes = ({user}) => {
                                 </p>
                             </div>
                         )}
+                        {modal.tipo === 'pago' && (
+                            <div className="mt-4 p-3 bg-green-50 border-l-4 border-green-700 rounded">
+                                <p className="text-[10px] font-black text-green-700 uppercase flex items-center gap-1">
+                                    ✓ Se procesará el pago y se generará el PDF
+                                </p>
+                            </div>
+                        )}
                         <div className="flex justify-end gap-3 mt-8">
-                            <button onClick={() => setModal({show: false})}
-                                    className="btn btn-sm btn-ghost font-black uppercase text-[10px]">Cancelar
-                            </button>
+                            {modal.tipo !== 'success' && (
+                                <button onClick={() => setModal({show: false})}
+                                        className="btn btn-sm btn-ghost font-black uppercase text-[10px]">
+                                    {modal.accion ? 'Cancelar' : 'Cerrar'}
+                                </button>
+                            )}
                             {modal.accion && <button onClick={modal.accion}
-                                                     className={`btn btn-sm text-white font-black uppercase text-[10px] ${modal.tipo === 'eliminar' ? 'btn-error' : 'btn-error'}`}>
-                                {modal.tipo === 'eliminar' ? 'Eliminar Viaje' : 'Continuar'}
+                                                     className={`btn btn-sm text-white font-black uppercase text-[10px] ${
+                                                         modal.tipo === 'eliminar' ? 'btn-error' :
+                                                         modal.tipo === 'pago' ? 'btn-success' :
+                                                         'btn-error'
+                                                     }`}>
+                                {modal.tipo === 'eliminar' ? 'Eliminar Viaje' :
+                                 modal.tipo === 'pago' ? 'Confirmar Pago' :
+                                 'Continuar'}
                             </button>}
                         </div>
                     </div>
@@ -524,15 +752,20 @@ const TablaViajes = ({user}) => {
                                                                                         tipo: "error"
                                                                                     });
                                                                                 } else {
-                                                                                    setViajeALiquidar(viaje);
+                                                                                    setModal({
+                                                                                        show: true,
+                                                                                        mensaje: `¿Confirmar pago del viaje #${viaje.numViaje}? Esta acción procesará el pago y generará el PDF automáticamente.`,
+                                                                                        accion: () => ejecutarPago(viaje),
+                                                                                        tipo: "pago"
+                                                                                    });
                                                                                 }
                                                                             }}
-                                                                            disabled={faltanClientes}
+                                                                            disabled={faltanClientes || procesandoPago}
                                                                             className={`btn btn-xs text-white font-black text-[10px] h-10 uppercase italic shadow-md ${
-                                                                                faltanClientes ? 'btn-disabled bg-gray-400' : 'btn-success'
+                                                                                faltanClientes || procesandoPago ? 'btn-disabled bg-gray-400' : 'btn-success'
                                                                             }`}
                                                                         >
-                                                                            Pagar Flete
+                                                                            {procesandoPago ? 'Procesando...' : 'Pagar Flete'}
                                                                         </button>
                                                                     );
                                                                 })()}
