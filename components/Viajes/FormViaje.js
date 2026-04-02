@@ -174,9 +174,12 @@ const FormViaje = ({user}) => {
 
             if (docV.exists) {
                 // Lote YA PAGADO - Permitir pero marcar como advertencia
-                setAlertMessage({msg: `⚠️ ADVERTENCIA: Lote ${loteLimpio} ya está pagado. Se registrará para actualizar precios.`, tipo: 'warning'});
+                // Solo mostrar alerta visual si es admin
+                if (user.admin) {
+                    setAlertMessage({msg: `⚠️ ADVERTENCIA: Lote ${loteLimpio} ya está pagado. Se registrará para actualizar precios.`, tipo: 'warning'});
+                    setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                }
                 setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: true} : v));
-                setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
             } else if (docT.exists) {
                 // Lote en tránsito - No permitir
                 setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito`, tipo: 'error'});
@@ -429,7 +432,7 @@ const FormViaje = ({user}) => {
                         </thead>
                         <tbody className="bg-white">
                         {vehiculos.map((v, i) => (
-                            <tr key={v.id} className={`${v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
+                            <tr key={v.id} className={`${user.admin && v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
                                 <td className="font-mono text-[10px] text-gray-400 italic">{i + 1}</td>
                                 <td>
                                     <input
@@ -439,12 +442,12 @@ const FormViaje = ({user}) => {
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
                                         onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
                                         className={`input input-xs w-full font-black ${
-                                            v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
+                                            user.admin && v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
                                             v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'
                                         }`}
                                         placeholder="8 dígitos"
                                     />
-                                    {v.yaPagado && (
+                                    {user.admin && v.yaPagado && (
                                         <span className="text-[8px] font-black text-yellow-700 uppercase italic block mt-1">YA PAGADO</span>
                                     )}
                                 </td>

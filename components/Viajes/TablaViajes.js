@@ -313,7 +313,7 @@ const TablaViajes = ({user}) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                {viaje.vehiculos.some(v => v.yaPagado) && (
+                                {user.admin && viaje.vehiculos.some(v => v.yaPagado) && (
                                     <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-yellow-500 text-black flex items-center gap-1">
                                         ⚠️ CONTIENE LOTES PAGADOS
                                     </span>
@@ -355,7 +355,7 @@ const TablaViajes = ({user}) => {
 
                                     return (
                                         <tr key={`${viaje.id}-${idx}`}
-                                            className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${v.yaPagado ? 'bg-yellow-50' : ''}`}>
+                                            className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${user.admin && v.yaPagado ? 'bg-yellow-50' : ''}`}>
                                             <td className="p-3">
                                                 {puedeEditar ? (
                                                     <div>
@@ -365,9 +365,9 @@ const TablaViajes = ({user}) => {
                                                             value={v.lote || ""}
                                                             maxLength={8}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
-                                                            className={`w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono py-1 focus:border-blue-500 ${v.yaPagado ? 'text-yellow-700 border-yellow-500' : 'text-blue-700'}`}
+                                                            className={`w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono py-1 focus:border-blue-500 ${user.admin && v.yaPagado ? 'text-yellow-700 border-yellow-500' : 'text-blue-700'}`}
                                                         />
-                                                        {v.yaPagado && (
+                                                        {user.admin && v.yaPagado && (
                                                             <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1 flex items-center gap-1">
                                                                 ⚠️ YA PAGADO
                                                             </div>
@@ -375,8 +375,8 @@ const TablaViajes = ({user}) => {
                                                     </div>
                                                 ) : (
                                                     <div>
-                                                        <span className={`font-mono text-xs font-black ${v.yaPagado ? 'text-yellow-700' : 'text-blue-700'}`}>{v.lote}</span>
-                                                        {v.yaPagado && (
+                                                        <span className={`font-mono text-xs font-black ${user.admin && v.yaPagado ? 'text-yellow-700' : 'text-blue-700'}`}>{v.lote}</span>
+                                                        {user.admin && v.yaPagado && (
                                                             <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1">
                                                                 ⚠️ YA PAGADO
                                                             </div>
