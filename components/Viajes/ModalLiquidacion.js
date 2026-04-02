@@ -32,6 +32,28 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
         try {
             const consecutivoRef = firestore().collection("config").doc("consecutivos");
 
+            // VERIFICAR LOTES YA PAGADOS
+            const lotesExistentes = [];
+            for (const v of viaje.vehiculos) {
+                const docExistente = await firestore().collection("vehiculos").doc(v.lote).get();
+                if (docExistente.exists) {
+                    lotesExistentes.push(v.lote);
+                }
+            }
+
+            // Si hay lotes pagados, mostrar confirmación
+            if (lotesExistentes.length > 0) {
+                const confirmar = window.confirm(
+                    `⚠️ ADVERTENCIA: Los siguientes lotes YA ESTÁN PAGADOS:\n\n${lotesExistentes.join(', ')}\n\n` +
+                    `Solo se actualizarán los precios (Storage, Sobrepeso, Gastos Extras) sin crear un nuevo pago.\n\n` +
+                    `¿Desea continuar?`
+                );
+                if (!confirmar) {
+                    setProcesando(false);
+                    return;
+                }
+            }
+
             await firestore().runTransaction(async (transaction) => {
                 const conDoc = await transaction.get(consecutivoRef);
                 if (!conDoc.exists) throw "El documento de consecutivos no existe";
@@ -45,66 +67,99 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
                     const movimientoRef = firestore().collection("movimientos").doc();
 
-                    const dataComun = {
-                        active: true,
-                        almacen: v.almacen || "PENDIENTE",
-                        asignado: false,
-                        binNip: v.lote,
-                        ciudad: v.ciudad || "",
-                        cliente: v.clienteNombre || v.clienteAlt || "SIN ASIGNAR",
-                        clienteAlt: v.clienteAlt || "",
-                        clienteId: v.clienteId || "",
-                        clienteNombre: v.clienteNombre || "",
-                        clienteTelefono: v.clienteTelefono || "",
-                        comentariosChofer: null,
-                        comentarioRegistro: v.comentarioRegistro || "",
-                        comentarioRecepcion: v.comentarioRecepcion || "",
-                        numViaje: viaje.numViaje,
-                        empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
-                        folioPago: nuevoFolioContable,
-                        descripcion: "",
-                        estado: v.estado || "",
-                        estatus: "EB",
-                        gastosExtra: parseFloat(v.gExtra || 0),
-                        gatePass: "X",
-                        marca: v.marca || "",
-                        modelo: v.modelo || "",
-                        price: String(v.precioVenta || v.flete || "0"),
-                        flete: parseFloat(v.flete || 0),
+                    // Verificar si el lote ya está pagado
+                    const yaPagado = lotesExistentes.includes(v.lote);
 
+                    if (yaPagado) {
+                        // LOTE YA PAGADO - Solo actualizar precios
+                        transaction.update(vehiculoRef, {
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            // Agregar nota de actualización
+                            ultimaActualizacionPrecios: {
+                                fecha: fechaOperacionActual,
+                                usuario: user?.nombre || "Admin",
+                                viajeRelacionado: viaje.numViaje
+                            }
+                        });
 
-
-                        // --- AJUSTE DE FECHAS Y TRAZABILIDAD ---
-                        registro: {
-                            idUsuario: user?.id || "Admin_ID",
+                        // Registrar movimiento de actualización
+                        transaction.set(movimientoRef, {
+                            binNip: v.lote,
+                            timestamp: fechaOperacionActual,
+                            tipo: "ACTUALIZACIÓN",
+                            tipoRegistro: "ACTUALIZACIÓN PRECIOS",
+                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            numViaje: viaje.numViaje,
                             usuario: user?.nombre || "Admin",
-                            timestamp: fechaOperacionActual // FECHA DE HOY (Liquidación)
-                        },
-                        datosOrigen: {
-                            idUsuario: viaje.creadoPor?.id,
-                            usuario: viaje.creadoPor?.nombre,
-                            fechaRegistro: viaje.fechaCreacion // Mantenemos la fecha de febrero para auditoría
-                        },
-                        // ---------------------------------------
+                            nota: "Actualización de precios - Lote ya pagado previamente"
+                        });
 
-                        sobrePeso: parseFloat(v.sPeso || 0),
-                        storage: parseFloat(v.storage || 0),
-                        telefonoCliente: v.clienteTelefono || "",
-                        tipoVehiculo: "",
-                        titulo: v.titulo || "NO"
-                    };
+                    } else {
+                        // LOTE NUEVO - Crear registro completo
+                        const dataComun = {
+                            active: true,
+                            almacen: v.almacen || "PENDIENTE",
+                            asignado: false,
+                            binNip: v.lote,
+                            ciudad: v.ciudad || "",
+                            cliente: v.clienteNombre || v.clienteAlt || "SIN ASIGNAR",
+                            clienteAlt: v.clienteAlt || "",
+                            clienteId: v.clienteId || "",
+                            clienteNombre: v.clienteNombre || "",
+                            clienteTelefono: v.clienteTelefono || "",
+                            comentariosChofer: null,
+                            comentarioRegistro: v.comentarioRegistro || "",
+                            comentarioRecepcion: v.comentarioRecepcion || "",
+                            numViaje: viaje.numViaje,
+                            empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
+                            folioPago: nuevoFolioContable,
+                            descripcion: "",
+                            estado: v.estado || "",
+                            estatus: "EB",
+                            gastosExtra: parseFloat(v.gExtra || 0),
+                            gatePass: "X",
+                            marca: v.marca || "",
+                            modelo: v.modelo || "",
+                            price: String(v.precioVenta || v.flete || "0"),
+                            flete: parseFloat(v.flete || 0),
 
-                    // Guardar en la colección de VEHICULOS (Inventario activo)
-                    transaction.set(vehiculoRef, dataComun);
+                            // --- AJUSTE DE FECHAS Y TRAZABILIDAD ---
+                            registro: {
+                                idUsuario: user?.id || "Admin_ID",
+                                usuario: user?.nombre || "Admin",
+                                timestamp: fechaOperacionActual // FECHA DE HOY (Liquidación)
+                            },
+                            datosOrigen: {
+                                idUsuario: viaje.creadoPor?.id,
+                                usuario: viaje.creadoPor?.nombre,
+                                fechaRegistro: viaje.fechaCreacion // Mantenemos la fecha de febrero para auditoría
+                            },
+                            // ---------------------------------------
 
-                    // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
-                    transaction.set(movimientoRef, {
-                        ...dataComun,
-                        timestamp: fechaOperacionActual,
-                        tipo: "+",
-                        tipoRegistro: "EB",
-                        estatus: "EB"
-                    });
+                            sobrePeso: parseFloat(v.sPeso || 0),
+                            storage: parseFloat(v.storage || 0),
+                            telefonoCliente: v.clienteTelefono || "",
+                            tipoVehiculo: "",
+                            titulo: v.titulo || "NO"
+                        };
+
+                        // Guardar en la colección de VEHICULOS (Inventario activo)
+                        transaction.set(vehiculoRef, dataComun);
+
+                        // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
+                        transaction.set(movimientoRef, {
+                            ...dataComun,
+                            timestamp: fechaOperacionActual,
+                            tipo: "+",
+                            tipoRegistro: "EB",
+                            estatus: "EB"
+                        });
+                    }
                 });
 
                 // --- 2. HISTORIAL DE PAGADOS (Expediente del Viaje) ---
@@ -214,16 +269,29 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
 
                     {/* DETALLE UNIDADES */}
                     <div className="flex-1">
+                        {viaje.vehiculos.some(v => v.yaPagado) && (
+                            <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 rounded">
+                                <p className="text-[10px] font-black text-yellow-800 uppercase flex items-center gap-2">
+                                    ⚠️ ADVERTENCIA: Este viaje contiene lotes ya pagados
+                                </p>
+                                <p className="text-[8px] font-bold text-yellow-700 mt-1">
+                                    Solo se actualizarán los precios (Storage, Sobrepeso, Gastos) sin crear un nuevo pago.
+                                </p>
+                            </div>
+                        )}
                         <h3 className="text-[10px] font-black text-gray-400 uppercase mb-4 flex items-center gap-2">
                             <FaCar/> Desglose de Unidades ({viaje.vehiculos.length})
                         </h3>
                         <div className="space-y-3">
                             {viaje.vehiculos.map((v, i) => (
                                 <div key={i}
-                                     className="p-3 border rounded-lg bg-white-500 shadow-sm border-l-4 border-red-600">
+                                     className={`p-3 border rounded-lg shadow-sm border-l-4 ${v.yaPagado ? 'bg-yellow-50 border-yellow-500' : 'bg-white-500 border-red-600'}`}>
                                     <div className="flex justify-between items-center">
                                         <div>
-                                            <p className="text-[11px] font-black uppercase text-gray-800 italic">{v.lote} - {v.marca}</p>
+                                            <p className={`text-[11px] font-black uppercase italic ${v.yaPagado ? 'text-yellow-800' : 'text-gray-800'}`}>
+                                                {v.lote} - {v.marca}
+                                                {v.yaPagado && <span className="ml-2 text-[8px] bg-yellow-200 px-2 py-1 rounded">⚠️ YA PAGADO</span>}
+                                            </p>
                                             <p className="text-gray-400 font-bold text-[9px] uppercase leading-none">{v.ciudad}</p>
                                         </div>
                                         <div className="flex gap-4 text-center">

@@ -1,9 +1,8 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
-import HojaChofer from "./HojaChofer";
 import HojaVerificacion from "./HojaVerificacion";
 import ModalLiquidacion from "./ModalLiquidacion";
 
@@ -147,13 +146,33 @@ const TablaViajes = ({user}) => {
             setModal({show: true, mensaje: "Error al guardar la nota", tipo: "error"});
         }
     };
+
+    const eliminarViaje = async (viajeId) => {
+        const viaje = viajes.find(v => v.id === viajeId);
+        if (!viaje) return;
+
+        try {
+            // Eliminar viaje de viajesPendientes
+            await firestore().collection("viajesPendientes").doc(viajeId).delete();
+
+            // Eliminar todos los lotes en tránsito asociados
+            const batch = firestore().batch();
+            viaje.vehiculos.forEach(v => {
+                const loteRef = firestore().collection("lotesEnTransito").doc(v.lote);
+                batch.delete(loteRef);
+            });
+            await batch.commit();
+
+            setModal({show: false});
+        } catch (error) {
+            console.error("Error al eliminar viaje:", error);
+            setModal({show: true, mensaje: "Error al eliminar el viaje", tipo: "error"});
+        }
+    };
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
             <div style={{display: "none"}}>
-                {user.admin ?
-                    <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/> :
-                    <HojaChofer ref={componentRef} viaje={viajeAImprimir}/>
-                }
+                <HojaVerificacion ref={componentRef} viajeData={viajeAImprimir}/>
             </div>
 
             {viajeALiquidar &&
@@ -163,15 +182,27 @@ const TablaViajes = ({user}) => {
             {modal.show && (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-xl p-8 max-w-sm w-full border-t-8 border-red-600 shadow-2xl">
-                        <h3 className="text-xl font-black uppercase italic tracking-tighter">Confirmar Acción</h3>
-                        <p className="text-sm mt-3 font-bold text-gray-600 uppercase leading-tight italic">{modal.mensaje}</p>
+                    <div className={`bg-white rounded-xl p-8 max-w-sm w-full border-t-8 shadow-2xl ${modal.tipo === 'eliminar' ? 'border-red-700' : 'border-red-600'}`}>
+                        <h3 className={`text-xl font-black uppercase italic tracking-tighter ${modal.tipo === 'eliminar' ? 'text-red-700 flex items-center gap-2' : ''}`}>
+                            {modal.tipo === 'eliminar' && <FaTrash />}
+                            Confirmar {modal.tipo === 'eliminar' ? 'Eliminación' : 'Acción'}
+                        </h3>
+                        <p className="text-sm mt-3 font-bold text-gray-600 leading-tight italic">{modal.mensaje}</p>
+                        {modal.tipo === 'eliminar' && (
+                            <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-700 rounded">
+                                <p className="text-[10px] font-black text-red-700 uppercase flex items-center gap-1">
+                                    ⚠️ ADVERTENCIA: Esta acción no se puede deshacer
+                                </p>
+                            </div>
+                        )}
                         <div className="flex justify-end gap-3 mt-8">
                             <button onClick={() => setModal({show: false})}
-                                    className="btn btn-sm btn-ghost font-black uppercase text-[10px]">Cerrar
+                                    className="btn btn-sm btn-ghost font-black uppercase text-[10px]">Cancelar
                             </button>
                             {modal.accion && <button onClick={modal.accion}
-                                                     className="btn btn-sm btn-error text-white font-black uppercase text-[10px]">Continuar</button>}
+                                                     className={`btn btn-sm text-white font-black uppercase text-[10px] ${modal.tipo === 'eliminar' ? 'btn-error' : 'btn-error'}`}>
+                                {modal.tipo === 'eliminar' ? 'Eliminar Viaje' : 'Continuar'}
+                            </button>}
                         </div>
                     </div>
                 </div>
@@ -282,6 +313,11 @@ const TablaViajes = ({user}) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
+                                {viaje.vehiculos.some(v => v.yaPagado) && (
+                                    <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-yellow-500 text-black flex items-center gap-1">
+                                        ⚠️ CONTIENE LOTES PAGADOS
+                                    </span>
+                                )}
                                 <span className={`text-[10px] font-black uppercase px-4 py-1 rounded-full ${
                                     viaje.estatus === 'PENDIENTE' ? 'bg-yellow-500 text-black' :
                                         viaje.estatus === 'VERIFICADO' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
@@ -319,19 +355,33 @@ const TablaViajes = ({user}) => {
 
                                     return (
                                         <tr key={`${viaje.id}-${idx}`}
-                                            className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
+                                            className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${v.yaPagado ? 'bg-yellow-50' : ''}`}>
                                             <td className="p-3">
                                                 {puedeEditar ? (
-                                                    <input
-                                                        type="text"
-                                                        disabled={isLocked}
-                                                        value={v.lote || ""}
-                                                        maxLength={8}
-                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
-                                                        className="w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono text-blue-700 py-1 focus:border-blue-500"
-                                                    />
+                                                    <div>
+                                                        <input
+                                                            type="text"
+                                                            disabled={isLocked}
+                                                            value={v.lote || ""}
+                                                            maxLength={8}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
+                                                            className={`w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono py-1 focus:border-blue-500 ${v.yaPagado ? 'text-yellow-700 border-yellow-500' : 'text-blue-700'}`}
+                                                        />
+                                                        {v.yaPagado && (
+                                                            <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1 flex items-center gap-1">
+                                                                ⚠️ YA PAGADO
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ) : (
-                                                    <span className="font-mono text-xs font-black text-blue-700">{v.lote}</span>
+                                                    <div>
+                                                        <span className={`font-mono text-xs font-black ${v.yaPagado ? 'text-yellow-700' : 'text-blue-700'}`}>{v.lote}</span>
+                                                        {v.yaPagado && (
+                                                            <div className="text-[7px] font-black text-yellow-700 uppercase italic mt-1">
+                                                                ⚠️ YA PAGADO
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                             <td className="p-3">
@@ -548,6 +598,20 @@ const TablaViajes = ({user}) => {
                                                             }}
                                                                     className="text-[8px] font-black uppercase text-red-500 underline hover:text-red-700 transition-all mt-1">
                                                                 Habilitar Edición
+                                                            </button>
+                                                        )}
+
+                                                        {puedeEditar && viaje.estatus !== "VERIFICADO" && (
+                                                            <button onClick={() => {
+                                                                setModal({
+                                                                    show: true,
+                                                                    mensaje: `¿Eliminar viaje #${viaje.numViaje}? Esta acción eliminará el viaje y ${viaje.vehiculos.length} vehículo(s) asociado(s). NO SE PUEDE DESHACER.`,
+                                                                    accion: () => eliminarViaje(viaje.id),
+                                                                    tipo: "eliminar"
+                                                                });
+                                                            }}
+                                                                    className="btn btn-xs btn-error text-white font-black text-[9px] uppercase h-8 w-full flex items-center justify-center gap-2 transition-all shadow-md mt-2">
+                                                                <FaTrash size={10}/> ELIMINAR
                                                             </button>
                                                         )}
                                                     </div>
