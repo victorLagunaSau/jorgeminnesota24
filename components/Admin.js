@@ -41,6 +41,7 @@ const Admin = () => {
     const router = useRouter();
     const [user, setUser] = useState(null);
     const [selectedModule, setSelectedModule] = useState(null);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
         const unsubscribe = auth().onAuthStateChanged((user) => {
@@ -142,17 +143,26 @@ const Admin = () => {
     };
 
     return (
-        <div className="flex bg-gray-50 min-h-screen text-black">
-            <Sidebar onSelectModule={setSelectedModule} selectedModule={selectedModule} />
-            <HeaderPanel user={user} onLogout={handleLogout} />
+        <div className="bg-gray-50 min-h-screen text-black">
+            <Sidebar
+                onSelectModule={setSelectedModule}
+                selectedModule={selectedModule}
+                isOpen={sidebarOpen}
+                onClose={() => setSidebarOpen(false)}
+            />
+            <HeaderPanel
+                user={user}
+                onLogout={handleLogout}
+                onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            />
 
-            <main className="ml-64 mt-20 p-8 flex-grow">
+            <main className="lg:ml-64 mt-16 p-4 lg:p-8 min-h-screen">
                 {user && user.tipo === "admin" ? (
                     <div className="flex flex-col w-full">
                         <motion.div
                             initial={{ x: -20, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
-                            className="mb-6"
+                            className="mb-4 lg:mb-6"
                         >
                             <h3 className="font-medium text-gray-600 uppercase text-xs tracking-widest">
                                 Panel <strong className="text-black font-black italic">Administrador</strong>

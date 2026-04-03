@@ -1,52 +1,44 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/router";
+import React from "react";
+import { FaBars, FaSignOutAlt } from "react-icons/fa";
 
-const HeaderPanel = ({ user, onLogout }) => {
-    const [activeLink, setActiveLink] = useState("inicio");
-    const router = useRouter();
-
-    useEffect(() => {
-        const { pathname } = router;
-        if (pathname === "/") {
-            setActiveLink("inicio");
-        } else if (pathname.includes("/admin")) {
-            setActiveLink("admin");
-        } else {
-            setActiveLink("");
-        }
-    }, [router.pathname]);
-
+const HeaderPanel = ({ user, onLogout, onToggleSidebar }) => {
     return (
-        <header className="fixed top-0 w-full z-30 bg-white-500 transition-all shadow-lg ">
-            <div className="max-w-screen-xl mx-auto flex justify-between items-center py-3 sm:py-4 px-6 sm:px-8 lg:px-16">
-                <div className="flex items-center">
-                    <img src="/assets/Logo.png" className="w-auto h-10" alt="Logo" />
+        <header className="fixed top-0 left-0 right-0 z-30 bg-white shadow-md lg:left-64">
+            <div className="flex justify-between items-center h-16 px-4 lg:px-6">
+                {/* Botón hamburguesa (solo móvil) */}
+                <button
+                    onClick={onToggleSidebar}
+                    className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                    <FaBars className="text-gray-600" size={20} />
+                </button>
+
+                {/* Logo en móvil */}
+                <div className="lg:hidden flex items-center">
+                    <img src="/assets/Logo.png" className="w-auto h-8" alt="Logo" />
                 </div>
-                <nav className="flex-grow flex items-center justify-between">
-                    <ul className="hidden lg:flex text-black-500 items-center">
-                        <li>
-                            <Link href="/">
-                                <a
-                                    onClick={() => setActiveLink("inicio")}
-                                    className={`px-4 py-2 mx-2 cursor-pointer animation-hover inline-block relative ${
-                                        activeLink === "inicio"
-                                            ? "text-primary animation-active"
-                                            : "text-black-500 hover:text-primary"
-                                    }`}
-                                >
-                                    Home
-                                </a>
-                            </Link>
-                        </li>
-                    </ul>
-                    <div className="font-medium flex justify-end items-center">
-                        <span className="mr-4 text-black-500">Hola <strong>{user?.nombre}</strong> </span>
-                        <button onClick={onLogout} className="btn btn-outline btn-error">
-                            Salir
-                        </button>
+
+                {/* Título en desktop */}
+                <div className="hidden lg:block">
+                    <h1 className="text-sm font-bold text-gray-800 uppercase tracking-wide">
+                        Panel de Administración
+                    </h1>
+                </div>
+
+                {/* Info usuario y logout */}
+                <div className="flex items-center gap-2 lg:gap-4">
+                    <div className="hidden sm:block text-right">
+                        <p className="text-xs text-gray-500 leading-none">Bienvenido</p>
+                        <p className="text-sm font-bold text-gray-800 leading-tight">{user?.nombre || 'Admin'}</p>
                     </div>
-                </nav>
+                    <button
+                        onClick={onLogout}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors text-sm font-semibold"
+                    >
+                        <FaSignOutAlt size={14} />
+                        <span className="hidden sm:inline">Salir</span>
+                    </button>
+                </div>
             </div>
         </header>
     );
