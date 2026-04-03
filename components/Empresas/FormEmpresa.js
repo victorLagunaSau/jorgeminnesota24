@@ -89,18 +89,58 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
 
             let empresaId = datos.id;
 
-            // Manejo de Auth (Lógica simplificada para actualización/creación)
+            // Manejo de Auth (Lógica para creación y actualización de credenciales)
             const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");
             try {
                 if (!empresaAEditar) {
+                    // CREAR NUEVO USUARIO
                     const userCredential = await secondaryApp.auth().createUserWithEmailAndPassword(datos.emailAcceso, datos.passwordAcceso);
                     empresaId = userCredential.user.uid;
                 } else {
-                    // Si ya existe, podrías agregar lógica para actualizar email en Auth aquí si fuera necesario
-                    console.log("Actualizando empresa existente...");
+                    // ACTUALIZAR USUARIO EXISTENTE - SIN CAMBIAR EL ID
+                    empresaId = empresaAEditar.id;
+
+                    // Obtener credenciales actuales de Firestore
+                    const empresaDoc = await firestore().collection("empresas").doc(empresaAEditar.id).get();
+                    const datosActuales = empresaDoc.data();
+                    const emailActual = datosActuales.emailAcceso;
+                    const passwordActual = datosActuales.passwordAcceso;
+
+                    try {
+                        // Intentar re-autenticar con credenciales actuales
+                        const userCredential = await secondaryApp.auth().signInWithEmailAndPassword(emailActual, passwordActual);
+                        const currentUser = userCredential.user;
+
+                        // Actualizar email si cambió
+                        if (datos.emailAcceso.toLowerCase() !== emailActual.toLowerCase()) {
+                            await currentUser.updateEmail(datos.emailAcceso.toLowerCase());
+                        }
+
+                        // Actualizar contraseña si cambió
+                        if (datos.passwordAcceso !== passwordActual) {
+                            await currentUser.updatePassword(datos.passwordAcceso);
+                        }
+                    } catch (loginError) {
+                        console.log("Error de autenticación:", loginError.code);
+
+                        // Si no existe en Auth, solo actualizar Firestore (el ID se mantiene)
+                        // El usuario podrá acceder cuando se sincronice manualmente en Firebase Console
+                        if (loginError.code === 'auth/user-not-found') {
+                            mostrarAviso("Usuario no existe en Auth. Se actualizarán solo los datos en Firestore.", "warning");
+                            // Continuar para guardar en Firestore con el mismo ID
+                        } else if (loginError.code === 'auth/wrong-password') {
+                            mostrarAviso("La contraseña actual no coincide. Se actualizarán solo los datos en Firestore.", "warning");
+                            // Continuar para guardar en Firestore con el mismo ID
+                        } else {
+                            throw loginError;
+                        }
+                    }
                 }
             } catch (authError) {
-                if (authError.code !== 'auth/email-already-in-use') throw authError;
+                console.error("Error en Auth:", authError);
+                mostrarAviso("Error: " + authError.message, "error");
+                setLoading(false);
+                return;
             } finally {
                 await secondaryApp.auth().signOut();
                 await secondaryApp.delete();
