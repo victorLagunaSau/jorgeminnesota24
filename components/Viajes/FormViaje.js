@@ -324,14 +324,15 @@ const FormViaje = ({user}) => {
             <div
                 className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
                 <div>
-                    <label className="block text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje
+                    <label className="block text-[10px] md:text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje
                         (Auto)</label>
                     <input type="text" disabled
-                           className="input input-bordered input-sm w-full bg-gray-100 text-black font-bold uppercase text-center"
-                           value={encabezado.numViaje} placeholder="Automático"/>
+                           className="input input-bordered input-md md:input-sm w-full bg-gray-100 text-black font-bold uppercase text-center text-[16px] md:text-[14px]"
+                           value={encabezado.numViaje} placeholder="Automático"
+                           style={{fontSize: '16px'}}/>
                 </div>
                 <div className="relative">
-                    <label className="block text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
+                    <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
 
                     {/* INPUT DE BÚSQUEDA */}
                     <div className="relative">
@@ -339,13 +340,14 @@ const FormViaje = ({user}) => {
                             type="text"
                             disabled={viajeIniciado}
                             placeholder={loading ? "Cargando..." : "Escribe para buscar chofer..."}
-                            className="input input-bordered input-sm w-full bg-white text-black font-bold uppercase pr-8"
+                            className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase pr-8 text-[16px] md:text-[14px]"
                             value={busquedaChofer}
                             onFocus={() => setMostrarLista(true)}
                             onChange={(e) => {
                                 setBusquedaChofer(e.target.value);
                                 setMostrarLista(true);
                             }}
+                            style={{fontSize: '16px'}}
                         />
                         {busquedaChofer && !viajeIniciado && (
                             <button
@@ -413,61 +415,66 @@ const FormViaje = ({user}) => {
                     </button>
                 </div>
 
-                <div className="overflow-x-auto border rounded-xl shadow-inner max-h-[400px]">
+                <div className="overflow-x-auto border rounded-xl shadow-inner max-h-[600px] md:max-h-[400px] -webkit-overflow-scrolling-touch">
                     <table className="table table-compact w-full">
                         <thead>
-                        <tr className="text-[10px] uppercase bg-gray-100 text-gray-500 sticky top-0 z-20">
-                            <th>#</th>
-                            <th>Lote *</th>
-                            <th>Marca *</th>
-                            <th>Modelo *</th>
-                            <th>Cliente *</th>
-                            <th>Almacén</th>
-                            <th>Estado *</th>
-                            <th>Ciudad *</th>
-                            <th className="text-blue-800">Flete</th>
-                            <th>Storage</th>
-                            <th>S. Peso</th>
-                            <th>G. Extra</th>
-                            <th>Título</th>
-                            <th className="text-orange-600">Comentario Reg.</th>
-                            <th></th>
+                        <tr className="text-[11px] md:text-[10px] uppercase bg-gray-100 text-gray-500 sticky top-0 z-20">
+                            <th className="p-2">#</th>
+                            <th className="p-2 min-w-[110px]">Lote *</th>
+                            <th className="p-2 min-w-[100px]">Marca *</th>
+                            <th className="p-2 min-w-[100px]">Modelo *</th>
+                            <th className="p-2 min-w-[130px]">Cliente *</th>
+                            <th className="p-2 min-w-[100px]">Almacén</th>
+                            <th className="p-2 min-w-[90px]">Estado *</th>
+                            <th className="p-2 min-w-[110px]">Ciudad *</th>
+                            <th className="p-2 min-w-[80px] text-blue-800">Flete</th>
+                            <th className="p-2 min-w-[70px]">Storage</th>
+                            <th className="p-2 min-w-[70px]">S. Peso</th>
+                            <th className="p-2 min-w-[70px]">G. Extra</th>
+                            <th className="p-2 min-w-[70px]">Título</th>
+                            <th className="p-2 min-w-[150px] text-orange-600">Comentario</th>
+                            <th className="p-2"></th>
                         </tr>
                         </thead>
                         <tbody className="bg-white">
                         {vehiculos.map((v, i) => (
                             <tr key={v.id} className={`${user.admin && v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
-                                <td className="font-mono text-[10px] text-gray-400 italic">{i + 1}</td>
-                                <td>
+                                <td className="font-mono text-[12px] md:text-[10px] text-gray-400 italic p-2">{i + 1}</td>
+                                <td className="p-1">
                                     <input
                                         type="text"
                                         value={v.lote}
                                         maxLength={8}
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
                                         onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
-                                        className={`input input-xs w-full font-black ${
+                                        className={`input input-sm md:input-xs w-full font-black text-[14px] md:text-[12px] ${
                                             user.admin && v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
                                             v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'
                                         }`}
                                         placeholder="8 dígitos"
+                                        style={{fontSize: '16px'}}
                                     />
                                     {user.admin && v.yaPagado && (
                                         <span className="text-[8px] font-black text-yellow-700 uppercase italic block mt-1">YA PAGADO</span>
                                     )}
                                 </td>
-                                <td><input type="text" value={v.marca}
+                                <td className="p-1"><input type="text" value={v.marca}
                                            onChange={(e) => handleTableChange(v.id, 'marca', e.target.value.toUpperCase())}
-                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
-                                <td><input type="text" value={v.modelo}
+                                           className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/></td>
+                                <td className="p-1"><input type="text" value={v.modelo}
                                            onChange={(e) => handleTableChange(v.id, 'modelo', e.target.value.toUpperCase())}
-                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
-                                <td><input type="text" value={v.clienteAlt}
+                                           className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/></td>
+                                <td className="p-1"><input type="text" value={v.clienteAlt}
                                            onChange={(e) => handleTableChange(v.id, 'clienteAlt', e.target.value.toUpperCase())}
-                                           className="input input-xs w-full bg-white-500 uppercase"/></td>
-                                <td>
+                                           className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/></td>
+                                <td className="p-1">
                                     <select value={v.almacen}
                                             onChange={(e) => handleTableChange(v.id, 'almacen', e.target.value)}
-                                            className="select select-ghost select-xs w-full">
+                                            className="select select-sm md:select-xs w-full font-bold text-[14px] md:text-[12px]"
+                                            style={{fontSize: '16px'}}>
                                         <option value="Copart">Copart</option>
                                         <option value="IAA">IAA</option>
                                         <option value="Manheim">Manheim</option>
@@ -475,55 +482,69 @@ const FormViaje = ({user}) => {
                                         <option value="Otra">Otra</option>
                                     </select>
                                 </td>
-                                <td>
+                                <td className="p-1">
                                     <select value={v.estado}
                                             onChange={(e) => handleTableChange(v.id, 'estado', e.target.value)}
-                                            className="select select-xs w-full text-red-800 font-bold">
+                                            className="select select-sm md:select-xs w-full text-red-800 font-bold text-[14px] md:text-[12px]"
+                                            style={{fontSize: '16px'}}>
                                         <option value="">-- ST --</option>
                                         {provincias.map(p => <option key={p.id} value={p.state}>{p.state}</option>)}
                                     </select>
                                 </td>
-                                <td>
+                                <td className="p-1">
                                     <select value={v.ciudad}
                                             onChange={(e) => handleTableChange(v.id, 'ciudad', e.target.value)}
-                                            className="select select-xs w-full text-red-800 font-bold">
+                                            className="select select-sm md:select-xs w-full text-red-800 font-bold text-[14px] md:text-[12px]"
+                                            style={{fontSize: '16px'}}>
                                         {provincias.find(p => p.state === v.estado)?.regions.map((r, idx) => (
                                             <option key={idx} value={r.city}>{r.city}</option>))}
                                     </select>
                                 </td>
-                                <td>
+                                <td className="p-1">
                                     <input
                                         type="number"
                                         value={v.flete}
                                         onChange={(e) => handleTableChange(v.id, 'flete', e.target.value)}
-                                        className="input input-xs w-20 text-center font-black text-blue-900 bg-blue-50"
+                                        className="input input-sm md:input-xs w-24 md:w-20 text-center font-black text-blue-900 bg-blue-50 text-[14px] md:text-[12px]"
                                         placeholder="0"
+                                        style={{fontSize: '16px'}}
                                     />
                                 </td>
-                                <td><input type="number" value={v.storage}
+                                <td className="p-1">
+                                    <input type="number" value={v.storage}
                                            onChange={(e) => handleTableChange(v.id, 'storage', e.target.value)}
-                                           className="input input-xs w-16 text-center"/></td>
-                                <td><input type="number" value={v.sPeso}
+                                           className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/>
+                                </td>
+                                <td className="p-1">
+                                    <input type="number" value={v.sPeso}
                                            onChange={(e) => handleTableChange(v.id, 'sPeso', e.target.value)}
-                                           className="input input-xs w-16 text-center"/></td>
-                                <td><input type="number" value={v.gExtra}
+                                           className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/>
+                                </td>
+                                <td className="p-1">
+                                    <input type="number" value={v.gExtra}
                                            onChange={(e) => handleTableChange(v.id, 'gExtra', e.target.value)}
-                                           className="input input-xs w-16 text-center"/></td>
-                                <td>
+                                           className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                           style={{fontSize: '16px'}}/>
+                                </td>
+                                <td className="p-1">
                                     <select value={v.titulo}
                                             onChange={(e) => handleTableChange(v.id, 'titulo', e.target.value)}
-                                            className="select select-xs w-full font-bold">
+                                            className="select select-sm md:select-xs w-full font-bold text-[14px] md:text-[12px]"
+                                            style={{fontSize: '16px'}}>
                                         <option value="NO">NO</option>
                                         <option value="SI">SI</option>
                                     </select>
                                 </td>
-                                <td>
+                                <td className="p-1">
                                     <input
                                         type="text"
                                         value={v.comentarioRegistro}
                                         placeholder="Nota opcional..."
                                         onChange={(e) => handleTableChange(v.id, 'comentarioRegistro', e.target.value.toUpperCase())}
-                                        className="input input-xs w-40 bg-white-500 italic text-[10px]"
+                                        className="input input-sm md:input-xs w-44 md:w-40 bg-white italic text-[14px] md:text-[10px]"
+                                        style={{fontSize: '16px'}}
                                     />
                                 </td>
                                 <td>
