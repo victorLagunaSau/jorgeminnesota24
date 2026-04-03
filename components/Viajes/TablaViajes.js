@@ -538,8 +538,35 @@ const TablaViajes = ({user}) => {
 
                         <div className="bg-gray-100 p-3 flex justify-between items-center text-white">
                             <div className="flex items-center gap-4">
-                                <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg]">
-                                    VIAJE #{viaje.numViaje}
+                                <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2">
+                                    {user.admin ? (
+                                        <>
+                                            <span>VIAJE #</span>
+                                            <input
+                                                type="text"
+                                                value={viaje.numViaje}
+                                                onChange={async (e) => {
+                                                    const nuevoNumero = e.target.value.toUpperCase();
+                                                    // Actualizar localmente
+                                                    setViajes(viajes.map(v =>
+                                                        v.id === viaje.id ? {...v, numViaje: nuevoNumero} : v
+                                                    ));
+                                                    // Guardar en Firestore
+                                                    try {
+                                                        await firestore().collection("viajesPendientes").doc(viaje.id).update({
+                                                            numViaje: nuevoNumero
+                                                        });
+                                                    } catch (error) {
+                                                        console.error("Error al actualizar número de viaje:", error);
+                                                    }
+                                                }}
+                                                className="bg-white text-red-600 px-2 py-1 rounded text-center font-black w-20 focus:outline-none focus:ring-2 focus:ring-white"
+                                                maxLength={10}
+                                            />
+                                        </>
+                                    ) : (
+                                        `VIAJE #${viaje.numViaje}`
+                                    )}
                                 </div>
                                 <div>
                                     <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>

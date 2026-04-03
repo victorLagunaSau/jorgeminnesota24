@@ -174,11 +174,27 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     </div>
                     <div className="flex items-center">
                         <span className="font-black text-[10px]" style={{ width: "48px", color: "#be123c", fontWeight: "900" }}>PHONE:</span>
-                        <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
+                        <div className="flex-1 border-b-2 pl-2 font-bold text-[10px]" style={{
+                            height: "16px",
+                            paddingTop: "2px",
+                            borderColor: "#fda4af",
+                            color: "#1f2937",
+                            fontWeight: "800"
+                        }}>
+                            {viajeData.chofer?.telefono || ""}
+                        </div>
                     </div>
                     <div className="flex items-center">
                         <span className="font-black text-[10px]" style={{ width: "65px", color: "#be123c", fontWeight: "900" }}>COMPANY:</span>
-                        <div className="flex-1 border-b-2" style={{ height: "16px", borderColor: "#fda4af" }}></div>
+                        <div className="flex-1 border-b-2 pl-2 font-bold text-[9px] uppercase" style={{
+                            height: "16px",
+                            paddingTop: "2px",
+                            borderColor: "#fda4af",
+                            color: "#1f2937",
+                            fontWeight: "800"
+                        }}>
+                            {viajeData.chofer?.empresa || viajeData.empresaNombre || ""}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -362,33 +378,33 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         {/* Fila única de Totales por columna */}
                         <tr style={{ backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
                             <td colSpan="6"></td>
-                            <td className="text-center px-2 font-black text-[10px]" style={{
+                            <td className="text-center px-2 font-black text-[13px]" style={{
                                 color: "#0f172a",
-                                padding: "6px 4px",
+                                padding: "8px 4px",
                                 fontWeight: "900",
                                 borderRight: "1px solid #e2e8f0"
                             }}>
                                 ${totalFlete.toFixed(2)}
                             </td>
-                            <td className="text-center px-2 font-black text-[10px]" style={{
+                            <td className="text-center px-2 font-black text-[13px]" style={{
                                 color: "#0f172a",
-                                padding: "6px 4px",
+                                padding: "8px 4px",
                                 fontWeight: "900",
                                 borderRight: "1px solid #e2e8f0"
                             }}>
                                 ${totalStorage.toFixed(2)}
                             </td>
-                            <td className="text-center px-2 font-black text-[10px]" style={{
+                            <td className="text-center px-2 font-black text-[13px]" style={{
                                 color: "#0f172a",
-                                padding: "6px 4px",
+                                padding: "8px 4px",
                                 fontWeight: "900",
                                 borderRight: "1px solid #e2e8f0"
                             }}>
                                 ${totalSobrepeso.toFixed(2)}
                             </td>
-                            <td className="text-center px-2 font-black text-[10px]" style={{
+                            <td className="text-center px-2 font-black text-[13px]" style={{
                                 color: "#0f172a",
-                                padding: "6px 4px",
+                                padding: "8px 4px",
                                 fontWeight: "900",
                                 borderRight: "1px solid #e2e8f0"
                             }}>
@@ -399,17 +415,17 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
 
                         {/* Fila de Subtotal */}
                         <tr style={{ backgroundColor: "#1e293b", borderTop: "2px solid #475569" }}>
-                            <td colSpan="10" className="text-right px-2 font-black text-[10px]" style={{
+                            <td colSpan="10" className="text-right px-2 font-black text-[14px]" style={{
                                 color: "#ffffff",
-                                padding: "6px 8px",
+                                padding: "8px 8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
                             }}>
                                 SUBTOTAL:
                             </td>
-                            <td className="text-center px-2 font-black text-[11px]" style={{
+                            <td className="text-center px-2 font-black text-[15px]" style={{
                                 color: "#ffffff",
-                                padding: "6px",
+                                padding: "8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
                             }}>
@@ -418,39 +434,47 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                             <td colSpan="1"></td>
                         </tr>
 
-                        {/* Fila de Total con Cheque y Efectivo */}
+                        {/* Fila de Total con Cheque, Efectivo y Zelle */}
                         <tr style={{ backgroundColor: "#10b981", borderTop: "3px solid #059669" }}>
-                            <td colSpan="8" className="text-right px-2 font-black text-[11px]" style={{
+                            <td colSpan="7" className="text-right px-2 font-black text-[16px]" style={{
                                 color: "#ffffff",
-                                padding: "8px",
+                                padding: "10px 8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
                             }}>
                                 TOTAL:
                             </td>
-                            <td colSpan="2" className="text-center px-2 font-black text-[13px]" style={{
+                            <td colSpan="3" className="text-center px-2 font-black text-[18px]" style={{
                                 color: "#ffffff",
-                                padding: "8px",
+                                padding: "10px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
                             }}>
                                 ${total.toFixed(2)}
                             </td>
-                            <td colSpan="2" style={{ padding: "4px" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <td colSpan="2" style={{ padding: "6px" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>CHEQUE:</span>
+                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>CHEQUE:</span>
                                         <div className="bg-white rounded" style={{
                                             flex: 1,
-                                            height: "12px",
+                                            height: "14px",
                                             border: "1px solid #059669"
                                         }}></div>
                                     </div>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                        <span className="font-bold text-[8px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "45px" }}>EFECTIVO:</span>
+                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>EFECTIVO:</span>
                                         <div className="bg-white rounded" style={{
                                             flex: 1,
-                                            height: "12px",
+                                            height: "14px",
+                                            border: "1px solid #059669"
+                                        }}></div>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>ZELLE:</span>
+                                        <div className="bg-white rounded" style={{
+                                            flex: 1,
+                                            height: "14px",
                                             border: "1px solid #059669"
                                         }}></div>
                                     </div>

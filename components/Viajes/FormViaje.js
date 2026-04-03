@@ -55,8 +55,10 @@ const FormViaje = ({user}) => {
                     setChoferes(filtrados.map(c => ({
                         id: c.id,
                         nombre: c.nombreChofer,
+                        telefono: c.telefonoChofer || "",
                         empresa: c.empresaNombre,
                         empresaLiderId: c.empresaLiderId || "",
+                        empresaLiderNombre: c.empresaLiderNombre || "",
                         esSubcontratado: c.empresaLiderId === user.id && c.empresaId !== user.id
                     })));
                 } else {
@@ -64,8 +66,10 @@ const FormViaje = ({user}) => {
                     setChoferes(todos.map(c => ({
                         id: c.id,
                         nombre: c.nombreChofer,
+                        telefono: c.telefonoChofer || "",
                         empresa: c.empresaNombre,
                         empresaLiderId: c.empresaLiderId || "",
+                        empresaLiderNombre: c.empresaLiderNombre || "",
                         esSubcontratado: false
                     })));
                 }
