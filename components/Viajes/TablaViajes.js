@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash, FaPlus, FaMinus} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaVerificacion from "./HojaVerificacion";
 
@@ -153,6 +153,74 @@ const TablaViajes = ({user}) => {
         } catch (error) {
             console.error("Error al eliminar viaje:", error);
             setModal({show: true, mensaje: "Error al eliminar el viaje", tipo: "error"});
+        }
+    };
+
+    // Agregar vehículo a un viaje existente
+    const agregarVehiculoAViaje = async (viajeId) => {
+        const viaje = viajes.find(v => v.id === viajeId);
+        if (!viaje) return;
+
+        const nuevoVehiculo = {
+            id: Date.now(),
+            lote: "",
+            marca: "",
+            modelo: "",
+            clienteAlt: "",
+            almacen: "Copart",
+            estado: "",
+            ciudad: "",
+            flete: "0",
+            precioVenta: 0,
+            storage: "0",
+            sPeso: "0",
+            gExtra: "0",
+            titulo: "NO",
+            comentarioRegistro: "",
+            comentarioRecepcion: "",
+            yaPagado: false
+        };
+
+        const nuevosVehiculos = [...viaje.vehiculos, nuevoVehiculo];
+
+        try {
+            await firestore().collection("viajesPendientes").doc(viajeId).update({
+                vehiculos: nuevosVehiculos
+            });
+        } catch (error) {
+            console.error("Error al agregar vehículo:", error);
+            setModal({show: true, mensaje: "Error al agregar vehículo", tipo: "error"});
+        }
+    };
+
+    // Eliminar un vehículo específico de un viaje
+    const eliminarVehiculoDeViaje = async (viajeId, vehiculoIdx, lote) => {
+        const viaje = viajes.find(v => v.id === viajeId);
+        if (!viaje) return;
+
+        // Si solo queda un vehículo, no permitir eliminar
+        if (viaje.vehiculos.length <= 1) {
+            setModal({show: true, mensaje: "No puedes eliminar el último vehículo. Si deseas eliminar todo el viaje, usa el botón 'Eliminar Viaje'.", tipo: "error"});
+            return;
+        }
+
+        const nuevosVehiculos = viaje.vehiculos.filter((_, idx) => idx !== vehiculoIdx);
+
+        try {
+            // Actualizar el viaje sin ese vehículo
+            await firestore().collection("viajesPendientes").doc(viajeId).update({
+                vehiculos: nuevosVehiculos
+            });
+
+            // Si el lote tenía un número, eliminar de lotesEnTransito
+            if (lote && lote.trim() !== "") {
+                await firestore().collection("lotesEnTransito").doc(lote).delete();
+            }
+
+            setModal({show: false});
+        } catch (error) {
+            console.error("Error al eliminar vehículo:", error);
+            setModal({show: true, mensaje: "Error al eliminar el vehículo", tipo: "error"});
         }
     };
 
@@ -592,6 +660,7 @@ const TablaViajes = ({user}) => {
                             <table className="table w-full border-collapse">
                                 <thead>
                                 <tr className="text-[10px] uppercase text-gray-500 bg-gray-50 border-b-2 border-gray-200 italic font-black">
+                                    <th className="p-1 w-8"></th>
                                     <th className="p-3">Lote</th>
                                     <th className="p-3">Vehículo</th>
                                     <th className="p-3">Ciudad / Almacén</th>
@@ -616,6 +685,23 @@ const TablaViajes = ({user}) => {
                                     return (
                                         <tr key={`${viaje.id}-${idx}`}
                                             className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors ${user.admin && v.yaPagado ? 'bg-yellow-50' : ''}`}>
+                                            {/* Botón para quitar vehículo */}
+                                            <td className="p-1 text-center">
+                                                {puedeEditar && viaje.vehiculos.length > 1 && (
+                                                    <button
+                                                        onClick={() => setModal({
+                                                            show: true,
+                                                            mensaje: `¿Eliminar el vehículo ${v.lote || '(sin lote)'} del viaje #${viaje.numViaje}?`,
+                                                            accion: () => eliminarVehiculoDeViaje(viaje.id, idx, v.lote),
+                                                            tipo: "eliminar"
+                                                        })}
+                                                        className="p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                        title="Quitar vehículo"
+                                                    >
+                                                        <FaMinus size={10}/>
+                                                    </button>
+                                                )}
+                                            </td>
                                             <td className="p-3">
                                                 {puedeEditar ? (
                                                     <div>
@@ -860,6 +946,23 @@ const TablaViajes = ({user}) => {
                                         </tr>
                                     );
                                 })}
+                                {/* Fila para agregar vehículo */}
+                                {(user.admin || viaje.empresaLiderId === user.id) && (
+                                    <tr className="bg-gray-50 border-t-2 border-dashed border-gray-200">
+                                        <td className="p-1 text-center">
+                                            <button
+                                                onClick={() => agregarVehiculoAViaje(viaje.id)}
+                                                className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                                                title="Agregar vehículo"
+                                            >
+                                                <FaPlus size={10}/>
+                                            </button>
+                                        </td>
+                                        <td colSpan="12" className="p-2 text-[10px] text-gray-400 italic">
+                                            Agregar vehículo
+                                        </td>
+                                    </tr>
+                                )}
                                 </tbody>
                             </table>
                         </div>
