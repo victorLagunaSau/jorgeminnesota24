@@ -134,21 +134,27 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Submenú Viajes */}
+                        {/* Control de Viajes - Separado */}
+                        <li>
+                            <button className={`${getButtonClass('viajes')} !font-black`} onClick={() => handleSelectModule('viajes')}>
+                                <FaTruckMoving className="mr-3 text-red-600" size={18} /> Control de Viajes
+                            </button>
+                        </li>
+
+                        {/* Submenú Gestión de Viajes */}
                         <li>
                             <button
-                                className={getMenuButtonClass(openSubMenu.viajesMenu)}
+                                className={`w-full px-4 py-3 text-gray-700 text-[13px] font-semibold text-left hover:bg-gray-100 flex items-center justify-between transition-colors ${openSubMenu.viajesMenu ? 'bg-gray-50' : ''}`}
                                 onClick={() => toggleSubMenu('viajesMenu')}
                             >
                                 <span className="flex items-center">
-                                    <FaTruckMoving className="mr-3 text-red-600" size={18} />
+                                    <FaCog className="mr-3 text-red-600" size={18} />
                                     Gestión de Viajes
                                 </span>
                                 {openSubMenu.viajesMenu ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
                             </button>
                             <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.viajesMenu ? 'max-h-96' : 'max-h-0'}`}>
                                 <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
-                                    <li><button className={getButtonClass('viajes')} onClick={() => handleSelectModule('viajes')}>Control de Viajes</button></li>
                                     <li><button className={getButtonClass('reporteViajesPago')} onClick={() => handleSelectModule('reporteViajesPago')}>Historial</button></li>
                                     <li><button className={getButtonClass('choferes')} onClick={() => handleSelectModule('choferes')}>Choferes</button></li>
                                     <li><button className={getButtonClass('empresas')} onClick={() => handleSelectModule('empresas')}>Empresas Transportistas</button></li>
@@ -156,9 +162,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                 </ul>
                             </div>
                         </li>
-
-                        {/* Separador */}
-                        <li className="my-4 border-t border-gray-200"></li>
 
                         {/* Vehículos */}
                         <li>
