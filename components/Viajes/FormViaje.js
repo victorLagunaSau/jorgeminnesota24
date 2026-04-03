@@ -3,7 +3,8 @@ import ReactToPrint from "react-to-print";
 import {firestore} from "../../firebase/firebaseIni";
 import {
     FaTrash, FaCheckCircle, FaExclamationCircle,
-    FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink
+    FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink,
+    FaStickyNote, FaRegStickyNote
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
 
@@ -26,6 +27,9 @@ const FormViaje = ({user}) => {
 
     const [busquedaChofer, setBusquedaChofer] = useState("");
     const [mostrarLista, setMostrarLista] = useState(false);
+
+    // Estado para modal de comentario
+    const [modalComentario, setModalComentario] = useState({ visible: false, vehiculoId: null, texto: "" });
 
     const [encabezado, setEncabezado] = useState({
         numViaje: "",
@@ -307,6 +311,48 @@ const FormViaje = ({user}) => {
                 </div>
             )}
 
+            {/* MODAL DE COMENTARIO */}
+            {modalComentario.visible && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border-2 border-t-4 border-orange-500 p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                                <FaStickyNote className="text-orange-600" size={18}/>
+                            </div>
+                            <div>
+                                <h4 className="text-lg font-black uppercase text-gray-800">Nota del Vehículo</h4>
+                                <p className="text-[10px] text-gray-400 uppercase">Comentario opcional para este lote</p>
+                            </div>
+                        </div>
+                        <textarea
+                            autoFocus
+                            value={modalComentario.texto}
+                            onChange={(e) => setModalComentario({...modalComentario, texto: e.target.value.toUpperCase()})}
+                            placeholder="Escribe una nota..."
+                            className="textarea textarea-bordered w-full h-32 text-[14px] font-medium uppercase"
+                            style={{fontSize: '16px'}}
+                        />
+                        <div className="flex gap-2 mt-4">
+                            <button
+                                onClick={() => setModalComentario({ visible: false, vehiculoId: null, texto: "" })}
+                                className="btn btn-ghost flex-1 font-bold"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handleTableChange(modalComentario.vehiculoId, 'comentarioRegistro', modalComentario.texto);
+                                    setModalComentario({ visible: false, vehiculoId: null, texto: "" });
+                                }}
+                                className="btn btn-warning text-white flex-1 font-bold gap-2"
+                            >
+                                <FaCheckCircle/> Guardar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {alertMessage.msg && (
                 <div
                     className={`alert ${
@@ -432,7 +478,7 @@ const FormViaje = ({user}) => {
                             <th className="p-2 min-w-[70px]">S. Peso</th>
                             <th className="p-2 min-w-[70px]">G. Extra</th>
                             <th className="p-2 min-w-[70px]">Título</th>
-                            <th className="p-2 min-w-[150px] text-orange-600">Comentario</th>
+                            <th className="p-2 min-w-[40px] text-orange-600">Nota</th>
                             <th className="p-2"></th>
                         </tr>
                         </thead>
@@ -537,15 +583,14 @@ const FormViaje = ({user}) => {
                                         <option value="SI">SI</option>
                                     </select>
                                 </td>
-                                <td className="p-1">
-                                    <input
-                                        type="text"
-                                        value={v.comentarioRegistro}
-                                        placeholder="Nota opcional..."
-                                        onChange={(e) => handleTableChange(v.id, 'comentarioRegistro', e.target.value.toUpperCase())}
-                                        className="input input-sm md:input-xs w-44 md:w-40 bg-white italic text-[14px] md:text-[10px]"
-                                        style={{fontSize: '16px'}}
-                                    />
+                                <td className="p-1 text-center">
+                                    <button
+                                        onClick={() => setModalComentario({ visible: true, vehiculoId: v.id, texto: v.comentarioRegistro })}
+                                        className={`p-2 rounded-lg transition-colors ${v.comentarioRegistro ? 'text-orange-600 bg-orange-100' : 'text-gray-400 hover:text-orange-500 hover:bg-orange-50'}`}
+                                        title={v.comentarioRegistro || "Agregar nota"}
+                                    >
+                                        {v.comentarioRegistro ? <FaStickyNote size={16}/> : <FaRegStickyNote size={16}/>}
+                                    </button>
                                 </td>
                                 <td>
                                     <button onClick={() => setVehiculos(vehiculos.filter(veh => veh.id !== v.id))}
