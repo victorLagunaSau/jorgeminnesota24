@@ -1,58 +1,33 @@
-import React, {useState, useEffect} from "react";
+import React, {useState} from "react";
 import Head from "next/head";
-import {firestore, auth} from "../firebase/firebaseIni";
-import FormViaje from "../components/Viajes/FormViaje";
-import TablaViajes from "../components/Viajes/TablaViajes";
+import { useAuthContext } from "../context/auth";
+import FormViaje from "../components/features/viajes/FormViaje";
+import TablaViajes from "../components/features/viajes/TablaViajes";
 import {FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt} from "react-icons/fa";
 
 const CarriersPage = () => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { user, loading, isEmpresa, signIn, signOut } = useAuthContext();
     const [view, setView] = useState("tabla");
 
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
     const [error, setError] = useState("");
 
-    useEffect(() => {
-        const unsub = auth().onAuthStateChanged(async (userAuth) => {
-            if (userAuth) {
-                // 1. Buscamos el usuario
-                const userDoc = await firestore().collection("users").doc(userAuth.uid).get();
-
-                if (userDoc.exists && userDoc.data().tipo === "empresa") {
-                    const userData = userDoc.data();
-
-                    // 2. Buscamos los datos de la empresa usando el mismo ID
-                    const empresaDoc = await firestore().collection("empresas").doc(userAuth.uid).get();
-                    const empresaData = empresaDoc.exists ? empresaDoc.data() : {};
-
-                    setUser({
-                        id: userDoc.id,
-                        ...userData,
-                        datosEmpresa: empresaData // Metemos los datos de la empresa aquí
-                    });
-                } else {
-                    auth().signOut();
-                    setError("Acceso denegado.");
-                }
-            } else {
-                setUser(null);
-            }
-            setLoading(false);
-        });
-        return () => unsub();
-    }, []);
-
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
         try {
-            await auth().signInWithEmailAndPassword(email, pass);
+            await signIn(email, pass);
         } catch (err) {
             setError("Credenciales incorrectas.");
         }
     };
+
+    // Si no es empresa pero está logueado, hacer logout
+    if (user && !isEmpresa) {
+        signOut();
+        return null;
+    }
 
     if (loading) return (
         <div className="h-screen flex flex-col justify-center items-center bg-white">
@@ -69,6 +44,7 @@ const CarriersPage = () => {
                         <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Jorge
                             Minnesota INC</h1>
                     </div>
+                    {error && <p className="text-red-500 text-center mb-4">{error}</p>}
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="relative">
                             <FaUser className="absolute left-4 top-4 text-gray-300"/>
@@ -104,7 +80,7 @@ const CarriersPage = () => {
                         Jorge Minnesota INC
                     </h1>
                 </div>
-                <button onClick={() => auth().signOut()}
+                <button onClick={() => signOut()}
                         className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg">
                     <FaSignOutAlt/> Salir
                 </button>

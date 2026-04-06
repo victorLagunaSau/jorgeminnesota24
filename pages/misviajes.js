@@ -1,58 +1,30 @@
-import React, {useState, useEffect} from "react";
+import React, {useState} from "react";
 import {useRouter} from "next/router";
-import {auth, firestore} from "../firebase/firebaseIni";
-import ConsultaMisViajes from "../components/MisViajes/ConsultaMisViajes";
-import SeoHead from "../components/SeoHead";
+import { useAuthContext } from "../context/auth";
+import ConsultaMisViajes from "../components/features/viajes/ConsultaMisViajes";
+import SeoHead from "../components/marketing/SeoHead";
 
 const MisViajes = () => {
     const router = useRouter();
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { user, loading, isAdmin, isChofer, signIn, signOut } = useAuthContext();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loginError, setLoginError] = useState('');
 
-    useEffect(() => {
-        const unsubscribe = auth().onAuthStateChanged((user) => {
-            if (user) {
-                dataUser(user.uid);
-            } else {
-                setLoading(false);
-            }
-        });
+    // Solo admin o chofer pueden acceder
+    const hasAccess = isAdmin || isChofer;
 
-        return () => unsubscribe();
-    }, []);
-
-    const dataUser = (userId) => {
-        firestore()
-            .collection("users")
-            .doc(userId)
-            .get()
-            .then((doc) => {
-                if (doc.exists) {
-                    const userData = doc.data();
-                    if (userData.tipo && (userData.tipo.includes("admin") || userData.tipo.includes("chofer"))) {
-                        setUser(userData);
-                    } else {
-                        auth().signOut().then(() => {
-                            router.push("/");
-                        });
-                    }
-                }
-                setLoading(false);
-            })
-            .catch((error) => {
-                console.error("Error getting user data:", error);
-                setLoading(false);
-            });
-    };
+    // Si está logueado pero no tiene acceso, hacer logout
+    if (user && !hasAccess) {
+        signOut();
+        router.push("/");
+        return null;
+    }
 
     const handleLogin = async (e) => {
         e.preventDefault();
         try {
-            const userCredential = await auth().signInWithEmailAndPassword(username, password);
-            dataUser(userCredential.user.uid);
+            await signIn(username, password);
             setLoginError('');
         } catch (error) {
             console.error("Error logging in:", error);
@@ -61,7 +33,11 @@ const MisViajes = () => {
     };
 
     if (loading) {
-        return <div>Loading...</div>;
+        return (
+            <div className="h-screen flex justify-center items-center">
+                <span className="loading loading-ring loading-lg text-red-600"></span>
+            </div>
+        );
     }
 
     if (!user) {
@@ -71,7 +47,7 @@ const MisViajes = () => {
                 <div className="flex items-center justify-center w-full">
                     <div className="bg-gray-300 p-6 rounded-lg shadow-md w-full max-w-md">
                         <h2 className="text-2xl font-bold text-black-500 mb-4">Iniciar Sesión</h2>
-                        {loginError && <p className="text-black-500 mb-4">{loginError}</p>}
+                        {loginError && <p className="text-red-500 mb-4">{loginError}</p>}
                         <form onSubmit={handleLogin}>
                             <div className="mb-4">
                                 <label className="block text-black-500 ">Usuario</label>

@@ -1,9 +1,9 @@
-import Feature from "../components/Feature";
-import Pricing from "../components/Pricing";
-import Hero from "../components/Hero";
+import Feature from "../components/marketing/Feature";
+import Pricing from "../components/marketing/Pricing";
+import Hero from "../components/marketing/Hero";
 import Layout from "../components/Layout/Layout";
-import SeoHead from "../components/SeoHead";
-import Catalogo from "../components/Catalogo/Catalogo";
+import SeoHead from "../components/marketing/SeoHead";
+import Catalogo from "../components/marketing/Catalogo";
 
 export default function Home() {
   return (

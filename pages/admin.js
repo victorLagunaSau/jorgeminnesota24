@@ -1,5 +1,5 @@
-import SeoHead from "../components/SeoHead";
-import Admin from "../components/Admin";
+import SeoHead from "../components/marketing/SeoHead";
+import Admin from "../components/features/Admin";
 
 export default function Home() {
   return (
