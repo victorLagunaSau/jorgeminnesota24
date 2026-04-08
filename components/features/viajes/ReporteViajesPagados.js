@@ -229,13 +229,13 @@ const ReporteViajesPagados = ({ user }) => {
                 titulo: vehData.titulo || "NO",
                 clienteId: vehData.clienteId || "",
                 clienteNombre: vehData.clienteNombre || vehData.cliente || "",
-                clienteTelefono: vehData.clienteTelefono || "",
+                clienteTelefono: vehData.clienteTelefono || vehData.telefonoCliente || "",
                 clienteAlt: vehData.cliente || "",
-                // Montos en 0, el usuario los captura manualmente
-                flete: 0,
-                storage: 0,
-                sPeso: 0,
-                gExtra: 0
+                // Pre-llenar con los valores del vehículo (el usuario puede modificarlos)
+                flete: parseFloat(vehData.price) || 0,
+                storage: parseFloat(vehData.storage) || 0,
+                sPeso: parseFloat(vehData.sobrePeso) || 0,
+                gExtra: parseFloat(vehData.gastosExtra) || 0
             }]);
             setBusqueda("");
         } catch (e) {

@@ -13,13 +13,12 @@ const Vehiculos = ({user}) => {
     const [selectedVehiculo, setSelectedVehiculo] = useState(null);
     const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isEntregadoModalOpen, setIsEntregadoModalOpen] = useState(false); // Nuevo estado
-    const [vehiculoIdEntregado, setVehiculoIdEntregado] = useState(null); // Nuevo estado
+    const [isEntregadoModalOpen, setIsEntregadoModalOpen] = useState(false);
+    const [vehiculoIdEntregado, setVehiculoIdEntregado] = useState(null);
     const [statusFilter, setStatusFilter] = useState("");
-    const [sortOrder, setSortOrder] = useState("asc");
+    const [sortOrder, setSortOrder] = useState("desc");
     const itemsPerPage = 20;
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
-    //     const ID_USUARIO_PERMITIDO = "PpTKE8o5ivdDZHa5EFfCkUoVTmD2";
     const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -34,8 +33,8 @@ const Vehiculos = ({user}) => {
     };
 
     const handleEntregadoClick = (vehiculo) => {
-        setSelectedVehiculo(vehiculo); // Guardar el vehículo completo
-        setIsEntregadoModalOpen(true); // Abrir el modal
+        setSelectedVehiculo(vehiculo);
+        setIsEntregadoModalOpen(true);
     };
 
     const handleCloseEntregadoModal = () => {
@@ -139,7 +138,7 @@ const Vehiculos = ({user}) => {
         setPinInput("");
         setTimeout(() => {
             document.getElementById("modal_borrar_vehiculo")?.showModal();
-        }, 100); // Garantiza que esté montado
+        }, 100);
     };
 
     const handleConfirmDelete = async () => {
@@ -151,10 +150,8 @@ const Vehiculos = ({user}) => {
         try {
             const firestoreInstance = firestore();
 
-            // 1. Eliminar vehículo
             await firestoreInstance.collection("vehiculos").doc(deleteTargetVehiculo.id).delete();
 
-            // 2. Eliminar movimientos relacionados
             const movimientosSnapshot = await firestoreInstance
                 .collection("movimientos")
                 .where("binNip", "==", deleteTargetVehiculo.id)
@@ -179,39 +176,51 @@ const Vehiculos = ({user}) => {
 
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
-            <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
-                <strong>Vehículos</strong>
-            </h3>
+            {/* HEADER MODERNIZADO */}
+            <div className="mb-6">
+                <h2 className="text-3xl font-black text-black uppercase italic tracking-tighter">
+                    Vehículos
+                </h2>
+                <p className="text-[10px] font-bold text-black uppercase tracking-widest mt-1">
+                    {sortedVehiculos.length} vehículos en sistema
+                </p>
+            </div>
+
             {isEntregadoModalOpen && (
                 <EntregadoVehiculo
                     user={user}
-                    vehiculo={selectedVehiculo} // Pasar el vehículo completo
+                    vehiculo={selectedVehiculo}
                     onClose={handleCloseEntregadoModal}
                 />
             )}
+
             <div className="flex flex-col w-full my-4">
-                <div className="flex justify-end">
-                    <button onClick={exportToExcel} className=" btn bg-green-500 text-white-100 px-4 py-2 rounded-lg">
+                {/* BOTONES DE ACCIÓN */}
+                <div className="flex justify-end gap-3 mb-4">
+                    <button
+                        onClick={exportToExcel}
+                        className="btn bg-green-600 hover:bg-green-700 text-white font-black uppercase text-xs border-none"
+                    >
                         Exportar a Excel
                     </button>
                     <button
-                        className="ml-10 btn btn-outline btn-error"
+                        className="btn btn-error text-white font-black uppercase text-xs"
                         onClick={() => setIsRegisterModalOpen(true)}
                     >
                         + Registra Vehículo
                     </button>
-
                 </div>
 
-
+                {/* MODAL REGISTRAR */}
                 <dialog open={isRegisterModalOpen} className="modal">
-                    <div className="modal-box w-11/12 max-w-5xl bg-white-100">
+                    <div className="modal-box w-11/12 max-w-5xl bg-white">
                         <FormDatosVehiculo user={user} onClose={() => setIsRegisterModalOpen(false)}/>
                     </div>
                 </dialog>
 
+                {/* MODAL EDITAR */}
                 <dialog open={isEditModalOpen} className="modal">
-                    <div className="modal-box w-11/12 max-w-5xl bg-white-100">
+                    <div className="modal-box w-11/12 max-w-5xl bg-white">
                         {selectedVehiculo && (
                             <FormEditarVehiculo vehiculo={selectedVehiculo} onClose={() => {
                                 setSelectedVehiculo(null);
@@ -221,71 +230,60 @@ const Vehiculos = ({user}) => {
                     </div>
                 </dialog>
             </div>
+
+            {/* TOAST COPIADO */}
             {isCopied && (
-                <div className="fixed inset-0 flex items-center justify-center z-50">
-                    <div className="modal modal-open">
-                        <div className="modal-box">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                 className="stroke-current text-green-500 h-6 w-6 mx-auto mb-4" fill="none"
-                                 viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <p className="text-lg font-medium text-center">Copiado con éxito</p>
-                            <div className="modal-action">
-                                <button
-                                    onClick={() => setIsCopied(false)}
-                                    className="btn btn-outline btn-error"
-                                >
-                                    Aceptar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-black text-white px-6 py-3 rounded-full font-bold shadow-lg z-[70]">
+                    Copiado al portapapeles
                 </div>
             )}
+
             <div className="flex flex-col w-full my-4">
-                <div className="flex border-2 border-primary rounded-md">
+                {/* BUSCADOR MODERNIZADO */}
+                <div className="flex border-2 border-gray-300 rounded-lg overflow-hidden">
                     <input
                         type="text"
                         placeholder="Buscar por estado, ciudad, BIN, modelo o cliente..."
                         value={searchTerm}
                         onChange={handleSearchTermChange}
-                        className="input-lg w-full border-gray-300 rounded-l-md px-4 py-2"
+                        className="input-lg w-full border-none px-4 py-2 font-semibold text-black"
                     />
                 </div>
 
-                <table className="table-auto w-full my-4">
+                {/* TABLA MODERNIZADA */}
+                <table className="table-auto w-full my-4 border-collapse">
                     <thead>
-                    <tr>
-                        <th className="px-4 py-2">#</th>
-                        <th className="px-4 py-2 flex items-center">
-                            Est:
-                            <select
-                                className="ml-2 p-1 border border-gray-300 rounded-md"
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                            >
-                                <option value="">Todos</option>
-                                <option value="PR">Registrado</option>
-                                <option value="IN">Cargando</option>
-                                <option value="TR">En Viaje</option>
-                                <option value="EB">En Brownsville</option>
-                                <option value="DS">Descargado</option>
-                                <option value="EN">Entregado</option>
-                            </select>
-                            <button
-                                className="ml-4 p-1 border border-gray-300 rounded-md"
-                                onClick={handleSortByDate}
-                            >
-                                {sortOrder === "asc" ? "Reg ^" : "Reg ˅"}
-                            </button>
+                    <tr className="border-b border-gray-200">
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">#</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">
+                            <div className="flex items-center gap-2">
+                                Est:
+                                <select
+                                    className="select select-sm border-black font-bold text-xs text-black"
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                >
+                                    <option value="">Todos</option>
+                                    <option value="PR">Registrado</option>
+                                    <option value="IN">Cargando</option>
+                                    <option value="TR">En Viaje</option>
+                                    <option value="EB">En Brownsville</option>
+                                    <option value="DS">Descargado</option>
+                                    <option value="EN">Entregado</option>
+                                </select>
+                                <button
+                                    className="btn btn-xs btn-outline border-black text-black font-bold"
+                                    onClick={handleSortByDate}
+                                >
+                                    {sortOrder === "asc" ? "Reg ↑" : "Reg ↓"}
+                                </button>
+                            </div>
                         </th>
-                        <th className="px-4 py-2">Viaja de:</th>
-                        <th className="px-4 py-2">Almacen</th>
-                        <th className="px-4 py-2">Vehículo</th>
-                        <th className="px-4 py-2">Cliente</th>
-                        <th className="px-4 py-2">Acciones</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Viaja de:</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Almacen</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Vehículo</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Cliente</th>
+                        <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Acciones</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -295,151 +293,153 @@ const Vehiculos = ({user}) => {
                             return vehiculo.estatus === statusFilter;
                         })
                         .map((vehiculo, index) => (
-                            <tr key={vehiculo.id}>
-                                <td className="border px-4 py-2">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                            <tr key={vehiculo.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                                <td className="px-4 py-3 font-bold text-black">
+                                    {(currentPage - 1) * itemsPerPage + index + 1}
+                                </td>
 
-                                <td className="border px-4 py-2">
-                                    {vehiculo.estatus === "PR" &&
-                                        <span className="text-black-500 text-xs">Estatus: Registrado</span>}
-                                    {vehiculo.estatus === "IN" &&
-                                        <span className="text-black-500 text-xs">Estatus: Cargando</span>}
-                                    {vehiculo.estatus === "TR" &&
-                                        <span className="text-black-500 text-xs">Estatus: En Viaje</span>}
-                                    {vehiculo.estatus === "EB" &&
-                                        <span className="text-black-500 text-xs">Estatus: En Brownsville</span>}
-                                    {vehiculo.estatus === "DS" &&
-                                        <span className="text-black-500 text-xs">Estatus: Descargado</span>}
-                                    {vehiculo.estatus === "EN" &&
-                                        <span className="text-black-500 text-xs">Estatus: Entregado</span>}
-                                    <div className="text-black-500 text-xs"> registrado:<br/>
+                                <td className="px-4 py-3">
+                                    <div className="text-sm font-black text-black">
                                         {vehiculo.registro.timestamp ?
-                                            new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleString()
-                                            : 'Fecha no asignada'}
+                                            new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                                            : '-'}
                                     </div>
+                                    <div className="text-[10px] font-bold text-black mt-1">
+                                        {vehiculo.estatus === "PR" && "Registrado"}
+                                        {vehiculo.estatus === "IN" && "Cargando"}
+                                        {vehiculo.estatus === "TR" && "En Viaje"}
+                                        {vehiculo.estatus === "EB" && "En Brownsville"}
+                                        {vehiculo.estatus === "DS" && "Descargado"}
+                                        {vehiculo.estatus === "EN" && "Entregado"}
+                                    </div>
+                                </td>
 
-                                </td>
-                                <td className="border px-4 py-2">
+                                <td className="px-4 py-3">
                                     <div>
-                                        <p>Estado: </p>
-                                        <strong className="text-black-500 text-xl">{vehiculo.estado}</strong>
-                                        <p>Ciudad: </p>
-                                        <strong className="text-black-500 text-xl">{vehiculo.ciudad}</strong>
-                                        <p>Almacen: <strong className="text-black-500">{vehiculo.almacen}</strong></p>
+                                        <p className="text-[9px] font-bold text-black uppercase">Estado:</p>
+                                        <strong className="text-black text-lg font-black uppercase">{vehiculo.estado}</strong>
+                                        <p className="text-[9px] font-bold text-black uppercase mt-1">Ciudad:</p>
+                                        <strong className="text-black font-bold">{vehiculo.ciudad}</strong>
+                                        <p className="text-[9px] font-bold text-black uppercase mt-1">Almacen: <strong className="text-black">{vehiculo.almacen}</strong></p>
                                     </div>
                                 </td>
-                                <td className="border px-4 py-2">
+
+                                <td className="px-4 py-3">
                                     <div>
-                                        <p>Bin o Lote:</p>
+                                        <p className="text-[9px] font-bold text-black uppercase">Bin o Lote:</p>
                                         <button
-                                            className="btn btn-link btn-sm text-black-500 text-xl"
+                                            className="font-mono font-black text-black text-lg hover:underline transition-colors"
                                             onClick={() => handleCopiarBin(vehiculo.binNip)}
                                         >
                                             {vehiculo.binNip}
                                         </button>
-                                        <p>Gate Pass/Cliente:</p>
-                                        <strong className="text-black-500">{vehiculo.gatePass}</strong>
+                                        {vehiculo.numViaje && (
+                                            <>
+                                                <p className="text-[9px] font-bold text-black uppercase mt-1">Viaje:</p>
+                                                <strong className="text-black font-black">#{vehiculo.numViaje}</strong>
+                                            </>
+                                        )}
                                     </div>
-                                    <button
-                                        className="btn btn-outline btn-accent"
-                                        onClick={() => handleCopiarWhats(vehiculo.binNip)}
-                                    >
-                                        Copiar WhatsApp
-                                    </button>
                                 </td>
-                                <td className="border px-4 py-2">
+
+                                <td className="px-4 py-3">
                                     <div>
-                                        <p>Modelo: </p>
-                                        <strong className="text-black-500">{vehiculo.modelo}</strong>
-                                        <p>Tipo: </p>
-                                        <strong className="text-black-500">{vehiculo.tipo}</strong>
+                                        <p className="text-[9px] font-bold text-black uppercase">Modelo:</p>
+                                        <strong className="text-black font-bold">{vehiculo.modelo}</strong>
                                     </div>
                                 </td>
-                                <td className="border px-4 py-2">
-                                    <strong>{vehiculo.cliente}</strong>
+
+                                <td className="px-4 py-3">
+                                    <strong className="text-black font-black">{vehiculo.cliente}</strong>
                                 </td>
 
-                                <td className="border px-4 py-2">
-                                    <button
-                                        className="btn btn-outline btn-primary ml-2 mt-4"
-                                        onClick={() => handleEditClick(vehiculo)}
-                                        disabled={!edicionPermitida}
-                                    >
-                                        Editar
-                                    </button>
-
-                                    <button
-                                        className="btn btn-outline btn-info ml-2 mt-4"
-                                        onClick={() => handleEntregadoClick(vehiculo)} // Pasar el vehículo completo
-                                        disabled={!edicionPermitida}
-                                    >
-                                        Entregado
-                                    </button>
-                                    {edicionPermitida && (
+                                <td className="px-4 py-3">
+                                    <div className="flex flex-col gap-2">
                                         <button
-                                            className="btn btn-outline btn-info ml-2 mt-4"
-                                            onClick={() => handleBorrarVehiculoClick(vehiculo)}
+                                            className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                                            onClick={() => handleEditClick(vehiculo)}
+                                            disabled={!edicionPermitida}
                                         >
-                                            Borrar Vehículo
+                                            Editar
                                         </button>
-                                    )}
 
+                                        <button
+                                            className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                                            onClick={() => handleEntregadoClick(vehiculo)}
+                                            disabled={!edicionPermitida}
+                                        >
+                                            Entregado
+                                        </button>
+
+                                        {edicionPermitida && (
+                                            <button
+                                                className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                                                onClick={() => handleBorrarVehiculoClick(vehiculo)}
+                                            >
+                                                Borrar
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-
             </div>
-            <div className="flex justify-between my-4">
+
+            {/* PAGINACIÓN MODERNIZADA */}
+            <div className="flex justify-between items-center my-6 pt-4">
                 <button
-                    className="btn btn-outline btn-secondary"
+                    className="btn btn-sm btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
                 >
-                    Anterior
+                    ← Anterior
                 </button>
+                <span className="text-sm font-bold text-black">
+                    Página {currentPage} de {Math.ceil(filteredVehiculos.length / itemsPerPage) || 1}
+                </span>
                 <button
-                    className="btn btn-outline btn-secondary"
+                    className="btn btn-sm btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage * itemsPerPage >= filteredVehiculos.length}
                 >
-                    Siguiente
+                    Siguiente →
                 </button>
             </div>
+
+            {/* MODAL ELIMINAR */}
             <dialog id="modal_borrar_vehiculo" className="modal" open={isDeleteModalOpen}>
-                <div className="modal-box">
-                    <h3 className="font-bold text-lg">Confirmar eliminación</h3>
-                    <p className="py-4">Ingresa el PIN de 4 dígitos para confirmar:</p>
+                <div className="modal-box bg-white border-2 border-black">
+                    <h3 className="font-black text-xl uppercase text-black">Confirmar eliminación</h3>
+                    <p className="py-4 text-black font-semibold">Ingresa el PIN de 4 dígitos para confirmar:</p>
 
                     <input
                         type="password"
                         value={pinInput}
                         onChange={(e) => setPinInput(e.target.value)}
                         maxLength={4}
-                        className="input input-bordered w-full mb-4"
+                        className="input input-bordered border-black w-full mb-4 text-center text-2xl font-mono tracking-widest text-black"
                         placeholder="****"
                     />
 
                     <div className="modal-action flex justify-between">
-                        <form method="dialog">
-                            <button
-                                className="btn"
-                                onClick={() => {
-                                    setIsDeleteModalOpen(false);
-                                    setDeleteTargetVehiculo(null);
-                                    setPinInput("");
-                                }}
-                            >
-                                Cancelar
-                            </button>
-                        </form>
-                        <button className="btn btn-error" onClick={handleConfirmDelete}>
+                        <button
+                            className="btn btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                            onClick={() => {
+                                setIsDeleteModalOpen(false);
+                                setDeleteTargetVehiculo(null);
+                                setPinInput("");
+                            }}
+                        >
+                            Cancelar
+                        </button>
+                        <button className="btn bg-black text-white hover:bg-white hover:text-black border border-black font-black" onClick={handleConfirmDelete}>
                             Confirmar Borrado
                         </button>
                     </div>
                 </div>
             </dialog>
-
         </div>
     );
 };
