@@ -42,6 +42,30 @@ export const useAuth = () => {
               }
             }
 
+            // Si es cliente, cargar también los datos del cliente
+            if (userData.tipo === USER_TYPES.CLIENTE) {
+              // Primero intentar con el UID (clientes nuevos)
+              let clienteDoc = await firestore()
+                .collection(COLLECTIONS.CLIENTES)
+                .doc(firebaseUser.uid)
+                .get();
+
+              // Si no existe, buscar por clienteIdOriginal (clientes existentes con auth agregado)
+              if (!clienteDoc.exists && userData.clienteIdOriginal) {
+                clienteDoc = await firestore()
+                  .collection(COLLECTIONS.CLIENTES)
+                  .doc(userData.clienteIdOriginal)
+                  .get();
+              }
+
+              if (clienteDoc.exists) {
+                fullUserData.datosCliente = {
+                  id: clienteDoc.id,
+                  ...clienteDoc.data()
+                };
+              }
+            }
+
             setUser(fullUserData);
           } else {
             // User exists in Auth but not in Firestore
@@ -134,6 +158,7 @@ export const useAuth = () => {
   const isAdmin = user?.tipo === USER_TYPES.ADMIN || user?.admin === true;
   const isEmpresa = user?.tipo === USER_TYPES.EMPRESA;
   const isChofer = user?.tipo === USER_TYPES.CHOFER;
+  const isCliente = user?.tipo === USER_TYPES.CLIENTE;
   const hasCajaAccess = user?.caja === true;
 
   // Check if user has permission for a specific module
@@ -149,11 +174,13 @@ export const useAuth = () => {
           return isEmpresa || isChofer;
         case "admin":
           return isAdmin;
+        case "portal":
+          return isCliente;
         default:
           return false;
       }
     },
-    [user, isAdmin, isEmpresa, isChofer, hasCajaAccess]
+    [user, isAdmin, isEmpresa, isChofer, isCliente, hasCajaAccess]
   );
 
   return {
@@ -164,6 +191,7 @@ export const useAuth = () => {
     isAdmin,
     isEmpresa,
     isChofer,
+    isCliente,
     hasCajaAccess,
     signIn,
     signOut,

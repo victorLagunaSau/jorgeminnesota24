@@ -158,7 +158,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                     <li><button className={getButtonClass('reporteViajesPago')} onClick={() => handleSelectModule('reporteViajesPago')}>Historial</button></li>
                                     <li><button className={getButtonClass('choferes')} onClick={() => handleSelectModule('choferes')}>Choferes</button></li>
                                     <li><button className={getButtonClass('empresas')} onClick={() => handleSelectModule('empresas')}>Empresas Transportistas</button></li>
-                                    <li><button className={getButtonClass('viajesAnteriores')} onClick={() => handleSelectModule('viajesAnteriores')}>Regularización</button></li>
                                 </ul>
                             </div>
                         </li>

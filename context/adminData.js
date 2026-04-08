@@ -27,12 +27,13 @@ export const AdminDataProvider = ({ children }) => {
       });
     unsubscribers.push(unsubChoferes);
 
-    // Suscripción a clientes
+    // Suscripción a clientes (ordenar por folio desc ya que no todos tienen el campo cliente)
     const unsubClientes = firestore()
       .collection(COLLECTIONS.CLIENTES)
-      .orderBy("nombreCliente", "asc")
       .onSnapshot((snap) => {
         const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        // Ordenar localmente por folio descendente
+        data.sort((a, b) => (b.folio || 0) - (a.folio || 0));
         setClientes(data);
       });
     unsubscribers.push(unsubClientes);
@@ -64,7 +65,7 @@ export const AdminDataProvider = ({ children }) => {
   const getChoferByNombre = (nombre) =>
     choferes.find((c) => c.nombreChofer?.toLowerCase() === nombre?.toLowerCase());
   const getClienteByNombre = (nombre) =>
-    clientes.find((c) => c.nombreCliente?.toLowerCase() === nombre?.toLowerCase());
+    clientes.find((c) => c.cliente?.toLowerCase() === nombre?.toLowerCase());
 
   return (
     <AdminDataContext.Provider

@@ -15,6 +15,7 @@ export const COLLECTIONS = {
   LOTES_EN_TRANSITO: "lotesEnTransito",
   ENTRADAS_CAJA: "entradasCaja",
   SALIDAS_CAJA: "salidasCaja",
+  SOLICITUDES_VEHICULOS: "solicitudesVehiculos",
 };
 
 // ===========================================
@@ -24,6 +25,7 @@ export const USER_TYPES = {
   ADMIN: "admin",
   EMPRESA: "empresa",
   CHOFER: "chofer",
+  CLIENTE: "cliente",
 };
 
 // ===========================================

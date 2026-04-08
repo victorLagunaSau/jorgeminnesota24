@@ -41,6 +41,7 @@ import Cobranza from "./cobranza/Cobranza";
 import Clientes from "./clientes/Clientes";
 import Empresas from "./empresas/Empresas";
 import Choferes from "./choferes/Choferes";
+import SolicitudesVehiculos from "./solicitudes/SolicitudesVehiculos";
 
 const Admin = () => {
     const router = useRouter();
@@ -109,6 +110,8 @@ const Admin = () => {
                 return <Users />;
             case 'registroMasivoVehiculos':
                 return <RegistroMasivoVehiculos user={user}/>;
+            case 'solicitudesVehiculos':
+                return <SolicitudesVehiculos user={user}/>;
             default:
                 return (
                     <div className="text-center mt-20">
