@@ -3,7 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import {
     FaSearch, FaFileExcel, FaTruck, FaBuilding, FaFileInvoice, FaLayerGroup,
-    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck
+    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import moment from "moment";
@@ -71,18 +71,20 @@ const ReporteViajesPagados = ({ user }) => {
         setLoading(true);
         try {
             const batch = firestore().batch();
-            const viajeAnterior = viajeActual.numViaje;
+            // Usar docId (ID real del documento en Firestore) para eliminar
+            const docIdAnterior = viajeActual.docId || viajeActual.numViaje;
 
-            // Crear nuevo documento con el nuevo número
+            // Crear nuevo documento con el nuevo número (sin incluir docId en los datos)
+            const { docId, ...viajeDataSinDocId } = viajeActual;
             const nuevoViajeData = {
-                ...viajeActual,
+                ...viajeDataSinDocId,
                 numViaje: nuevoNum,
                 folioPago: nuevoNum
             };
             batch.set(firestore().collection("viajesPagados").doc(nuevoNum), nuevoViajeData);
 
-            // Eliminar documento anterior
-            batch.delete(firestore().collection("viajesPagados").doc(viajeAnterior));
+            // Eliminar documento anterior usando el ID real
+            batch.delete(firestore().collection("viajesPagados").doc(docIdAnterior));
 
             // Actualizar vehículos con el nuevo número
             if (viajeActual.vehiculos) {
@@ -97,12 +99,64 @@ const ReporteViajesPagados = ({ user }) => {
             }
 
             await batch.commit();
-            alert(`Viaje actualizado de #${viajeAnterior} a #${nuevoNum}`);
+            alert(`Viaje actualizado de #${viajeActual.numViaje} a #${nuevoNum}`);
             setEditandoViaje(null);
             consultarViajes(periodoSeleccionado);
         } catch (error) {
             console.error(error);
             alert("Error: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Verificar si el usuario puede eliminar viajes
+    const puedeEliminarViajes = user?.adminMaster === true || user?.eliminarViajes === true;
+
+    // Función para eliminar un viaje completo
+    const eliminarViaje = async (viaje) => {
+        if (!puedeEliminarViajes) {
+            alert("No tienes permisos para eliminar viajes.");
+            return;
+        }
+
+        const confirmar = window.confirm(
+            `¿Estás seguro de eliminar el viaje #${viaje.numViaje}?\n\nEsto eliminará:\n- El registro del viaje\n- Las referencias en ${viaje.vehiculos?.length || 0} vehículos\n\nEsta acción NO se puede deshacer.`
+        );
+        if (!confirmar) return;
+
+        // Segunda confirmación para mayor seguridad
+        const confirmar2 = window.confirm(
+            `⚠️ ÚLTIMA CONFIRMACIÓN ⚠️\n\n¿Realmente deseas eliminar el viaje #${viaje.numViaje}?`
+        );
+        if (!confirmar2) return;
+
+        setLoading(true);
+        try {
+            const batch = firestore().batch();
+            const docId = viaje.docId || viaje.numViaje;
+
+            // Eliminar el documento del viaje
+            batch.delete(firestore().collection("viajesPagados").doc(docId));
+
+            // Limpiar las referencias de numViaje en los vehículos
+            if (viaje.vehiculos && viaje.vehiculos.length > 0) {
+                for (const v of viaje.vehiculos) {
+                    if (v.lote) {
+                        batch.update(firestore().collection("vehiculos").doc(v.lote), {
+                            numViaje: firebase.firestore.FieldValue.delete(),
+                            folioPago: firebase.firestore.FieldValue.delete()
+                        });
+                    }
+                }
+            }
+
+            await batch.commit();
+            alert(`Viaje #${viaje.numViaje} eliminado correctamente.`);
+            consultarViajes(periodoSeleccionado);
+        } catch (error) {
+            console.error(error);
+            alert("Error al eliminar: " + error.message);
         } finally {
             setLoading(false);
         }
@@ -140,7 +194,7 @@ const ReporteViajesPagados = ({ user }) => {
                 .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
                 .orderBy("fechaPago", "desc")
                 .get();
-            setViajes(snap.docs.map(doc => doc.data()));
+            setViajes(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
@@ -516,6 +570,17 @@ const ReporteViajesPagados = ({ user }) => {
                                         <span className="text-[10px] font-black uppercase px-4 py-1 rounded-full bg-green-500 text-white">
                                             PAGADO
                                         </span>
+                                        {/* Botón eliminar - solo visible si tiene permiso */}
+                                        {puedeEliminarViajes && (
+                                            <button
+                                                onClick={() => eliminarViaje(viaje)}
+                                                disabled={loading}
+                                                className="btn btn-sm btn-ghost text-red-400 hover:text-red-600 hover:bg-red-50"
+                                                title="Eliminar viaje"
+                                            >
+                                                <FaTrashAlt size={14} />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

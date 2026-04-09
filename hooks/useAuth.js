@@ -155,16 +155,18 @@ export const useAuth = () => {
   }, []);
 
   // Permission checks
+  const isAdminMaster = user?.adminMaster === true;
   const isAdmin = user?.tipo === USER_TYPES.ADMIN || user?.admin === true;
   const isEmpresa = user?.tipo === USER_TYPES.EMPRESA;
   const isChofer = user?.tipo === USER_TYPES.CHOFER;
   const isCliente = user?.tipo === USER_TYPES.CLIENTE;
-  const hasCajaAccess = user?.caja === true;
+  const hasCajaAccess = user?.caja === true || isAdminMaster;
 
   // Check if user has permission for a specific module
   const hasPermission = useCallback(
     (permission) => {
       if (!user) return false;
+      if (isAdminMaster) return true; // Admin Master tiene acceso a todo
       if (isAdmin) return true;
 
       switch (permission) {
@@ -176,11 +178,13 @@ export const useAuth = () => {
           return isAdmin;
         case "portal":
           return isCliente;
+        case "users":
+          return isAdminMaster; // Solo Admin Master puede gestionar usuarios
         default:
           return false;
       }
     },
-    [user, isAdmin, isEmpresa, isChofer, isCliente, hasCajaAccess]
+    [user, isAdminMaster, isAdmin, isEmpresa, isChofer, isCliente, hasCajaAccess]
   );
 
   return {
@@ -188,6 +192,7 @@ export const useAuth = () => {
     loading,
     error,
     isAuthenticated: !!user,
+    isAdminMaster,
     isAdmin,
     isEmpresa,
     isChofer,

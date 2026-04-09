@@ -5,13 +5,16 @@ import { useAdminData } from "../../../context/adminData";
 import {
     FaTrash, FaCheckCircle, FaExclamationCircle,
     FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink,
-    FaStickyNote, FaRegStickyNote
+    FaStickyNote, FaRegStickyNote, FaKey
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
 
 const FormViaje = ({user}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw } = useAdminData();
+
+    // Verificar si es Admin Master
+    const isAdminMaster = user?.adminMaster === true;
 
     // --- ESTADOS DE CONTROL ---
     const [viajeIniciado, setViajeIniciado] = useState(false);
@@ -34,9 +37,18 @@ const FormViaje = ({user}) => {
     // Estado para modal de comentario
     const [modalComentario, setModalComentario] = useState({ visible: false, vehiculoId: null, texto: "" });
 
+    // Estados para token de chofer temporal
+    const [mostrarModalToken, setMostrarModalToken] = useState(false);
+    const [tokenInput, setTokenInput] = useState("");
+    const [validandoToken, setValidandoToken] = useState(false);
+    const [tokenValido, setTokenValido] = useState(false);
+    const [choferManual, setChoferManual] = useState("");
+    const [tokenUsado, setTokenUsado] = useState(null);
+
     const [encabezado, setEncabezado] = useState({
         numViaje: "",
         choferId: "",
+        choferManual: "", // Para chofer ingresado con token
         fecha: new Date().toLocaleDateString()
     });
 
@@ -90,10 +102,18 @@ const FormViaje = ({user}) => {
         return () => unsubProvincias();
     }, [user]);
 
-    // --- FUNCIÓN PARA FOLIO AUTOMÁTICO ---
+    // --- FUNCIÓN PARA FOLIO AUTOMÁTICO O MANUAL ---
     const iniciarViajeConFolio = async () => {
         setLoading(true);
         try {
+            // Si es Admin Master y ya ingresó un número manual, usarlo
+            if (isAdminMaster && encabezado.numViaje && encabezado.numViaje.trim() !== "") {
+                setViajeIniciado(true);
+                setLoading(false);
+                return;
+            }
+
+            // Si no, obtener el siguiente folio automático
             const conRef = firestore().collection("config").doc("consecutivos");
             const doc = await conRef.get();
             const proximo = (doc.data()["viajesPendientes"] || 0) + 1;
@@ -105,6 +125,72 @@ const FormViaje = ({user}) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // --- FUNCIÓN PARA VALIDAR TOKEN ---
+    const validarToken = async () => {
+        if (!tokenInput || tokenInput.trim() === "") return;
+
+        setValidandoToken(true);
+        try {
+            const tokenDoc = await firestore().collection("tokensChofer").doc(tokenInput.toUpperCase()).get();
+
+            if (!tokenDoc.exists) {
+                setAlertMessage({ msg: "Token inválido", tipo: 'error' });
+                setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+                setValidandoToken(false);
+                return;
+            }
+
+            const tokenData = tokenDoc.data();
+            const ahora = new Date();
+            const expira = tokenData.fechaExpiracion?.toDate?.() || new Date(tokenData.fechaExpiracion);
+
+            if (expira < ahora) {
+                setAlertMessage({ msg: "Token expirado", tipo: 'error' });
+                setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+                setValidandoToken(false);
+                return;
+            }
+
+            // Token válido
+            setTokenValido(true);
+            setTokenUsado(tokenInput.toUpperCase());
+            setMostrarModalToken(false);
+            setAlertMessage({ msg: "Token válido. Ahora ingresa el nombre del chofer.", tipo: 'success' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+        } catch (e) {
+            setAlertMessage({ msg: "Error al validar token", tipo: 'error' });
+        } finally {
+            setValidandoToken(false);
+        }
+    };
+
+    // Confirmar chofer manual con token
+    const confirmarChoferManual = () => {
+        if (!choferManual || choferManual.trim() === "") {
+            setAlertMessage({ msg: "Ingresa el nombre del chofer", tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+            return;
+        }
+
+        setEncabezado(prev => ({
+            ...prev,
+            choferId: "TEMPORAL_" + tokenUsado,
+            choferManual: choferManual.trim().toUpperCase()
+        }));
+        setBusquedaChofer(choferManual.trim().toUpperCase() + " (TEMPORAL)");
+        setMostrarLista(false);
+    };
+
+    // Cancelar modo token
+    const cancelarModoToken = () => {
+        setTokenValido(false);
+        setTokenUsado(null);
+        setChoferManual("");
+        setTokenInput("");
+        setEncabezado(prev => ({ ...prev, choferId: "", choferManual: "" }));
+        setBusquedaChofer("");
     };
 
     // --- LÓGICA DE LA TABLA ---
@@ -208,19 +294,51 @@ const FormViaje = ({user}) => {
         try {
             const conRef = firestore().collection("config").doc("consecutivos");
 
+            // Verificar si Admin Master usó número manual
+            const usaNumeroManual = isAdminMaster && encabezado.numViaje && encabezado.numViaje.trim() !== "";
+
             await firestore().runTransaction(async (transaction) => {
                 const conDoc = await transaction.get(conRef);
-                const proximoFolio = (conDoc.data()["viajesPendientes"] || 0) + 1;
-                const numViajeFinal = String(proximoFolio);
+                const consecutivoActual = conDoc.data()["viajesPendientes"] || 0;
+
+                // Usar número manual si Admin Master lo ingresó, sino usar automático
+                let numViajeFinal;
+                let actualizarConsecutivo = false;
+
+                if (usaNumeroManual) {
+                    numViajeFinal = String(encabezado.numViaje).trim();
+                } else {
+                    numViajeFinal = String(consecutivoActual + 1);
+                    actualizarConsecutivo = true;
+                }
 
                 const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
-                const choferData = choferes.find(c => c.id === encabezado.choferId);
+
+                // Verificar si es chofer temporal (con token)
+                const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_");
+                let choferData;
+
+                if (esChoferTemporal) {
+                    // Chofer temporal ingresado con token
+                    choferData = {
+                        id: encabezado.choferId,
+                        nombre: encabezado.choferManual,
+                        empresa: "PENDIENTE DE ASIGNAR",
+                        telefono: "",
+                        esTemporal: true,
+                        tokenUsado: tokenUsado
+                    };
+                } else {
+                    // Chofer normal de la lista
+                    choferData = choferes.find(c => c.id === encabezado.choferId);
+                }
 
                 const viajeData = {
                     numViaje: numViajeFinal,
                     chofer: choferData,
+                    choferTemporal: esChoferTemporal, // Flag para identificar viajes con chofer temporal
                     empresaId: user.id, // ID del creador (Carrier o Admin)
-                    empresaLiderId: choferData.empresaLiderId || "", // Guardamos quién es el líder de este chofer
+                    empresaLiderId: esChoferTemporal ? "" : (choferData?.empresaLiderId || ""), // Guardamos quién es el líder de este chofer
                     estatus: "PENDIENTE",
                     fechaCreacion: new Date(),
                     creadoPor: {
@@ -241,12 +359,15 @@ const FormViaje = ({user}) => {
                 vehiculos.forEach(v => {
                     transaction.set(firestore().collection("lotesEnTransito").doc(v.lote), {
                         viajeAsignado: numViajeFinal,
-                        choferNombre: choferData.nombre,
+                        choferNombre: choferData?.nombre || encabezado.choferManual,
                         fechaBloqueo: new Date()
                     });
                 });
 
-                transaction.update(conRef, {"viajesPendientes": proximoFolio});
+                // Solo actualizar consecutivo si se usó número automático
+                if (actualizarConsecutivo) {
+                    transaction.update(conRef, {"viajesPendientes": consecutivoActual + 1});
+                }
                 setViajeReciente(viajeData);
             });
 
@@ -296,9 +417,15 @@ const FormViaje = ({user}) => {
 
                         <button onClick={() => {
                             setVehiculos([]);
-                            setEncabezado({numViaje: "", choferId: "", fecha: new Date().toLocaleDateString()});
+                            setEncabezado({numViaje: "", choferId: "", choferManual: "", fecha: new Date().toLocaleDateString()});
                             setViajeIniciado(false);
                             setMostrarModalExito(false);
+                            setBusquedaChofer("");
+                            // Resetear estados del token
+                            setTokenValido(false);
+                            setTokenUsado(null);
+                            setChoferManual("");
+                            setTokenInput("");
                         }} className="btn btn-success text-white w-full mt-4 h-14 gap-3 font-black uppercase shadow-lg">
                             <FaCheckDouble/> Registrar Nuevo Viaje
                         </button>
@@ -348,6 +475,59 @@ const FormViaje = ({user}) => {
                 </div>
             )}
 
+            {/* MODAL DE TOKEN */}
+            {mostrarModalToken && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border-2 border-t-4 border-blue-600 p-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <FaKey className="text-blue-600" size={18}/>
+                            </div>
+                            <div>
+                                <h4 className="text-lg font-black uppercase text-gray-800">Token de Acceso</h4>
+                                <p className="text-[10px] text-gray-400 uppercase">Ingresa el token proporcionado</p>
+                            </div>
+                        </div>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={tokenInput}
+                            onChange={(e) => setTokenInput(e.target.value.toUpperCase())}
+                            placeholder="Ej: ABC123"
+                            className="input input-bordered w-full text-center text-2xl font-black tracking-widest uppercase"
+                            maxLength={6}
+                            style={{fontSize: '24px'}}
+                            onKeyPress={(e) => e.key === 'Enter' && validarToken()}
+                        />
+                        <p className="text-[10px] text-gray-400 text-center mt-2">
+                            Solicita el token al administrador
+                        </p>
+                        <div className="flex gap-2 mt-4">
+                            <button
+                                onClick={() => {
+                                    setMostrarModalToken(false);
+                                    setTokenInput("");
+                                }}
+                                className="btn btn-ghost flex-1 font-bold"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={validarToken}
+                                disabled={validandoToken || tokenInput.length < 6}
+                                className="btn btn-info text-white flex-1 font-bold gap-2"
+                            >
+                                {validandoToken ? (
+                                    <span className="loading loading-spinner loading-sm"></span>
+                                ) : (
+                                    <><FaCheckCircle/> Validar</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {alertMessage.msg && (
                 <div
                     className={`alert ${
@@ -365,74 +545,126 @@ const FormViaje = ({user}) => {
             <div
                 className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
                 <div>
-                    <label className="block text-[10px] md:text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje
-                        (Auto)</label>
-                    <input type="text" disabled
-                           className="input input-bordered input-md md:input-sm w-full bg-gray-100 text-black font-bold uppercase text-center text-[16px] md:text-[14px]"
-                           value={encabezado.numViaje} placeholder="Automático"
-                           style={{fontSize: '16px'}}/>
+                    <label className="block text-[10px] md:text-[10px] font-black text-red-600 uppercase mb-1 italic">
+                        Núm. Viaje {isAdminMaster ? "*" : "(Auto)"}
+                    </label>
+                    <input
+                        type="text"
+                        disabled={!isAdminMaster}
+                        className={`input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] ${
+                            isAdminMaster ? "bg-white" : "bg-gray-100"
+                        }`}
+                        value={encabezado.numViaje}
+                        onChange={(e) => isAdminMaster && setEncabezado({...encabezado, numViaje: e.target.value})}
+                        placeholder={isAdminMaster ? "Ingresa el número" : "Automático"}
+                        style={{fontSize: '16px'}}
+                    />
                 </div>
                 <div className="relative">
-                    <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
-
-                    {/* INPUT DE BÚSQUEDA */}
-                    <div className="relative">
-                        <input
-                            type="text"
-                            disabled={viajeIniciado}
-                            placeholder={loading ? "Cargando..." : "Escribe para buscar chofer..."}
-                            className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase pr-8 text-[16px] md:text-[14px]"
-                            value={busquedaChofer}
-                            onFocus={() => setMostrarLista(true)}
-                            onChange={(e) => {
-                                setBusquedaChofer(e.target.value);
-                                setMostrarLista(true);
-                            }}
-                            style={{fontSize: '16px'}}
-                        />
-                        {busquedaChofer && !viajeIniciado && (
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase italic">Chofer *</label>
+                        {/* Botón de Token */}
+                        {!viajeIniciado && !tokenValido && (
                             <button
-                                className="absolute right-2 top-2 text-gray-400"
-                                onClick={() => {
-                                    setBusquedaChofer("");
-                                    setEncabezado({...encabezado, choferId: ""});
-                                }}
+                                onClick={() => setMostrarModalToken(true)}
+                                className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 uppercase"
+                                title="¿Chofer no está en la lista? Usa un token"
                             >
-                                <FaTimes size={12}/>
+                                <FaKey size={10} /> Token
+                            </button>
+                        )}
+                        {tokenValido && (
+                            <button
+                                onClick={cancelarModoToken}
+                                className="text-[9px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 uppercase"
+                            >
+                                <FaTimes size={10} /> Cancelar Token
                             </button>
                         )}
                     </div>
 
-                    {/* LISTA DESPLEGABLE FILTRADA */}
-                    {mostrarLista && !viajeIniciado && (
-                        <div
-                            className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-60 overflow-y-auto mt-1 border-red-200">
-                            {choferes
-                                .filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase()))
-                                .map(c => (
-                                    <div
-                                        key={c.id}
-                                        className="p-3 hover:bg-red-600 hover:text-white cursor-pointer text-[11px] font-black uppercase border-b last:border-none flex justify-between items-center"
-                                        onClick={() => {
-                                            setEncabezado({...encabezado, choferId: c.id});
-                                            setBusquedaChofer(c.nombre); // Seteamos el nombre en el input
-                                            setMostrarLista(false);      // Cerramos la lista
-                                        }}
-                                    >
-                                        <span>{c.nombre}</span>
-                                        <span className="text-[9px] opacity-70">
-                            {c.esSubcontratado ? "Subcontratado" : c.empresa}
-                        </span>
-                                    </div>
-                                ))
-                            }
-                            {choferes.filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase())).length === 0 && (
-                                <div className="p-3 text-gray-400 text-[10px] italic font-bold">No se encontró al
-                                    chofer...</div>
+                    {/* INPUT DE BÚSQUEDA O CHOFER MANUAL */}
+                    {tokenValido ? (
+                        // Modo Token: Input para chofer manual
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                disabled={viajeIniciado || encabezado.choferId}
+                                placeholder="Nombre del chofer..."
+                                className="input input-bordered input-md md:input-sm flex-1 bg-blue-50 text-black font-bold uppercase text-[16px] md:text-[14px] border-blue-300"
+                                value={choferManual}
+                                onChange={(e) => setChoferManual(e.target.value.toUpperCase())}
+                                style={{fontSize: '16px'}}
+                            />
+                            {!encabezado.choferId && (
+                                <button
+                                    onClick={confirmarChoferManual}
+                                    className="btn btn-sm btn-info text-white font-black"
+                                >
+                                    OK
+                                </button>
+                            )}
+                        </div>
+                    ) : (
+                        // Modo normal: Búsqueda de chofer
+                        <div className="relative">
+                            <input
+                                type="text"
+                                disabled={viajeIniciado}
+                                placeholder={loading ? "Cargando..." : "Escribe para buscar chofer..."}
+                                className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase pr-8 text-[16px] md:text-[14px]"
+                                value={busquedaChofer}
+                                onFocus={() => setMostrarLista(true)}
+                                onChange={(e) => {
+                                    setBusquedaChofer(e.target.value);
+                                    setMostrarLista(true);
+                                }}
+                                style={{fontSize: '16px'}}
+                            />
+                            {busquedaChofer && !viajeIniciado && (
+                                <button
+                                    className="absolute right-2 top-2 text-gray-400"
+                                    onClick={() => {
+                                        setBusquedaChofer("");
+                                        setEncabezado({...encabezado, choferId: ""});
+                                    }}
+                                >
+                                    <FaTimes size={12}/>
+                                </button>
+                            )}
+
+                            {/* LISTA DESPLEGABLE FILTRADA */}
+                            {mostrarLista && !viajeIniciado && (
+                                <div className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-60 overflow-y-auto mt-1 border-red-200">
+                                    {choferes
+                                        .filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase()))
+                                        .map(c => (
+                                            <div
+                                                key={c.id}
+                                                className="p-3 hover:bg-red-600 hover:text-white cursor-pointer text-[11px] font-black uppercase border-b last:border-none flex justify-between items-center"
+                                                onClick={() => {
+                                                    setEncabezado({...encabezado, choferId: c.id});
+                                                    setBusquedaChofer(c.nombre);
+                                                    setMostrarLista(false);
+                                                }}
+                                            >
+                                                <span>{c.nombre}</span>
+                                                <span className="text-[9px] opacity-70">
+                                                    {c.esSubcontratado ? "Subcontratado" : c.empresa}
+                                                </span>
+                                            </div>
+                                        ))
+                                    }
+                                    {choferes.filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase())).length === 0 && (
+                                        <div className="p-3 text-gray-400 text-[10px] italic font-bold">
+                                            No se encontró al chofer...
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
-                </div>
+                    </div>
                 <div
                     className="text-center font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</div>
 

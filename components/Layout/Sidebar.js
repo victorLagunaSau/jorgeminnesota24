@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { FaCashRegister, FaFileInvoice, FaCar, FaUsers, FaCog, FaDollarSign, FaUserFriends, FaTruckMoving, FaTimes, FaChevronDown, FaChevronRight } from "react-icons/fa";
+import { useAuthContext } from "../../context/auth";
 
 const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
+    const { user } = useAuthContext();
+    const isAdminMaster = user?.adminMaster === true;
     const [openSubMenu, setOpenSubMenu] = useState({
         caja: false,
         reportes: false,
@@ -176,12 +179,14 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Usuarios */}
-                        <li>
-                            <button className={getButtonClass('users')} onClick={() => handleSelectModule('users')}>
-                                <FaUsers className="mr-3 text-red-600" size={18} /> Usuarios
-                            </button>
-                        </li>
+                        {/* Usuarios - Solo visible para Admin Master */}
+                        {isAdminMaster && (
+                            <li>
+                                <button className={getButtonClass('users')} onClick={() => handleSelectModule('users')}>
+                                    <FaUsers className="mr-3 text-red-600" size={18} /> Usuarios
+                                </button>
+                            </li>
+                        )}
 
                     </ul>
                 </nav>
