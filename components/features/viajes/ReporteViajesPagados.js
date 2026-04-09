@@ -219,6 +219,25 @@ const ReporteViajesPagados = ({ user }) => {
                 if (!confirmar) return;
             }
 
+            // Buscar el COSTO al chofer en la configuración de Estados y Precios
+            let costoChofer = 0;
+            if (vehData.estado && vehData.ciudad) {
+                const provinceSnap = await firestore().collection("province")
+                    .where("state", "==", vehData.estado)
+                    .limit(1)
+                    .get();
+
+                if (!provinceSnap.empty) {
+                    const provinceData = provinceSnap.docs[0].data();
+                    const regionEncontrada = provinceData.regions?.find(
+                        r => r.city?.toUpperCase() === vehData.ciudad?.toUpperCase()
+                    );
+                    if (regionEncontrada) {
+                        costoChofer = parseFloat(regionEncontrada.cost) || 0;
+                    }
+                }
+            }
+
             setVehiculosSeleccionados([...vehiculosSeleccionados, {
                 lote: vehDoc.id,
                 marca: vehData.marca || "",
@@ -231,8 +250,8 @@ const ReporteViajesPagados = ({ user }) => {
                 clienteNombre: vehData.clienteNombre || vehData.cliente || "",
                 clienteTelefono: vehData.clienteTelefono || vehData.telefonoCliente || "",
                 clienteAlt: vehData.cliente || "",
-                // Pre-llenar con los valores del vehículo (el usuario puede modificarlos)
-                flete: parseFloat(vehData.price) || 0,
+                // Pre-llenar con el COSTO al chofer desde Estados y Precios
+                flete: costoChofer,
                 storage: parseFloat(vehData.storage) || 0,
                 sPeso: parseFloat(vehData.sobrePeso) || 0,
                 gExtra: parseFloat(vehData.gastosExtra) || 0
@@ -553,285 +572,354 @@ const ReporteViajesPagados = ({ user }) => {
                     )}
                 </div>
             ) : (
-                // VISTA AGREGAR VIAJE PASADO
+                // VISTA AGREGAR VIAJE PASADO - Estilo idéntico a FormViaje
                 <div className="p-4">
-                    <div className="bg-white rounded-xl shadow-xl border-t-8 border-red-600 p-6">
-                        <h3 className="text-xl font-black uppercase italic mb-6 flex items-center gap-3">
-                            <FaHistory /> Agregar Viaje Pasado
-                        </h3>
+                    <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 font-sans text-black">
+                        <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Registrar Viaje Pasado</h2>
 
-                        {/* ENCABEZADO */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+                        {/* ENCABEZADO - Grid 4 columnas como FormViaje */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
                             <div>
-                                <label className="text-[10px] font-black uppercase text-gray-400">Número de Viaje</label>
+                                <label className="block text-[10px] md:text-[10px] font-black text-red-600 uppercase mb-1 italic">Núm. Viaje *</label>
                                 <input
                                     type="text"
-                                    className="input input-bordered w-full font-black text-xl text-red-600"
+                                    className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase text-center text-[16px] md:text-[14px]"
                                     value={numViaje}
                                     onChange={(e) => setNumViaje(e.target.value)}
                                     placeholder="Ej: 500"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-gray-400">Fecha del Viaje</label>
-                                <input
-                                    type="date"
-                                    className="input input-bordered input-sm w-full font-bold uppercase"
-                                    value={encabezado.fechaViaje}
-                                    onChange={(e) => setEncabezado({ ...encabezado, fechaViaje: e.target.value })}
+                                    style={{ fontSize: '16px' }}
                                 />
                             </div>
                             <div className="relative">
-                                <label className="text-[10px] font-black uppercase text-gray-400">Chofer</label>
+                                <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase mb-1 italic">Chofer *</label>
                                 <div className="relative">
                                     <input
                                         type="text"
-                                        className={`input input-bordered input-sm w-full font-bold uppercase ${
-                                            encabezado.choferId ? "bg-gray-200 text-gray-700" : "bg-white"
-                                        }`}
+                                        className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase pr-8 text-[16px] md:text-[14px]"
                                         value={busquedaChofer || (choferSeleccionado ? choferSeleccionado.nombreChofer : "")}
                                         onChange={(e) => setBusquedaChofer(e.target.value)}
-                                        placeholder="BUSCAR CHOFER..."
+                                        placeholder="Buscar chofer..."
                                         readOnly={!!encabezado.choferId && !busquedaChofer}
+                                        style={{ fontSize: '16px' }}
                                     />
                                     {encabezado.choferId && (
                                         <button
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500"
+                                            className="absolute right-2 top-2 text-gray-400"
                                             onClick={() => {
                                                 setEncabezado({ ...encabezado, choferId: "" });
                                                 setChoferSeleccionado(null);
                                             }}
                                         >
-                                            <FaTimes />
+                                            <FaTimes size={12} />
                                         </button>
                                     )}
                                 </div>
                                 {busquedaChofer && !encabezado.choferId && (
-                                    <div className="absolute z-[110] w-full bg-white border-2 border-black shadow-xl rounded-md max-h-48 overflow-y-auto mt-1">
+                                    <div className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-60 overflow-y-auto mt-1 border-red-200">
                                         {choferes
                                             .filter(c => c.nombreChofer.toLowerCase().includes(busquedaChofer.toLowerCase()))
                                             .map(c => (
                                                 <div
                                                     key={c.id}
-                                                    className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-xs font-bold uppercase border-b border-gray-100"
+                                                    className="p-3 hover:bg-red-600 hover:text-white cursor-pointer text-[11px] font-black uppercase border-b last:border-none flex justify-between items-center"
                                                     onClick={() => seleccionarChofer(c)}
                                                 >
-                                                    {c.nombreChofer} <span className="text-[9px] opacity-70">({c.empresaNombre})</span>
+                                                    <span>{c.nombreChofer}</span>
+                                                    <span className="text-[9px] opacity-70">{c.empresaNombre}</span>
                                                 </div>
                                             ))
                                         }
+                                        {choferes.filter(c => c.nombreChofer.toLowerCase().includes(busquedaChofer.toLowerCase())).length === 0 && (
+                                            <div className="p-3 text-gray-400 text-[10px] italic font-bold">No se encontró al chofer...</div>
+                                        )}
                                     </div>
                                 )}
                             </div>
+                            <div>
+                                <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase mb-1 italic">Fecha del Viaje *</label>
+                                <input
+                                    type="date"
+                                    className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase text-[16px] md:text-[14px]"
+                                    value={encabezado.fechaViaje}
+                                    onChange={(e) => setEncabezado({ ...encabezado, fechaViaje: e.target.value })}
+                                    style={{ fontSize: '16px' }}
+                                />
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Lote..."
+                                    className="input input-bordered input-md md:input-sm flex-1 bg-white text-black font-bold uppercase text-[16px] md:text-[14px]"
+                                    value={busqueda}
+                                    onChange={(e) => setBusqueda(e.target.value.toUpperCase())}
+                                    onKeyPress={(e) => e.key === 'Enter' && buscarVehiculo()}
+                                    style={{ fontSize: '16px' }}
+                                />
+                                <button
+                                    onClick={buscarVehiculo}
+                                    disabled={loading || !busqueda}
+                                    className="btn btn-sm btn-info text-white font-black px-4"
+                                >
+                                    + Agregar
+                                </button>
+                            </div>
                         </div>
 
-                        {/* BUSCADOR DE LOTE */}
-                        <div className="mb-6 flex gap-2">
-                            <input
-                                type="text"
-                                placeholder="Escanea o escribe el Lote..."
-                                className="input input-bordered flex-1 font-mono font-black uppercase"
-                                value={busqueda}
-                                onChange={(e) => setBusqueda(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && buscarVehiculo()}
-                            />
-                            <button
-                                onClick={buscarVehiculo}
-                                disabled={loading}
-                                className="btn btn-accent text-white px-10 font-black uppercase"
-                            >
-                                Validar Lote
-                            </button>
+                        {/* CONTADOR DE UNIDADES */}
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-[11px] font-black uppercase text-gray-400 italic">
+                                Unidades: {vehiculosSeleccionados.length}
+                            </span>
+                            <span className="text-[11px] font-black uppercase text-gray-400 italic">
+                                Total: ${vehiculosSeleccionados.reduce((acc, v) => acc + (v.flete + v.storage + v.sPeso + v.gExtra), 0).toLocaleString()}
+                            </span>
                         </div>
 
-                        {/* TABLA */}
-                        <div className="overflow-x-auto border rounded-xl shadow-inner mb-6">
-                            <table className="table table-compact w-full border-separate border-spacing-0">
-                                <thead className="bg-gray-800 text-white text-[9px] uppercase sticky top-0">
-                                    <tr>
-                                        <th className="p-2">Identificación</th>
-                                        <th className="p-2 w-48">Cliente Oficial</th>
-                                        <th className="p-2 text-right">Flete</th>
-                                        <th className="p-2 text-right">Storage</th>
-                                        <th className="p-2 text-right">Extras</th>
-                                        <th className="p-2 text-right">S.Peso</th>
-                                        <th className="p-2 text-center">Título</th>
-                                        <th className="p-2 text-right bg-red-600">Subtotal</th>
+                        {/* TABLA - Estilo idéntico a FormViaje */}
+                        <div className="overflow-x-auto border rounded-xl shadow-inner max-h-[600px] md:max-h-[400px] -webkit-overflow-scrolling-touch mb-6">
+                            <table className="table table-compact w-full">
+                                <thead>
+                                    <tr className="text-[11px] md:text-[10px] uppercase bg-gray-100 text-gray-500 sticky top-0 z-20">
+                                        <th className="p-2">#</th>
+                                        <th className="p-2 min-w-[110px]">Lote</th>
+                                        <th className="p-2 min-w-[100px]">Marca</th>
+                                        <th className="p-2 min-w-[100px]">Modelo</th>
+                                        <th className="p-2 min-w-[150px]">Cliente *</th>
+                                        <th className="p-2 min-w-[90px]">Almacén</th>
+                                        <th className="p-2 min-w-[80px]">Estado</th>
+                                        <th className="p-2 min-w-[100px]">Ciudad</th>
+                                        <th className="p-2 min-w-[80px] text-blue-800">Flete</th>
+                                        <th className="p-2 min-w-[70px]">Storage</th>
+                                        <th className="p-2 min-w-[70px]">S. Peso</th>
+                                        <th className="p-2 min-w-[70px]">G. Extra</th>
+                                        <th className="p-2 min-w-[60px]">Título</th>
                                         <th className="p-2"></th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="bg-white">
                                     {vehiculosSeleccionados.length === 0 ? (
                                         <tr>
-                                            <td colSpan="9" className="text-center py-10 text-gray-400 font-bold uppercase">
+                                            <td colSpan="14" className="text-center py-10 text-gray-400 font-bold uppercase">
                                                 Escanea lotes para agregar vehículos
                                             </td>
                                         </tr>
                                     ) : (
-                                        vehiculosSeleccionados.map((v, i) => {
-                                            const subtotal = v.flete + v.storage + v.sPeso + v.gExtra;
-                                            return (
-                                                <tr key={v.lote} className="text-[11px] font-bold border-b hover:bg-gray-50">
-                                                    <td className="p-2">
-                                                        <div className="text-blue-700 font-black">{v.lote}</div>
-                                                        <div className="text-gray-500 uppercase flex items-center gap-1">
-                                                            <FaCar size={10} /> {v.marca} {v.modelo}
-                                                        </div>
-                                                        <div className="text-red-700 uppercase italic text-[9px]">
-                                                            <FaMapMarkerAlt size={9} /> {v.ciudad}, {v.estado}
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <div className="relative w-full">
-                                                            <div className="text-[8px] font-black text-blue-600 mb-1 italic uppercase">
-                                                                Ref: {v.clienteAlt || "S/N"}
-                                                            </div>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="BUSCAR CLIENTE..."
-                                                                    className={`input input-bordered input-xs w-full font-bold text-[9px] uppercase pr-8 ${
-                                                                        v.clienteNombre ? "bg-gray-200 text-gray-700" : "bg-white text-black"
-                                                                    }`}
-                                                                    value={busquedaCliente[v.lote] || (v.clienteNombre ? v.clienteNombre : "")}
-                                                                    onChange={(e) => setBusquedaCliente({
-                                                                        ...busquedaCliente,
-                                                                        [v.lote]: e.target.value
-                                                                    })}
-                                                                    readOnly={!!v.clienteNombre && !busquedaCliente[v.lote]}
-                                                                />
-                                                                {v.clienteNombre && !busquedaCliente[v.lote] && (
-                                                                    <button
-                                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors"
-                                                                        onClick={() => {
-                                                                            const resetVehiculos = vehiculosSeleccionados.map(veh =>
-                                                                                veh.lote === v.lote
-                                                                                    ? { ...veh, clienteId: "", clienteNombre: "", clienteTelefono: "" }
-                                                                                    : veh
-                                                                            );
-                                                                            setVehiculosSeleccionados(resetVehiculos);
-                                                                        }}
+                                        vehiculosSeleccionados.map((v, i) => (
+                                            <tr key={v.lote} className="bg-gray-200">
+                                                <td className="font-mono text-[12px] md:text-[10px] text-gray-400 italic p-2">{i + 1}</td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.lote}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full font-black text-[14px] md:text-[12px] text-blue-700 bg-gray-100"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.marca}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full bg-gray-100 uppercase font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.modelo}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full bg-gray-100 uppercase font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1 relative">
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Buscar cliente..."
+                                                            className={`input input-sm md:input-xs w-full font-bold text-[14px] md:text-[12px] uppercase pr-8 ${
+                                                                v.clienteNombre ? "bg-green-100 text-green-800" : "bg-white text-black"
+                                                            }`}
+                                                            value={busquedaCliente[v.lote] || (v.clienteNombre ? v.clienteNombre : "")}
+                                                            onChange={(e) => setBusquedaCliente({
+                                                                ...busquedaCliente,
+                                                                [v.lote]: e.target.value
+                                                            })}
+                                                            readOnly={!!v.clienteNombre && !busquedaCliente[v.lote]}
+                                                            style={{ fontSize: '16px' }}
+                                                        />
+                                                        {v.clienteNombre && !busquedaCliente[v.lote] && (
+                                                            <button
+                                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-red-500"
+                                                                onClick={() => {
+                                                                    const resetVehiculos = vehiculosSeleccionados.map(veh =>
+                                                                        veh.lote === v.lote
+                                                                            ? { ...veh, clienteId: "", clienteNombre: "", clienteTelefono: "" }
+                                                                            : veh
+                                                                    );
+                                                                    setVehiculosSeleccionados(resetVehiculos);
+                                                                }}
+                                                            >
+                                                                <FaTimes size={10} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    {busquedaCliente[v.lote] && (
+                                                        <div className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-40 overflow-y-auto mt-1 border-red-200">
+                                                            {clientes
+                                                                .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[v.lote].toLowerCase()))
+                                                                .map(cliente => (
+                                                                    <div
+                                                                        key={cliente.id}
+                                                                        className="p-2 hover:bg-red-600 hover:text-white cursor-pointer text-[11px] font-black uppercase border-b last:border-none"
+                                                                        onClick={() => asignarClienteAFila(v.lote, cliente)}
                                                                     >
-                                                                        <FaTimes size={12} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                            {busquedaCliente[v.lote] && (
-                                                                <div className="absolute z-[100] w-full bg-white border-2 shadow-xl rounded-md max-h-32 overflow-y-auto mt-1 border-blue-200">
-                                                                    {clientes
-                                                                        .filter(c => c.nombre.toLowerCase().includes(busquedaCliente[v.lote].toLowerCase()))
-                                                                        .map(cliente => (
-                                                                            <div
-                                                                                key={cliente.id}
-                                                                                className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[9px] font-bold uppercase border-b last:border-none"
-                                                                                onClick={() => asignarClienteAFila(v.lote, cliente)}
-                                                                            >
-                                                                                {cliente.nombre}
-                                                                            </div>
-                                                                        ))
-                                                                    }
-                                                                </div>
-                                                            )}
+                                                                        {cliente.nombre}
+                                                                    </div>
+                                                                ))
+                                                            }
                                                         </div>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="number"
-                                                            className="input input-bordered input-xs w-20 font-mono font-bold text-right"
-                                                            value={v.flete}
-                                                            onChange={(e) => {
-                                                                const nuevos = vehiculosSeleccionados.map(veh =>
-                                                                    veh.lote === v.lote ? { ...veh, flete: parseFloat(e.target.value) || 0 } : veh
-                                                                );
-                                                                setVehiculosSeleccionados(nuevos);
-                                                            }}
-                                                            placeholder="0"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="number"
-                                                            className="input input-bordered input-xs w-16 font-mono text-right"
-                                                            value={v.storage}
-                                                            onChange={(e) => {
-                                                                const nuevos = vehiculosSeleccionados.map(veh =>
-                                                                    veh.lote === v.lote ? { ...veh, storage: parseFloat(e.target.value) || 0 } : veh
-                                                                );
-                                                                setVehiculosSeleccionados(nuevos);
-                                                            }}
-                                                            placeholder="0"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="number"
-                                                            className="input input-bordered input-xs w-16 font-mono text-right"
-                                                            value={v.gExtra}
-                                                            onChange={(e) => {
-                                                                const nuevos = vehiculosSeleccionados.map(veh =>
-                                                                    veh.lote === v.lote ? { ...veh, gExtra: parseFloat(e.target.value) || 0 } : veh
-                                                                );
-                                                                setVehiculosSeleccionados(nuevos);
-                                                            }}
-                                                            placeholder="0"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <input
-                                                            type="number"
-                                                            className="input input-bordered input-xs w-16 font-mono text-right"
-                                                            value={v.sPeso}
-                                                            onChange={(e) => {
-                                                                const nuevos = vehiculosSeleccionados.map(veh =>
-                                                                    veh.lote === v.lote ? { ...veh, sPeso: parseFloat(e.target.value) || 0 } : veh
-                                                                );
-                                                                setVehiculosSeleccionados(nuevos);
-                                                            }}
-                                                            placeholder="0"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2 text-center text-xs">{v.titulo === "SI" ? "✅" : "❌"}</td>
-                                                    <td className="p-2 text-right font-black bg-red-50 text-red-700 font-mono text-sm">${subtotal.toLocaleString()}</td>
-                                                    <td className="p-2 text-center">
-                                                        <button
-                                                            onClick={() => setVehiculosSeleccionados(vehiculosSeleccionados.filter(veh => veh.lote !== v.lote))}
-                                                            className="text-red-400 hover:text-red-600"
-                                                        >
-                                                            <FaTrash />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })
+                                                    )}
+                                                    {v.clienteAlt && !v.clienteNombre && (
+                                                        <span className="text-[8px] font-bold text-blue-600 uppercase italic block mt-1">
+                                                            Ref: {v.clienteAlt}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.almacen}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full bg-gray-100 uppercase font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.estado}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full bg-gray-100 text-red-800 font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="text"
+                                                        value={v.ciudad}
+                                                        disabled
+                                                        className="input input-sm md:input-xs w-full bg-gray-100 text-red-800 font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="number"
+                                                        value={v.flete}
+                                                        onChange={(e) => {
+                                                            const nuevos = vehiculosSeleccionados.map(veh =>
+                                                                veh.lote === v.lote ? { ...veh, flete: parseFloat(e.target.value) || 0 } : veh
+                                                            );
+                                                            setVehiculosSeleccionados(nuevos);
+                                                        }}
+                                                        className="input input-sm md:input-xs w-20 md:w-16 text-center font-black text-blue-900 bg-blue-50 text-[14px] md:text-[12px]"
+                                                        placeholder="0"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="number"
+                                                        value={v.storage}
+                                                        onChange={(e) => {
+                                                            const nuevos = vehiculosSeleccionados.map(veh =>
+                                                                veh.lote === v.lote ? { ...veh, storage: parseFloat(e.target.value) || 0 } : veh
+                                                            );
+                                                            setVehiculosSeleccionados(nuevos);
+                                                        }}
+                                                        className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                                        placeholder="0"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="number"
+                                                        value={v.sPeso}
+                                                        onChange={(e) => {
+                                                            const nuevos = vehiculosSeleccionados.map(veh =>
+                                                                veh.lote === v.lote ? { ...veh, sPeso: parseFloat(e.target.value) || 0 } : veh
+                                                            );
+                                                            setVehiculosSeleccionados(nuevos);
+                                                        }}
+                                                        className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                                        placeholder="0"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <input
+                                                        type="number"
+                                                        value={v.gExtra}
+                                                        onChange={(e) => {
+                                                            const nuevos = vehiculosSeleccionados.map(veh =>
+                                                                veh.lote === v.lote ? { ...veh, gExtra: parseFloat(e.target.value) || 0 } : veh
+                                                            );
+                                                            setVehiculosSeleccionados(nuevos);
+                                                        }}
+                                                        className="input input-sm md:input-xs w-20 md:w-16 text-center text-[14px] md:text-[12px]"
+                                                        placeholder="0"
+                                                        style={{ fontSize: '16px' }}
+                                                    />
+                                                </td>
+                                                <td className="p-1">
+                                                    <select
+                                                        value={v.titulo}
+                                                        onChange={(e) => {
+                                                            const nuevos = vehiculosSeleccionados.map(veh =>
+                                                                veh.lote === v.lote ? { ...veh, titulo: e.target.value } : veh
+                                                            );
+                                                            setVehiculosSeleccionados(nuevos);
+                                                        }}
+                                                        className="select select-sm md:select-xs w-full font-bold text-[14px] md:text-[12px]"
+                                                        style={{ fontSize: '16px' }}
+                                                    >
+                                                        <option value="NO">NO</option>
+                                                        <option value="SI">SI</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <button
+                                                        onClick={() => setVehiculosSeleccionados(vehiculosSeleccionados.filter(veh => veh.lote !== v.lote))}
+                                                        className="text-red-400"
+                                                    >
+                                                        <FaTrash size={12} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
                                     )}
                                 </tbody>
-                                {vehiculosSeleccionados.length > 0 && (
-                                    <tfoot className="bg-gray-100">
-                                        <tr>
-                                            <td colSpan="7" className="text-right font-black uppercase p-3">Gran Total de Pago:</td>
-                                            <td className="text-right font-black p-3 text-xl text-black bg-red-100 font-mono border-l-4 border-red-600">
-                                                ${vehiculosSeleccionados.reduce((acc, v) => acc + (v.flete + v.storage + v.sPeso + v.gExtra), 0).toLocaleString()}
-                                            </td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                )}
                             </table>
                         </div>
 
-                        <button
-                            onClick={registrarViajePasado}
-                            disabled={loading || vehiculosSeleccionados.length === 0}
-                            className="btn btn-error btn-sm h-12 px-10 text-white font-black text-sm gap-3 shadow-lg uppercase italic transition-all hover:scale-105 active:scale-95"
-                        >
-                            {loading ? (
-                                <span className="loading loading-spinner loading-sm"></span>
-                            ) : (
-                                <>
-                                    <FaSave /> Registrar Viaje #{numViaje}
-                                </>
-                            )}
-                        </button>
+                        {/* BOTÓN FINAL */}
+                        <div className="mt-8 flex justify-end">
+                            <button
+                                onClick={registrarViajePasado}
+                                disabled={loading || vehiculosSeleccionados.length === 0}
+                                className="btn btn-error text-white font-black px-16 gap-3 shadow-xl"
+                            >
+                                {loading ? (
+                                    <span className="loading loading-spinner"></span>
+                                ) : (
+                                    <><FaCheck /> REGISTRAR VIAJE #{numViaje}</>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
