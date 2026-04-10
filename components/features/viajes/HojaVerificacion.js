@@ -56,13 +56,13 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     }
                 }
                 .modern-border {
-                    border: 1.5px solid #e11d48 !important;
+                    border: 1px solid #d1d5db !important;
                 }
                 .modern-shadow {
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
                 }
                 .subtle-shadow {
-                    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+                    box-shadow: none;
                 }
             ` }} />
 
@@ -74,12 +74,12 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                 padding: "12px 18px",
                 borderRadius: "12px",
                 flexShrink: 0,
-                boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.15)',
+                boxShadow: 'none',
                 backgroundColor: "#ffffff",
-                border: "3px solid #1f2937"
+                border: "1px solid #9ca3af"
             }}>
                 <div className="flex-shrink-0 flex items-center gap-2" style={{ width: "160px" }}>
-                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                    <div className="bg-gray-50 rounded-xl p-3" style={{ border: "1px solid #d1d5db" }}>
                         <img src="/assets/Logoprint.png" alt="Logo" style={{ width: "120px", height: "auto" }} />
                     </div>
                 </div>
@@ -114,13 +114,13 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                 </div>
 
                 <div className="flex flex-col gap-3" style={{ width: "180px" }}>
-                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                    <div className="bg-gray-50 rounded-xl p-3" style={{ border: "1px solid #d1d5db" }}>
                         <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Viaje</div>
                         <div className="text-center font-black" style={{ fontSize: "28px", color: "#1f2937", letterSpacing: '1px', lineHeight: '1' }}>
                             #{viajeData.numViaje}
                         </div>
                     </div>
-                    <div className="bg-gray-50 rounded-xl p-3 subtle-shadow" style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)', border: "2px solid #e5e7eb" }}>
+                    <div className="bg-gray-50 rounded-xl p-3" style={{ border: "1px solid #d1d5db" }}>
                         <div className="text-[9px] font-black text-center uppercase tracking-wider" style={{ color: "#dc2626", marginBottom: "4px", letterSpacing: '1.5px' }}>Date</div>
                         <div className="text-center font-black" style={{ fontSize: "22px", color: "#1f2937", letterSpacing: '0.5px', lineHeight: '1' }}>
                             {moment().format('MM/DD/YY')}
@@ -205,35 +205,36 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     <thead>
                         <tr className="font-black text-[11px]" style={{
                             letterSpacing: '0.5px',
-                            background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                            color: "#ffffff",
-                            fontWeight: "900"
+                            background: '#ffffff',
+                            color: "#1f2937",
+                            fontWeight: "900",
+                            borderBottom: "1px solid #d1d5db"
                         }}>
-                            <th className="text-center" style={{ width: "22px", borderRight: "1px solid #475569", fontWeight: "900" }}>★</th>
-                            <th className="text-left px-2" style={{ width: "120px", borderRight: "1px solid #475569", fontWeight: "900" }}>CUSTOMER</th>
-                            <th className="text-left px-2" style={{ width: "60px", borderRight: "1px solid #475569", fontWeight: "900" }}>STOCK#</th>
-                            <th className="text-left px-2" style={{ width: "100px", borderRight: "1px solid #475569", fontWeight: "900" }}>VEHICLE</th>
-                            <th className="text-left px-2" style={{ width: "75px", borderRight: "1px solid #475569", fontWeight: "900" }}>CITY</th>
-                            <th className="text-left px-2" style={{ width: "70px", borderRight: "1px solid #475569", fontWeight: "900" }}>AUCTION</th>
-                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>FLETE</th>
-                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #475569", fontWeight: "900" }}>STORAGE</th>
-                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>S.PESO</th>
-                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #475569", fontWeight: "900" }}>G.EXTRA</th>
-                            <th className="text-center" style={{ width: "50px", borderRight: "1px solid #475569", fontWeight: "900" }}>TOTAL</th>
+                            <th className="text-center" style={{ width: "22px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>★</th>
+                            <th className="text-left px-2" style={{ width: "120px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>CUSTOMER</th>
+                            <th className="text-left px-2" style={{ width: "60px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>STOCK#</th>
+                            <th className="text-left px-2" style={{ width: "100px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>VEHICLE</th>
+                            <th className="text-left px-2" style={{ width: "75px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>CITY</th>
+                            <th className="text-left px-2" style={{ width: "70px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>AUCTION</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>FLETE</th>
+                            <th className="text-center" style={{ width: "45px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>STORAGE</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>S.PESO</th>
+                            <th className="text-center" style={{ width: "40px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>G.EXTRA</th>
+                            <th className="text-center" style={{ width: "50px", borderRight: "1px solid #94a3b8", fontWeight: "900" }}>TOTAL</th>
                             <th className="text-center" style={{ width: "35px", fontWeight: "900" }}>TITLE</th>
                         </tr>
                     </thead>
                     <tbody>
                         {vehiculosConVacios.map((v, i) => (
                             <tr key={i} style={{
-                                backgroundColor: i % 2 === 0 ? "#ffffff" : "#f8fafc",
-                                borderBottom: "1px solid #e2e8f0",
+                                backgroundColor: "#ffffff",
+                                borderBottom: "1px solid #e5e7eb",
                                 height: "18px"
                             }}>
                                 <td className="text-center font-black text-[12px]" style={{
-                                    backgroundColor: v ? "linear-gradient(135deg, #fecdd3, #fda4af)" : "#f8fafc",
+                                    backgroundColor: "#ffffff",
                                     color: "#be123c",
-                                    borderRight: "1px solid #e2e8f0",
+                                    borderRight: "1px solid #e5e7eb",
                                     height: "18px",
                                     maxHeight: "18px",
                                     overflow: "hidden",
@@ -350,9 +351,9 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                     {v ? `$${v.gExtra || 0}` : ""}
                                 </td>
                                 <td className="text-center text-[11px] font-black" style={{
-                                    background: v ? "linear-gradient(135deg, #d1fae5, #a7f3d0)" : "transparent",
+                                    background: "#ffffff",
                                     color: "#065f46",
-                                    borderRight: "1px solid #e2e8f0",
+                                    borderRight: "1px solid #e5e7eb",
                                     height: "18px",
                                     maxHeight: "18px",
                                     overflow: "hidden",
@@ -376,7 +377,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     </tbody>
                     <tfoot>
                         {/* Fila única de Totales por columna */}
-                        <tr style={{ backgroundColor: "#f8fafc", borderTop: "2px solid #e2e8f0" }}>
+                        <tr style={{ backgroundColor: "#ffffff", borderTop: "1px solid #d1d5db" }}>
                             <td colSpan="6"></td>
                             <td className="text-center px-2 font-black text-[13px]" style={{
                                 color: "#0f172a",
@@ -414,9 +415,9 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         </tr>
 
                         {/* Fila de Subtotal */}
-                        <tr style={{ backgroundColor: "#1e293b", borderTop: "2px solid #475569" }}>
+                        <tr style={{ backgroundColor: "#ffffff", borderTop: "1px solid #d1d5db" }}>
                             <td colSpan="10" className="text-right px-2 font-black text-[14px]" style={{
-                                color: "#ffffff",
+                                color: "#1f2937",
                                 padding: "8px 8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
@@ -424,7 +425,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 SUBTOTAL:
                             </td>
                             <td className="text-center px-2 font-black text-[15px]" style={{
-                                color: "#ffffff",
+                                color: "#1f2937",
                                 padding: "8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
@@ -435,9 +436,9 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                         </tr>
 
                         {/* Fila de Total con Cheque, Efectivo y Zelle */}
-                        <tr style={{ backgroundColor: "#10b981", borderTop: "3px solid #059669" }}>
+                        <tr style={{ backgroundColor: "#ffffff", borderTop: "1px solid #d1d5db" }}>
                             <td colSpan="7" className="text-right px-2 font-black text-[16px]" style={{
-                                color: "#ffffff",
+                                color: "#1f2937",
                                 padding: "10px 8px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
@@ -445,7 +446,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                                 TOTAL:
                             </td>
                             <td colSpan="3" className="text-center px-2 font-black text-[18px]" style={{
-                                color: "#ffffff",
+                                color: "#1f2937",
                                 padding: "10px",
                                 letterSpacing: '0.5px',
                                 fontWeight: "900"
@@ -455,36 +456,36 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                             <td colSpan="2" style={{ padding: "6px" }}>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>CHEQUE:</span>
+                                        <span className="font-bold text-[10px]" style={{ color: "#1f2937", fontWeight: "900", minWidth: "50px" }}>CHEQUE:</span>
                                         <div className="bg-white rounded font-black text-[11px] text-center" style={{
                                             flex: 1,
                                             height: "14px",
-                                            border: "1px solid #059669",
-                                            color: "#065f46",
+                                            border: "1px solid #d1d5db",
+                                            color: "#1f2937",
                                             lineHeight: "14px"
                                         }}>
                                             {viajeData.metodoPago?.cheque ? `$${viajeData.metodoPago.cheque}` : ""}
                                         </div>
                                     </div>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>EFECTIVO:</span>
+                                        <span className="font-bold text-[10px]" style={{ color: "#1f2937", fontWeight: "900", minWidth: "50px" }}>EFECTIVO:</span>
                                         <div className="bg-white rounded font-black text-[11px] text-center" style={{
                                             flex: 1,
                                             height: "14px",
-                                            border: "1px solid #059669",
-                                            color: "#065f46",
+                                            border: "1px solid #d1d5db",
+                                            color: "#1f2937",
                                             lineHeight: "14px"
                                         }}>
                                             {viajeData.metodoPago?.efectivo ? `$${viajeData.metodoPago.efectivo}` : ""}
                                         </div>
                                     </div>
                                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                        <span className="font-bold text-[10px]" style={{ color: "#ffffff", fontWeight: "900", minWidth: "50px" }}>ZELLE:</span>
+                                        <span className="font-bold text-[10px]" style={{ color: "#1f2937", fontWeight: "900", minWidth: "50px" }}>ZELLE:</span>
                                         <div className="bg-white rounded font-black text-[11px] text-center" style={{
                                             flex: 1,
                                             height: "14px",
-                                            border: "1px solid #059669",
-                                            color: "#065f46",
+                                            border: "1px solid #d1d5db",
+                                            color: "#1f2937",
                                             lineHeight: "14px"
                                         }}>
                                             {viajeData.metodoPago?.zelle ? `$${viajeData.metodoPago.zelle}` : ""}
@@ -509,7 +510,7 @@ const HojaVerificacion = React.forwardRef(({viajeData}, ref) => {
                     }}>
                         DRIVER SIGNATURE
                     </div>
-                    <div style={{ borderTop: "3px solid #1f2937", width: "300px", marginTop: "4px" }}></div>
+                    <div style={{ borderTop: "1px solid #9ca3af", width: "300px", marginTop: "4px" }}></div>
                 </div>
             </div>
 
