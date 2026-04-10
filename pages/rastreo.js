@@ -1,6 +1,6 @@
 import Layout from "../components/Layout/Layout";
-import SeoHead from "../components/SeoHead";
-import Rastreo from "../components/BuscaVehiculo/Rastreo";
+import SeoHead from "../components/marketing/SeoHead";
+import Rastreo from "../components/features/vehiculos/Rastreo";
 
 export default function Home() {
   return (
