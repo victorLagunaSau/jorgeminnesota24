@@ -203,12 +203,14 @@ const Vehiculos = ({user}) => {
                     >
                         Exportar a Excel
                     </button>
-                    <button
-                        className="btn btn-error text-white font-black uppercase text-xs"
-                        onClick={() => setIsRegisterModalOpen(true)}
-                    >
-                        + Registra Vehículo
-                    </button> 
+                    {/*
+    <button
+        className="btn btn-error text-white font-black uppercase text-xs"
+        onClick={() => setIsRegisterModalOpen(true)}
+    >
+        + Registra Vehículo
+    </button>
+    */}
                 </div>
 
                 {/* MODAL REGISTRAR */}
