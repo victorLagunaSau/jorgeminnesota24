@@ -804,59 +804,76 @@ const TablaViajes = ({user}) => {
                                             <td className="p-2">
                                                 {user.admin ? (
                                                     <div className="relative group">
-                                                        <div className="text-[8px] font-black text-blue-600 mb-1 italic flex items-center gap-1">
-                                                            Ref:
-                                                            <input
-                                                                type="text"
-                                                                value={v.clienteAlt || ""}
-                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
-                                                                className="w-24 bg-gray-50 rounded border border-gray-200 outline-none text-[8px] font-black text-blue-600 px-1 focus:border-blue-500"
-                                                            />
-                                                        </div>
-                                                        <div className="relative">
-                                                            <input
-                                                                type="text"
-                                                                placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
-                                                                className="input input-bordered input-xs w-full font-bold text-[10px] uppercase bg-gray-50 focus:bg-white"
-                                                                value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
-                                                                onChange={(e) => setBusquedaCliente({
-                                                                    ...busquedaCliente,
-                                                                    [`${viaje.id}-${idx}`]: e.target.value
-                                                                })}
-                                                            />
-                                                            {busquedaCliente[`${viaje.id}-${idx}`] && (
-                                                                <button className="absolute right-1 top-1 text-gray-400"
-                                                                        onClick={() => setBusquedaCliente({
-                                                                            ...busquedaCliente,
-                                                                            [`${viaje.id}-${idx}`]: ""
-                                                                        })}>
-                                                                    <FaTimes size={10}/>
+                                                        {/* Si el cliente ya viene confirmado del registro, mostrarlo directamente */}
+                                                        {v.clienteConfirmado && v.clienteNombre ? (
+                                                            <div>
+                                                                <div className="text-[9px] bg-green-100 text-green-700 px-2 py-1 rounded flex items-center gap-1 font-bold">
+                                                                    <FaCheckCircle size={10}/> {v.clienteNombre}
+                                                                </div>
+                                                                <button
+                                                                    className="text-[8px] text-blue-500 hover:text-blue-700 mt-1 underline"
+                                                                    onClick={() => handleLocalEdit(viaje.id, idx, 'clienteConfirmado', false)}
+                                                                >
+                                                                    Cambiar cliente
                                                                 </button>
-                                                            )}
-                                                        </div>
-                                                        {busquedaCliente[`${viaje.id}-${idx}`] && (
-                                                            <div
-                                                                className="absolute z-[100] w-full bg-white border-2 border-blue-500 shadow-2xl rounded-md max-h-40 overflow-y-auto mt-1">
-                                                                {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).map(cliente => (
-                                                                    <div key={cliente.id}
-                                                                         className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[10px] font-black uppercase border-b"
-                                                                         onClick={() => {
-                                                                             handleLocalEdit(viaje.id, idx, 'clienteId', cliente.id);
-                                                                             setBusquedaCliente({
-                                                                                 ...busquedaCliente,
-                                                                                 [`${viaje.id}-${idx}`]: ""
-                                                                             });
-                                                                         }}>
-                                                                        {cliente.nombre}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-[8px] font-black text-blue-600 mb-1 italic flex items-center gap-1">
+                                                                    Ref:
+                                                                    <input
+                                                                        type="text"
+                                                                        value={v.clienteAlt || ""}
+                                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'clienteAlt', e.target.value.toUpperCase())}
+                                                                        className="w-24 bg-gray-50 rounded border border-gray-200 outline-none text-[8px] font-black text-blue-600 px-1 focus:border-blue-500"
+                                                                    />
+                                                                </div>
+                                                                <div className="relative">
+                                                                    <input
+                                                                        type="text"
+                                                                        placeholder={v.clienteNombre || "BUSCAR CLIENTE..."}
+                                                                        className="input input-bordered input-xs w-full font-bold text-[10px] uppercase bg-gray-50 focus:bg-white"
+                                                                        value={busquedaCliente[`${viaje.id}-${idx}`] || ""}
+                                                                        onChange={(e) => setBusquedaCliente({
+                                                                            ...busquedaCliente,
+                                                                            [`${viaje.id}-${idx}`]: e.target.value
+                                                                        })}
+                                                                    />
+                                                                    {busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                                        <button className="absolute right-1 top-1 text-gray-400"
+                                                                                onClick={() => setBusquedaCliente({
+                                                                                    ...busquedaCliente,
+                                                                                    [`${viaje.id}-${idx}`]: ""
+                                                                                })}>
+                                                                            <FaTimes size={10}/>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                                    <div
+                                                                        className="absolute z-[100] w-full bg-white border-2 border-blue-500 shadow-2xl rounded-md max-h-40 overflow-y-auto mt-1">
+                                                                        {clientes.filter(c => c.nombre.toLowerCase().includes(busquedaCliente[`${viaje.id}-${idx}`].toLowerCase())).map(cliente => (
+                                                                            <div key={cliente.id}
+                                                                                 className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[10px] font-black uppercase border-b"
+                                                                                 onClick={() => {
+                                                                                     handleLocalEdit(viaje.id, idx, 'clienteId', cliente.id);
+                                                                                     setBusquedaCliente({
+                                                                                         ...busquedaCliente,
+                                                                                         [`${viaje.id}-${idx}`]: ""
+                                                                                     });
+                                                                                 }}>
+                                                                                {cliente.nombre}
+                                                                            </div>
+                                                                        ))}
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {v.clienteNombre && !busquedaCliente[`${viaje.id}-${idx}`] && (
-                                                            <div
-                                                                className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1 font-bold">
-                                                                <FaCheckCircle size={8}/> {v.clienteNombre}
-                                                            </div>
+                                                                )}
+                                                                {v.clienteNombre && !busquedaCliente[`${viaje.id}-${idx}`] && (
+                                                                    <div
+                                                                        className="mt-1 text-[9px] bg-green-100 text-green-700 px-1 rounded flex items-center gap-1 font-bold">
+                                                                        <FaCheckCircle size={8}/> {v.clienteNombre}
+                                                                    </div>
+                                                                )}
+                                                            </>
                                                         )}
                                                     </div>
                                                 ) : puedeEditar ? (

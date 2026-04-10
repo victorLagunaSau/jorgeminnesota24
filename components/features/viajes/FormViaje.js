@@ -9,9 +9,9 @@ import {
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
 
-const FormViaje = ({user}) => {
+const FormViaje = ({user, onViajeCreado}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
-    const { choferes: choferesRaw } = useAdminData();
+    const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
     // Verificar si es Admin Master
     const isAdminMaster = user?.adminMaster === true;
@@ -36,6 +36,10 @@ const FormViaje = ({user}) => {
 
     // Estado para modal de comentario
     const [modalComentario, setModalComentario] = useState({ visible: false, vehiculoId: null, texto: "" });
+
+    // Estado para dropdown de cliente en cada fila
+    const [clienteDropdownId, setClienteDropdownId] = useState(null);
+    const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
 
     // Estados para token de chofer temporal
     const [mostrarModalToken, setMostrarModalToken] = useState(false);
@@ -199,6 +203,8 @@ const FormViaje = ({user}) => {
         setVehiculos([...vehiculos, {
             id: Date.now(),
             lote: "", marca: "", modelo: "", clienteAlt: "",
+            clienteId: "",         // ID del cliente seleccionado
+            clienteConfirmado: false, // Si el cliente fue seleccionado de la lista
             almacen: "Copart",
             estado: "", ciudad: "",
             flete: "0",        // Se usará para el COST (chofer) - Editable
@@ -371,8 +377,29 @@ const FormViaje = ({user}) => {
                 setViajeReciente(viajeData);
             });
 
-            setMostrarModalExito(true);
-            setGuardando(false);
+            // Si hay callback de redirección (modo administrativo), redirigir automáticamente
+            if (onViajeCreado) {
+                setAlertMessage({msg: `Viaje #${viajeReciente?.numViaje || ''} creado exitosamente. Redirigiendo...`, tipo: 'success'});
+                setGuardando(false);
+
+                // Limpiar estados y redirigir después de un breve momento
+                setTimeout(() => {
+                    setVehiculos([]);
+                    setEncabezado({numViaje: "", choferId: "", choferManual: "", fecha: new Date().toLocaleDateString()});
+                    setViajeIniciado(false);
+                    setBusquedaChofer("");
+                    setTokenValido(false);
+                    setTokenUsado(null);
+                    setChoferManual("");
+                    setTokenInput("");
+                    setAlertMessage({msg: '', tipo: ''});
+                    onViajeCreado();
+                }, 1500);
+            } else {
+                // Modo normal (carriers): mostrar modal de éxito
+                setMostrarModalExito(true);
+                setGuardando(false);
+            }
 
         } catch (e) {
             setAlertMessage({msg: "Error al guardar viaje: " + e.message, tipo: 'error'});
@@ -526,6 +553,64 @@ const FormViaje = ({user}) => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* DROPDOWN DE CLIENTES - Solo para admins, renderizado fuera del overflow */}
+            {user?.admin && clienteDropdownId && (
+                <>
+                    <div
+                        className="fixed inset-0 z-[90]"
+                        onClick={() => setClienteDropdownId(null)}
+                    />
+                    <div
+                        className="fixed z-[100] w-64 bg-white border-2 shadow-2xl rounded-lg max-h-52 overflow-y-auto border-blue-400"
+                        style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                    >
+                        {(() => {
+                            const vehiculoActual = vehiculos.find(v => v.id === clienteDropdownId);
+                            const busqueda = vehiculoActual?.clienteAlt || '';
+                            const filtrados = clientesRaw.filter(c =>
+                                c.cliente?.toLowerCase().includes(busqueda.toLowerCase())
+                            ).slice(0, 10);
+
+                            return (
+                                <>
+                                    {filtrados.map(c => (
+                                        <div
+                                            key={c.id}
+                                            className="p-3 hover:bg-blue-600 hover:text-white cursor-pointer text-[12px] font-black uppercase border-b last:border-none transition-colors"
+                                            onClick={() => {
+                                                setVehiculos(vehiculos.map(veh =>
+                                                    veh.id === clienteDropdownId
+                                                        ? {
+                                                            ...veh,
+                                                            clienteAlt: c.cliente,
+                                                            clienteId: c.id,
+                                                            clienteNombre: c.cliente,
+                                                            clienteTelefono: c.telefonoCliente || "",
+                                                            clienteConfirmado: true
+                                                        }
+                                                        : veh
+                                                ));
+                                                setClienteDropdownId(null);
+                                            }}
+                                        >
+                                            <span>{c.cliente}</span>
+                                            {c.apodoCliente && (
+                                                <span className="text-[9px] opacity-70 block">{c.apodoCliente}</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {filtrados.length === 0 && (
+                                        <div className="p-3 text-gray-400 text-[11px] italic font-bold text-center">
+                                            No se encontró cliente...
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
+                    </div>
+                </>
             )}
 
             {alertMessage.msg && (
@@ -739,10 +824,38 @@ const FormViaje = ({user}) => {
                                            onChange={(e) => handleTableChange(v.id, 'modelo', e.target.value.toUpperCase())}
                                            className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
                                            style={{fontSize: '16px'}}/></td>
-                                <td className="p-1"><input type="text" value={v.clienteAlt}
-                                           onChange={(e) => handleTableChange(v.id, 'clienteAlt', e.target.value.toUpperCase())}
-                                           className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
-                                           style={{fontSize: '16px'}}/></td>
+                                <td className="p-1">
+                                    <input
+                                        type="text"
+                                        value={v.clienteAlt}
+                                        onChange={(e) => {
+                                            const nuevoValor = e.target.value.toUpperCase();
+                                            setVehiculos(vehiculos.map(veh =>
+                                                veh.id === v.id
+                                                    ? { ...veh, clienteAlt: nuevoValor, clienteConfirmado: false, clienteId: '', clienteNombre: '' }
+                                                    : veh
+                                            ));
+                                        }}
+                                        onFocus={(e) => {
+                                            // Solo abrir dropdown si es admin
+                                            if (user?.admin) {
+                                                const rect = e.target.getBoundingClientRect();
+                                                setDropdownPos({ top: rect.bottom + 2, left: rect.left });
+                                                setClienteDropdownId(v.id);
+                                            }
+                                        }}
+                                        className={`input input-sm md:input-xs w-full uppercase font-bold text-[14px] md:text-[12px] ${
+                                            v.clienteConfirmado
+                                                ? 'bg-green-50 border-green-400 text-green-800'
+                                                : 'bg-white'
+                                        }`}
+                                        placeholder={user?.admin ? "Buscar cliente..." : "Cliente..."}
+                                        style={{fontSize: '16px'}}
+                                    />
+                                    {v.clienteConfirmado && (
+                                        <span className="text-[8px] font-black text-green-600 uppercase">✓ CONFIRMADO</span>
+                                    )}
+                                </td>
                                 <td className="p-1">
                                     <select value={v.almacen}
                                             onChange={(e) => handleTableChange(v.id, 'almacen', e.target.value)}

@@ -47,7 +47,7 @@ const Viajes = ({ user }) => {
                     exit={{ opacity: 0, x: view === "nuevo" ? -20 : 20 }}
                     transition={{ duration: 0.2 }}
                 >
-                    {view === "nuevo" ? <FormViaje user={user} /> : <TablaViajes user={user} />}
+                    {view === "nuevo" ? <FormViaje user={user} onViajeCreado={() => setView("administracion")} /> : <TablaViajes user={user} />}
                 </motion.div>
             </AnimatePresence>
         </motion.div>

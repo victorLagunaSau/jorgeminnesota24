@@ -208,7 +208,7 @@ const Vehiculos = ({user}) => {
                         onClick={() => setIsRegisterModalOpen(true)}
                     >
                         + Registra Vehículo
-                    </button>
+                    </button> 
                 </div>
 
                 {/* MODAL REGISTRAR */}
