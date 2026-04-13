@@ -42,6 +42,9 @@ const ReporteViajesPagados = ({ user }) => {
     // Modal para confirmar cambio de número de viaje
     const [modalCambioNum, setModalCambioNum] = useState({ show: false, viaje: null, nuevoNum: "", resultado: "" });
 
+    // Lotes que ya fueron cobrados en Caja (estatus "EN")
+    const [lotesPagados, setLotesPagados] = useState({});
+
     // Cargar datos para agregar viajes
     useEffect(() => {
         const unsubChoferes = firestore().collection("choferes").onSnapshot(snap => {
@@ -200,6 +203,23 @@ const ReporteViajesPagados = ({ user }) => {
                 return numB - numA;
             });
             setViajes(data);
+
+            // Consultar cuáles lotes ya fueron cobrados en Caja
+            const todosLotes = data.flatMap(v => (v.vehiculos || []).map(vh => vh.lote).filter(Boolean));
+            const pagados = {};
+            // Firestore limita "in" a 10 elementos, hacemos batches
+            for (let i = 0; i < todosLotes.length; i += 10) {
+                const batch = todosLotes.slice(i, i + 10);
+                const vehSnap = await firestore().collection("vehiculos")
+                    .where(firebase.firestore.FieldPath.documentId(), "in", batch)
+                    .get();
+                vehSnap.docs.forEach(doc => {
+                    if (doc.data().estatus === "EN") {
+                        pagados[doc.id] = true;
+                    }
+                });
+            }
+            setLotesPagados(pagados);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
@@ -598,164 +618,116 @@ const ReporteViajesPagados = ({ user }) => {
 
             {/* CONTENIDO */}
             {vista === "historial" ? (
-                // VISTA HISTORIAL
-                <div className="p-4 space-y-4">
+                // VISTA HISTORIAL - TABLA TIPO EXCEL
+                <div className="p-2 overflow-x-auto">
                     {viajes.length === 0 ? (
                         <div className="text-center py-20">
                             <p className="text-gray-400 font-bold uppercase">No hay viajes pagados en este período</p>
                         </div>
                     ) : (
-                        viajes.map((viaje, vIndex) => (
-                            <div key={vIndex} className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden transform transition-all">
-                                <div className="bg-gray-100 p-3 flex justify-between items-center">
-                                    <div className="flex items-center gap-4">
-                                        {editandoViaje === viaje.numViaje ? (
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-gray-500 font-bold">VIAJE #</span>
-                                                <input
-                                                    type="text"
-                                                    className="input input-bordered input-sm w-24 font-black"
-                                                    value={nuevoNumViaje}
-                                                    onChange={(e) => setNuevoNumViaje(e.target.value)}
-                                                    autoFocus
-                                                />
-                                                <button
-                                                    onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)}
-                                                    className="btn btn-sm btn-success text-white"
-                                                >
-                                                    <FaCheck />
-                                                </button>
-                                                <button
-                                                    onClick={() => setEditandoViaje(null)}
-                                                    className="btn btn-sm btn-ghost"
-                                                >
-                                                    <FaTimes />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <div className="bg-green-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] text-white">
-                                                    VIAJE #{viaje.numViaje}
-                                                </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditandoViaje(viaje.numViaje);
-                                                        setNuevoNumViaje(viaje.numViaje);
-                                                    }}
-                                                    className="btn btn-xs btn-ghost text-gray-500 hover:text-blue-600"
-                                                    title="Editar número de viaje"
-                                                >
-                                                    <FaPen size={10} />
-                                                </button>
-                                            </div>
-                                        )}
-                                        <div>
-                                            <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>
-                                            <p className="text-sm font-black uppercase italic leading-none text-gray-800">{viaje.chofer?.nombre}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Empresa</p>
-                                            <p className="text-sm font-black uppercase italic leading-none text-gray-800">{viaje.empresaLiquidada}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Fecha de Pago</p>
-                                            <p className="text-sm font-black uppercase italic leading-none text-gray-800">
-                                                {moment(viaje.fechaPago.toDate()).format("DD/MM/YYYY")}
-                                            </p>
-                                        </div>
-                                        <span className="text-[10px] font-black uppercase px-4 py-1 rounded-full bg-green-500 text-white">
-                                            PAGADO
-                                        </span>
-                                        {/* Botón eliminar - solo visible si tiene permiso */}
-                                        {puedeEliminarViajes && (
-                                            <button
-                                                onClick={() => eliminarViaje(viaje)}
-                                                disabled={loading}
-                                                className="btn btn-sm btn-ghost text-red-400 hover:text-red-600 hover:bg-red-50"
-                                                title="Eliminar viaje"
-                                            >
-                                                <FaTrashAlt size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="overflow-x-auto">
-                                    <table className="table w-full border-collapse">
-                                        <thead>
-                                            <tr className="text-[10px] uppercase text-gray-500 bg-gray-50 border-b-2 border-gray-200 italic font-black">
-                                                <th className="p-3">Lote</th>
-                                                <th className="p-3">Vehículo</th>
-                                                <th className="p-3">Ciudad / Almacén</th>
-                                                <th className="p-3">Cliente</th>
-                                                <th className="p-3 text-center text-blue-800">Flete</th>
-                                                <th className="p-3 text-center">Storage</th>
-                                                <th className="p-3 text-center text-gray-400">S. Peso</th>
-                                                <th className="p-3 text-center text-gray-400">G. Extra</th>
-                                                <th className="p-3 text-center bg-green-100 text-green-700">Total</th>
-                                                <th className="p-3 text-right text-blue-700">Nota</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {viaje.vehiculos.map((v, idx) => {
-                                                const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
-                                                const notaRegistro = (v.comentarioRegistro || "").trim();
-                                                const notaRecepcion = (v.comentarioRecepcion || "").trim();
-                                                const tieneNota = notaRegistro !== "" || notaRecepcion !== "";
-                                                return (
-                                                    <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                                                        <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
-                                                        <td className="p-3 text-[10px] uppercase font-bold text-gray-600">{v.marca} {v.modelo}</td>
-                                                        <td className="p-3">
-                                                            <div className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
-                                                            <div className="text-[9px] font-bold text-gray-400 mt-1 uppercase italic">{v.almacen}</div>
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <div className="text-[10px] font-bold uppercase text-gray-800">{v.clienteNombre || v.clienteAlt}</div>
-                                                        </td>
-                                                        <td className="p-3 text-center font-mono text-[11px] font-black">${v.flete}</td>
-                                                        <td className="p-3 text-center font-mono text-[11px] font-black">${v.storage || 0}</td>
-                                                        <td className="p-3 text-center font-mono text-[11px] font-black">${v.sPeso || 0}</td>
-                                                        <td className="p-3 text-center font-mono text-[11px] font-black">${v.gExtra || 0}</td>
-                                                        <td className="p-3 text-center font-black bg-green-50 text-green-700">${total.toLocaleString()}</td>
-                                                        <td className="p-3 text-right">
-                                                            {tieneNota ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setModalNota({
-                                                                        show: true,
-                                                                        lote: v.lote,
-                                                                        notaRegistro,
-                                                                        notaRecepcion
-                                                                    })}
-                                                                    className="text-blue-600 hover:text-blue-800 transition-colors inline-flex"
-                                                                    title="Ver nota"
-                                                                >
-                                                                    <FaCommentDots size={20} />
-                                                                </button>
-                                                            ) : (
-                                                                <span className="text-gray-200">—</span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                            <tr className="bg-gray-50 border-t-2 border-gray-300">
-                                                <td colSpan="8" className="p-3 text-right font-black uppercase text-gray-600">
-                                                    Total del Viaje:
+                        <table className="w-full border-collapse text-[11px]" style={{ minWidth: "1100px" }}>
+                            <thead>
+                                <tr className="bg-gray-800 text-white text-[10px] uppercase font-black">
+                                    <th className="border border-gray-600 px-2 py-2 text-center">Fecha</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-center">N° Viaje</th>
+                                    <th className="border border-gray-600 px-2 py-2">Chofer</th>
+                                    <th className="border border-gray-600 px-2 py-2">Marca</th>
+                                    <th className="border border-gray-600 px-2 py-2">Modelo</th>
+                                    <th className="border border-gray-600 px-2 py-2">Lote</th>
+                                    <th className="border border-gray-600 px-2 py-2">Estado</th>
+                                    <th className="border border-gray-600 px-2 py-2">Ciudad</th>
+                                    <th className="border border-gray-600 px-2 py-2">Cliente</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right">Flete</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right">Storage</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right">S.Peso</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right">G.Extra</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-center">Título</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right bg-green-900">Total</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-center">Nota</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-center">Acc</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {viajes.map((viaje, vIndex) => {
+                                    const bgViaje = ""; // se define por fila
+                                    const fecha = viaje.fechaPago?.toDate ? moment(viaje.fechaPago.toDate()).format("D MMM YY") : "";
+                                    return viaje.vehiculos.map((v, idx) => {
+                                        const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
+                                        const notaRegistro = (v.comentarioRegistro || "").trim();
+                                        const notaRecepcion = (v.comentarioRecepcion || "").trim();
+                                        const tieneNota = notaRegistro !== "" || notaRecepcion !== "";
+                                        const lotePagado = lotesPagados[v.lote] === true;
+                                        const bgFila = lotePagado ? "bg-green-100" : "bg-white";
+                                        return (
+                                            <tr key={`${vIndex}-${idx}`} className={`${bgFila} hover:bg-yellow-50 border-b border-gray-200`}>
+                                                <td className="border border-gray-200 px-2 py-1 text-center font-bold text-gray-600 whitespace-nowrap">{idx === 0 ? fecha : ""}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-center font-black whitespace-nowrap">
+                                                    {idx === 0 ? (
+                                                        editandoViaje === viaje.numViaje ? (
+                                                            <div className="flex items-center gap-1 justify-center">
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-16 border border-gray-400 rounded text-center text-[11px] font-black px-1 py-0.5"
+                                                                    value={nuevoNumViaje}
+                                                                    onChange={(e) => setNuevoNumViaje(e.target.value)}
+                                                                    autoFocus
+                                                                />
+                                                                <button onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)} className="text-green-600 hover:text-green-800"><FaCheck size={10}/></button>
+                                                                <button onClick={() => setEditandoViaje(null)} className="text-red-400 hover:text-red-600"><FaTimes size={10}/></button>
+                                                            </div>
+                                                        ) : (
+                                                            <span
+                                                                className="cursor-pointer hover:text-blue-600"
+                                                                onDoubleClick={() => { setEditandoViaje(viaje.numViaje); setNuevoNumViaje(viaje.numViaje); }}
+                                                                title="Doble clic para editar"
+                                                            >
+                                                                #{viaje.numViaje}
+                                                            </span>
+                                                        )
+                                                    ) : ""}
                                                 </td>
-                                                <td className="p-3 text-center font-black text-lg bg-green-100 text-green-700 border-l-4 border-green-600">
-                                                    ${viaje.resumenFinanciero?.granTotal?.toLocaleString() || '0'}
+                                                <td className="border border-gray-200 px-2 py-1 font-bold uppercase text-gray-700 whitespace-nowrap">{idx === 0 ? viaje.chofer?.nombre : ""}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase text-gray-600">{v.marca}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase text-gray-600">{v.modelo}</td>
+                                                <td className="border border-gray-200 px-2 py-1 font-mono font-black text-blue-700">{v.lote}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase text-gray-600">{v.estado}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase font-bold text-red-700">{v.ciudad}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase font-bold text-gray-800">{v.clienteNombre || v.clienteAlt}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono font-bold">${v.flete}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono">${v.storage || 0}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono">${v.sPeso || 0}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono">${v.gExtra || 0}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-center font-bold">{v.titulo || "NO"}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono font-black text-green-700 bg-green-50">${total.toLocaleString()}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-center">
+                                                    {tieneNota ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setModalNota({ show: true, lote: v.lote, notaRegistro, notaRecepcion })}
+                                                            className="text-blue-600 hover:text-blue-800"
+                                                        >
+                                                            <FaCommentDots size={14} />
+                                                        </button>
+                                                    ) : ""}
                                                 </td>
-                                                <td className="p-3 bg-gray-50"></td>
+                                                <td className="border border-gray-200 px-2 py-1 text-center">
+                                                    {idx === 0 && puedeEliminarViajes ? (
+                                                        <button
+                                                            onClick={() => eliminarViaje(viaje)}
+                                                            disabled={loading}
+                                                            className="text-red-400 hover:text-red-600"
+                                                            title="Eliminar viaje"
+                                                        >
+                                                            <FaTrashAlt size={12} />
+                                                        </button>
+                                                    ) : ""}
+                                                </td>
                                             </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ))
+                                        );
+                                    });
+                                })}
+                            </tbody>
+                        </table>
                     )}
                 </div>
             ) : (

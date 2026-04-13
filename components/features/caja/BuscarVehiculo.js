@@ -77,7 +77,7 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
             {mensajeError && <div className="text-red-500">{mensajeError}</div>}
 
             {/* Mostrar estatus del vehículo si existe */}
-            {estatus && (
+            {estatus && estatus !== "PA" && (
                 <ul className="steps steps-gray-500 mt-4 w-full max-w-3xl mx-auto mt-2">
                     {["PR", "IN", "TR", "EB", "DS", "EN"].map((step, index) => (
                         <li
@@ -98,6 +98,16 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
                         </li>
                     ))}
                 </ul>
+            )}
+            {estatus === "PA" && (
+                <div className="mt-4 p-3 rounded-lg border-l-8 border-green-600 bg-green-100 shadow">
+                    <p className="text-lg font-black text-green-800 uppercase">
+                        Estatus: Pago Adelantado (PA)
+                    </p>
+                    <p className="text-sm text-green-700">
+                        Este vehículo tiene un anticipo registrado. Puede proceder al cobro.
+                    </p>
+                </div>
             )}
         </div>
     );
