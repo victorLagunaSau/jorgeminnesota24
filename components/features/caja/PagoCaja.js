@@ -13,8 +13,16 @@ const PagoCaja = ({vehiculo, user}) => {
         price, // Usamos 'price' para el pago
         storage, // Usamos 'storage' para overhead
         sobrePeso, // Usamos 'sobrePeso' para el pago sobrepeso
-        gastosExtra // Usamos 'gastosExtra' para los gastos adicionales
+        gastosExtra, // Usamos 'gastosExtra' para los gastos adicionales
+        comentarioRegistro,
+        comentarioRecepcion
     } = vehiculo[0] || {}; // Aseguramos que el vehículo esté disponible
+
+    // Mostramos la nota sin importar en qué campo esté guardada
+    const notaRegistroTxt = (comentarioRegistro || "").trim();
+    const notaRecepcionTxt = (comentarioRecepcion || "").trim();
+    const notaCombinada = [notaRegistroTxt, notaRecepcionTxt].filter(Boolean).join(" — ");
+    const tieneNotas = notaCombinada !== "";
 
     // Estados iniciales
     const [pago, setPago] = useState(price || 0);
@@ -216,6 +224,18 @@ const PagoCaja = ({vehiculo, user}) => {
                         <p className="ml-2">Marca: <strong>{marca}</strong></p>
                     </div>
                     <p className="mt-4 text-xl">Precio de transporte: <strong>$ {price} DLL</strong></p>
+
+                    {tieneNotas && (
+                        <div className="mt-4 p-1 rounded-xl border-l-8 border-red-700 bg-red-500 shadow-lg">
+                            <p className="text-2xl font-black text-white uppercase tracking-widest mb-3">
+                                Nota:
+                            </p>
+                            <p className="text-2xl font-black text-black leading-snug">
+                                {notaCombinada}
+                            </p>
+                        </div>
+                    )}
+
                     <div>
                         <div className="p-1">
                             <div className="flex items-center">
@@ -344,34 +364,6 @@ const PagoCaja = ({vehiculo, user}) => {
                                 min="0"
                                 step="any"
                             /> Dll
-                            </div>
-                        </div>
-                        <div className="p-1">
-                            <label htmlFor="pagoTardioFlete" className="block text-black-500">Pago Tardío de
-                                Flete:</label>
-                            <select
-                                id="pagoTardioFlete"
-                                value={pagoTardioFlete}
-                                onChange={(e) => setPagoTardioFlete(parseFloat(e.target.value))}
-                                className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
-                            >
-                                <option value={0}>No aplicar</option>
-                                <option value={50}>Aplicar (+50 USD)</option>
-                            </select>
-                        </div>
-                        <div className="p-1">
-                            <label htmlFor="estacionamiento" className="block text-black-500">Estacionamiento (3 USD por
-                                día):</label>
-                            <div className="flex items-center">
-                                <input
-                                    type="number"
-                                    id="estacionamiento"
-                                    value={estacionamientoDias}
-                                    onChange={handleEstacionamientoChange}
-                                    className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
-                                    min="0"
-                                    step="1"
-                                /> Días
                             </div>
                         </div>
                         <p className="mt-4 text-4xl">Total: <strong>$ {total} DLL</strong></p>
