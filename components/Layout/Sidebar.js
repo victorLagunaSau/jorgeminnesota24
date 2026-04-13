@@ -97,8 +97,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                     <li><button className={getButtonClass('pagoAdelantado')} onClick={() => handleSelectModule('pagoAdelantado')}>Pago Adelantado</button></li>
                                     <li><button className={getButtonClass('salidaCaja')} onClick={() => handleSelectModule('salidaCaja')}>Salida Caja</button></li>
                                     <li><button className={getButtonClass('entradaCaja')} onClick={() => handleSelectModule('entradaCaja')}>Entrada Caja</button></li>
-                                    <li><button className={getButtonClass('corteDia')} onClick={() => handleSelectModule('corteDia')}>Corte del día</button></li>
-                                    <li><button className={getButtonClass('corteTotal')} onClick={() => handleSelectModule('corteTotal')}>Corte Total</button></li>
                                 </ul>
                             </div>
                         </li>
@@ -127,6 +125,8 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                     <li><button className={getButtonClass('reporteCobros')} onClick={() => handleSelectModule('reporteCobros')}>Reporte Ingresos</button></li>
                                     <li><button className={getButtonClass('reports')} onClick={() => handleSelectModule('reports')}>Movimientos</button></li>
                                     <li><button className={getButtonClass('reportsPendientesPago')} onClick={() => handleSelectModule('reportsPendientesPago')}>Pendientes de pago</button></li>
+                                    <li><button className={getButtonClass('corteDia')} onClick={() => handleSelectModule('corteDia')}>Corte del día</button></li>
+                                    <li><button className={getButtonClass('corteTotal')} onClick={() => handleSelectModule('corteTotal')}>Corte Total</button></li>
                                 </ul>
                             </div>
                         </li>
