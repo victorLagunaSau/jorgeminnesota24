@@ -39,6 +39,9 @@ const ReporteViajesPagados = ({ user }) => {
     // Modal para ver nota del vehículo en el historial
     const [modalNota, setModalNota] = useState({ show: false, lote: "", notaRegistro: "", notaRecepcion: "" });
 
+    // Modal para confirmar cambio de número de viaje
+    const [modalCambioNum, setModalCambioNum] = useState({ show: false, viaje: null, nuevoNum: "", resultado: "" });
+
     // Cargar datos para agregar viajes
     useEffect(() => {
         const unsubChoferes = firestore().collection("choferes").onSnapshot(snap => {
@@ -60,24 +63,21 @@ const ReporteViajesPagados = ({ user }) => {
     }, []);
 
     // Función para cambiar número de viaje existente
-    const cambiarNumeroViaje = async (viajeActual, nuevoNum) => {
+    const cambiarNumeroViaje = (viajeActual, nuevoNum) => {
         if (!nuevoNum || nuevoNum === viajeActual.numViaje) {
             setEditandoViaje(null);
             return;
         }
+        setModalCambioNum({ show: true, viaje: viajeActual, nuevoNum, resultado: "" });
+    };
 
-        const confirmar = window.confirm(
-            `¿Cambiar viaje #${viajeActual.numViaje} a #${nuevoNum}?`
-        );
-        if (!confirmar) return;
-
+    const ejecutarCambioNumero = async () => {
+        const { viaje: viajeActual, nuevoNum } = modalCambioNum;
         setLoading(true);
         try {
             const batch = firestore().batch();
-            // Usar docId (ID real del documento en Firestore) para eliminar
             const docIdAnterior = viajeActual.docId || viajeActual.numViaje;
 
-            // Crear nuevo documento con el nuevo número (sin incluir docId en los datos)
             const { docId, ...viajeDataSinDocId } = viajeActual;
             const nuevoViajeData = {
                 ...viajeDataSinDocId,
@@ -85,11 +85,8 @@ const ReporteViajesPagados = ({ user }) => {
                 folioPago: nuevoNum
             };
             batch.set(firestore().collection("viajesPagados").doc(nuevoNum), nuevoViajeData);
-
-            // Eliminar documento anterior usando el ID real
             batch.delete(firestore().collection("viajesPagados").doc(docIdAnterior));
 
-            // Actualizar vehículos con el nuevo número
             if (viajeActual.vehiculos) {
                 viajeActual.vehiculos.forEach(v => {
                     if (v.lote) {
@@ -102,12 +99,11 @@ const ReporteViajesPagados = ({ user }) => {
             }
 
             await batch.commit();
-            alert(`Viaje actualizado de #${viajeActual.numViaje} a #${nuevoNum}`);
+            setModalCambioNum(prev => ({ ...prev, resultado: `Viaje actualizado de #${viajeActual.numViaje} a #${nuevoNum}` }));
             setEditandoViaje(null);
             consultarViajes(periodoSeleccionado);
         } catch (error) {
-            console.error(error);
-            alert("Error: " + error.message);
+            setModalCambioNum(prev => ({ ...prev, resultado: `Error: ${error.message}` }));
         } finally {
             setLoading(false);
         }
@@ -197,7 +193,13 @@ const ReporteViajesPagados = ({ user }) => {
                 .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
                 .orderBy("fechaPago", "desc")
                 .get();
-            setViajes(snap.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
+            const data = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            data.sort((a, b) => {
+                const numA = parseFloat(a.numViaje) || 0;
+                const numB = parseFloat(b.numViaje) || 0;
+                return numB - numA;
+            });
+            setViajes(data);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
@@ -468,6 +470,57 @@ const ReporteViajesPagados = ({ user }) => {
                                     Cerrar
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL CAMBIO DE NÚMERO DE VIAJE */}
+            {modalCambioNum.show && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-xl max-w-sm w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
+                        <div className="p-6">
+                            {!modalCambioNum.resultado ? (
+                                <>
+                                    <h3 className="text-xl font-black uppercase italic tracking-tighter text-gray-800">
+                                        Cambiar Número de Viaje
+                                    </h3>
+                                    <p className="text-sm font-bold text-gray-600 mt-3">
+                                        ¿Cambiar viaje <span className="text-red-600">#{modalCambioNum.viaje?.numViaje}</span> a <span className="text-green-600">#{modalCambioNum.nuevoNum}</span>?
+                                    </p>
+                                    <div className="flex gap-2 mt-6">
+                                        <button
+                                            onClick={() => setModalCambioNum({ show: false, viaje: null, nuevoNum: "", resultado: "" })}
+                                            className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={ejecutarCambioNumero}
+                                            className="btn btn-sm btn-success flex-1 text-white font-black uppercase text-[10px]"
+                                        >
+                                            Sí, cambiar
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3 className="text-xl font-black uppercase italic tracking-tighter text-green-700 flex items-center gap-2">
+                                        <FaCheck /> Listo
+                                    </h3>
+                                    <p className="text-sm font-bold text-gray-600 mt-3">
+                                        {modalCambioNum.resultado}
+                                    </p>
+                                    <div className="flex mt-6">
+                                        <button
+                                            onClick={() => setModalCambioNum({ show: false, viaje: null, nuevoNum: "", resultado: "" })}
+                                            className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
+                                        >
+                                            Cerrar
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
