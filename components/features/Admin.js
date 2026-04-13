@@ -25,6 +25,7 @@ import RegistroMasivoVehiculos from "./vehiculos/RegistroMasivoVehiculos";
 
 // Módulos - Caja
 import SalidaVehiculo from "./caja/SalidaVehiculo";
+import PagoAdelantado from "./caja/PagoAdelantado";
 import SalidaCaja from "./caja/SalidaCaja";
 import EntradaCaja from "./caja/EntradaCaja";
 import CorteDia from "./caja/CorteDia";
@@ -71,6 +72,8 @@ const Admin = () => {
                 return <Clientes user={user} />;
             case 'salidaVehiculo':
                 return <SalidaVehiculo user={user} />;
+            case 'pagoAdelantado':
+                return <PagoAdelantado user={user} />;
             case 'eliminaVehiculos':
                 return <EliminaVehiculos user={user} />;
             case 'eliminarMovimientosERC':

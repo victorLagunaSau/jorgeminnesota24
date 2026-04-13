@@ -15,8 +15,12 @@ const PagoCaja = ({vehiculo, user}) => {
         sobrePeso, // Usamos 'sobrePeso' para el pago sobrepeso
         gastosExtra, // Usamos 'gastosExtra' para los gastos adicionales
         comentarioRegistro,
-        comentarioRecepcion
+        comentarioRecepcion,
+        anticipoPago
     } = vehiculo[0] || {}; // Aseguramos que el vehículo esté disponible
+
+    const tieneAnticipo = parseFloat(anticipoPago || 0) > 0;
+    const montoAnticipo = parseFloat(anticipoPago || 0);
 
     // Mostramos la nota sin importar en qué campo esté guardada
     const notaRegistroTxt = (comentarioRegistro || "").trim();
@@ -44,14 +48,19 @@ const PagoCaja = ({vehiculo, user}) => {
 
     // Calcular el total
     const total = parseFloat(sobrePesoState) + parseFloat(gastosExtraState) + parseFloat(storageState) + parseFloat(pago) + parseFloat(pagoTardioFlete) + parseFloat(estacionamientoTotal);
-    const cajaCambio = parseFloat(recibo) + parseFloat(reciboCC) - total;
+    const totalConAnticipo = total - montoAnticipo;
+    const restante = totalConAnticipo > 0 ? totalConAnticipo : 0;
+    const cajaCambio = tieneAnticipo
+        ? parseFloat(recibo) + parseFloat(reciboCC) - restante
+        : parseFloat(recibo) + parseFloat(reciboCC) - total;
 
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
     const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
 
     const handleDarSalida = async () => {
 
-        if (cajaCambio < 0) {
+        const montoACubrir = tieneAnticipo ? restante : total;
+        if (parseFloat(recibo) + parseFloat(reciboCC) < montoACubrir) {
             setMensajeError("El cliente no ha cubierto el total, aún falta dinero.");
             return;
         }
@@ -97,9 +106,10 @@ const PagoCaja = ({vehiculo, user}) => {
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
                 pagosPendientes: false,
-                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
-                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                pagoTardioFlete: pagoTardioFlete || 0,
+                estacionamiento: estacionamientoTotal || 0,
                 folioVenta: nuevoFolio,
+                anticipoPago: montoAnticipo || 0,
             });
 
             // Guardar en la colección de movimientos
@@ -127,9 +137,10 @@ const PagoCaja = ({vehiculo, user}) => {
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
                 pagosPendientes: false,
-                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
-                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                pagoTardioFlete: pagoTardioFlete || 0,
+                estacionamiento: estacionamientoTotal || 0,
                 folioVenta: nuevoFolio,
+                anticipoPago: montoAnticipo || 0,
             });
 
             // Actualizamos los datos del vehículo
@@ -155,9 +166,10 @@ const PagoCaja = ({vehiculo, user}) => {
                 cajaRecibo: recibo,
                 cajaCambio: cajaCambio,
                 cajaCC: reciboCC,
-                pagoTardioFlete: pagoTardioFlete || 0, // Nuevo campo
-                estacionamiento: estacionamientoTotal || 0, // Nuevo campo
+                pagoTardioFlete: pagoTardioFlete || 0,
+                estacionamiento: estacionamientoTotal || 0,
                 folioVenta: nuevoFolio,
+                anticipoPago: montoAnticipo || 0,
             }]);
             setMovimientoGuardado(true);
             setMensajeError("");
@@ -233,6 +245,25 @@ const PagoCaja = ({vehiculo, user}) => {
                             <p className="text-2xl font-black text-black leading-snug">
                                 {notaCombinada}
                             </p>
+                        </div>
+                    )}
+
+                    {tieneAnticipo && (
+                        <div className="mt-4 p-4 rounded-xl border-l-8 border-green-700 bg-green-100 shadow-lg">
+                            <p className="text-xl font-black text-green-800 uppercase">
+                                Pago Adelantado: ${montoAnticipo} DLL
+                            </p>
+                            <p className="text-lg font-bold text-black mt-1">
+                                Total sin anticipo: ${total.toFixed(2)} DLL
+                            </p>
+                            <p className="text-2xl font-black text-green-700 mt-1">
+                                Resta por cobrar: ${restante.toFixed(2)} DLL
+                            </p>
+                            {restante <= 0 && (
+                                <p className="text-sm font-bold text-green-600 mt-1">
+                                    El anticipo cubre el total. Solo confirma la salida.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -367,7 +398,13 @@ const PagoCaja = ({vehiculo, user}) => {
                             </div>
                         </div>
                         <p className="mt-4 text-4xl">Total: <strong>$ {total} DLL</strong></p>
-                        <p className="mt-4 text-4xl">Cambio: <strong>$ {parseFloat(recibo) + parseFloat(reciboCC) - total} DLL</strong>
+                        {tieneAnticipo && (
+                            <p className="mt-2 text-2xl text-green-700">Anticipo: <strong>- ${montoAnticipo} DLL</strong></p>
+                        )}
+                        {tieneAnticipo && (
+                            <p className="mt-2 text-3xl font-black text-green-800">A cobrar: <strong>$ {restante.toFixed(2)} DLL</strong></p>
+                        )}
+                        <p className="mt-4 text-4xl">Cambio: <strong>$ {cajaCambio.toFixed(2)} DLL</strong>
                         </p>
                     </div>
                     <div className="mt-4">

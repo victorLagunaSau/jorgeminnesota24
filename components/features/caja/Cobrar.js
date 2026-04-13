@@ -6,12 +6,27 @@ import PagoPendiente from './PagoPendiente';  // Importa el formulario de Cuenta
 const Cobrar = ({ vehiculo, user }) => {
     const [tipoPago, setTipoPago] = useState(null);  // Controla el tipo de pago seleccionado (efectivo o pendiente)
 
+    const tieneAnticipo = parseFloat(vehiculo?.[0]?.anticipoPago || 0) > 0;
+    const montoAnticipo = parseFloat(vehiculo?.[0]?.anticipoPago || 0);
+
     const handleRegresar = () => {
         setTipoPago(null); // Restablece el estado a null para mostrar los botones nuevamente
     };
 
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
+
+            {/* Banner de anticipo */}
+            {tieneAnticipo && !tipoPago && (
+                <div className="mb-4 p-3 rounded-lg border-l-8 border-green-600 bg-green-100 shadow">
+                    <p className="text-lg font-black text-green-800 uppercase">
+                        Este vehículo tiene un pago adelantado de ${montoAnticipo} DLL
+                    </p>
+                    <p className="text-sm text-green-700">
+                        Al cobrar, el sistema descontará automáticamente el anticipo del total.
+                    </p>
+                </div>
+            )}
 
             {/* Botones para elegir tipo de pago */}
             {!tipoPago && (
