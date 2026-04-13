@@ -18,6 +18,7 @@ const TablaViajes = ({user}) => {
     const [procesandoPago, setProcesandoPago] = useState(false);
     const btnPrintRef = useRef();
     const [estadoOrigen, setEstadoOrigen] = useState("");
+    const [numViajePago, setNumViajePago] = useState("");
     const [metodoPago, setMetodoPago] = useState({ efectivo: "", cheque: "", zelle: "" });
 
     // Estado para el Modal de Comentarios
@@ -229,6 +230,8 @@ const TablaViajes = ({user}) => {
         setProcesandoPago(true);
         const fechaOperacionActual = new Date();
         const empresaSeleccionada = viaje.empresaNombre || viaje.chofer?.empresa || "";
+        // Usar el número de viaje ingresado al pagar
+        const numViajeFinal = numViajePago.trim() || viaje.numViaje;
 
         // CÁLCULO DE TOTALES
         const totalFletes = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.flete) || 0), 0);
@@ -288,7 +291,7 @@ const TablaViajes = ({user}) => {
                             ultimaActualizacionPrecios: {
                                 fecha: fechaOperacionActual,
                                 usuario: user?.nombre || "Admin",
-                                viajeRelacionado: viaje.numViaje
+                                viajeRelacionado: numViajeFinal
                             }
                         });
 
@@ -301,7 +304,7 @@ const TablaViajes = ({user}) => {
                             storage: parseFloat(v.storage || 0),
                             sobrePeso: parseFloat(v.sPeso || 0),
                             gastosExtra: parseFloat(v.gExtra || 0),
-                            numViaje: viaje.numViaje,
+                            numViaje: numViajeFinal,
                             usuario: user?.nombre || "Admin",
                             nota: "Actualización de precios - Lote ya pagado previamente"
                         });
@@ -322,7 +325,7 @@ const TablaViajes = ({user}) => {
                             comentariosChofer: null,
                             comentarioRegistro: v.comentarioRegistro || "",
                             comentarioRecepcion: v.comentarioRecepcion || "",
-                            numViaje: viaje.numViaje,
+                            numViaje: numViajeFinal,
                             empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
                             folioPago: nuevoFolioContable,
                             descripcion: "",
@@ -370,6 +373,7 @@ const TablaViajes = ({user}) => {
                 // --- 2. HISTORIAL DE PAGADOS (Expediente del Viaje) ---
                 const viajePagadoData = {
                     ...viaje,
+                    numViaje: numViajeFinal,
                     folioPago: nuevoFolioContable,
                     fechaPago: fechaOperacionActual,
                     empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
@@ -402,7 +406,7 @@ const TablaViajes = ({user}) => {
             });
 
             // Preparar el PDF para imprimir con el estado de origen y métodos de pago
-            setViajeAImprimir({...viaje, estadoOrigen: estadoOrigen, metodoPago: metodoPago});
+            setViajeAImprimir({...viaje, numViaje: numViajeFinal, estadoOrigen: estadoOrigen, metodoPago: metodoPago});
 
             // Imprimir automáticamente después de un pequeño delay
             setTimeout(() => {
@@ -410,8 +414,9 @@ const TablaViajes = ({user}) => {
                     btnPrintRef.current.click();
                 }
                 setModal({show: false});
-                setEstadoOrigen(""); // Limpiar el estado para el próximo pago
-                setMetodoPago({ efectivo: "", cheque: "", zelle: "" }); // Limpiar métodos de pago
+                setEstadoOrigen("");
+                setNumViajePago("");
+                setMetodoPago({ efectivo: "", cheque: "", zelle: "" });
             }, 1000);
 
         } catch (error) {
@@ -467,7 +472,20 @@ const TablaViajes = ({user}) => {
                         )}
                         {modal.tipo === 'pago' && (
                             <>
-                                <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-700 rounded">
+                                <div className="mt-4 p-3 bg-red-50 border-l-4 border-red-700 rounded">
+                                    <label className="text-[9px] font-black text-red-700 uppercase block mb-2">
+                                        Número de Viaje:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={numViajePago}
+                                        onChange={(e) => setNumViajePago(e.target.value.toUpperCase())}
+                                        placeholder="ESCRIBE EL NÚMERO DE VIAJE"
+                                        className="w-full px-3 py-2 border-2 border-red-300 rounded-md text-sm font-bold uppercase focus:border-red-600 focus:outline-none"
+                                        maxLength={30}
+                                    />
+                                </div>
+                                <div className="mt-3 p-3 bg-blue-50 border-l-4 border-blue-700 rounded">
                                     <label className="text-[9px] font-black text-blue-700 uppercase block mb-2">
                                         Estado de Origen del Viaje:
                                     </label>
@@ -530,6 +548,7 @@ const TablaViajes = ({user}) => {
                                     setModal({show: false});
                                     if (modal.tipo === 'pago') {
                                         setEstadoOrigen("");
+                                        setNumViajePago("");
                                         setMetodoPago({ efectivo: "", cheque: "", zelle: "" });
                                     }
                                 }}
@@ -539,12 +558,12 @@ const TablaViajes = ({user}) => {
                             )}
                             {modal.accion && <button
                                 onClick={modal.accion}
-                                disabled={modal.tipo === 'pago' && !estadoOrigen.trim()}
+                                disabled={modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim())}
                                 className={`btn btn-sm text-white font-black uppercase text-[10px] ${
                                     modal.tipo === 'eliminar' ? 'btn-error' :
                                     modal.tipo === 'pago' ? 'btn-success' :
                                     'btn-error'
-                                } ${modal.tipo === 'pago' && !estadoOrigen.trim() ? 'btn-disabled' : ''}`}>
+                                } ${modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim()) ? 'btn-disabled' : ''}`}>
                                 {modal.tipo === 'eliminar' ? 'Eliminar Viaje' :
                                  modal.tipo === 'pago' ? 'Confirmar Pago' :
                                  'Continuar'}
@@ -675,7 +694,7 @@ const TablaViajes = ({user}) => {
                                             />
                                         </>
                                     ) : (
-                                        `VIAJE #${viaje.numViaje}`
+                                        viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"
                                     )}
                                 </div>
                                 <div>
@@ -956,7 +975,7 @@ const TablaViajes = ({user}) => {
                                                                                     setEstadoOrigen(""); // Limpiar estado anterior
                                                                                     setModal({
                                                                                         show: true,
-                                                                                        mensaje: `¿Confirmar pago del viaje #${viaje.numViaje}? Completa el estado de origen y se procesará el pago generando el PDF automáticamente.`,
+                                                                                        mensaje: `¿Confirmar pago del viaje? Escribe el número de viaje y el estado de origen para procesar el pago y generar el PDF automáticamente.`,
                                                                                         accion: () => ejecutarPago(viaje),
                                                                                         tipo: "pago"
                                                                                     });

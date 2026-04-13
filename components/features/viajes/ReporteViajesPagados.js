@@ -3,7 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import {
     FaSearch, FaFileExcel, FaTruck, FaBuilding, FaFileInvoice, FaLayerGroup,
-    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt
+    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt, FaCommentDots
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import moment from "moment";
@@ -35,6 +35,9 @@ const ReporteViajesPagados = ({ user }) => {
     // Estado para editar viaje existente
     const [editandoViaje, setEditandoViaje] = useState(null);
     const [nuevoNumViaje, setNuevoNumViaje] = useState("");
+
+    // Modal para ver nota del vehículo en el historial
+    const [modalNota, setModalNota] = useState({ show: false, lote: "", notaRegistro: "", notaRecepcion: "" });
 
     // Cargar datos para agregar viajes
     useEffect(() => {
@@ -428,6 +431,48 @@ const ReporteViajesPagados = ({ user }) => {
 
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
+            {/* MODAL DE NOTA DEL VEHÍCULO */}
+            {modalNota.show && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border-t-8 border-blue-600 overflow-hidden">
+                        <div className="p-6">
+                            <h3 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-2 text-gray-800">
+                                <FaCommentDots className="text-blue-600" /> Notas del Vehículo
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Lote: {modalNota.lote}</p>
+
+                            <div className="mt-6 space-y-4">
+                                {modalNota.notaRegistro && (
+                                    <div className="p-3 bg-gray-50 rounded-lg border-l-4 border-gray-300">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">Nota de Registro (Origen)</p>
+                                        <p className="text-sm font-bold text-gray-700 italic">
+                                            {modalNota.notaRegistro}
+                                        </p>
+                                    </div>
+                                )}
+                                {modalNota.notaRecepcion && (
+                                    <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                                        <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Nota de Recepción (Destino)</p>
+                                        <p className="text-sm font-bold text-blue-700 italic">
+                                            {modalNota.notaRecepcion}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex mt-6">
+                                <button
+                                    onClick={() => setModalNota({ show: false, lote: "", notaRegistro: "", notaRecepcion: "" })}
+                                    className="btn btn-sm btn-ghost flex-1 font-black uppercase text-[10px]"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* HEADER */}
             <div className="sticky top-0 z-50 p-6 bg-white border-b-2 border-gray-200 shadow-sm">
                 <div className="flex justify-between items-center mb-4">
@@ -597,11 +642,15 @@ const ReporteViajesPagados = ({ user }) => {
                                                 <th className="p-3 text-center text-gray-400">S. Peso</th>
                                                 <th className="p-3 text-center text-gray-400">G. Extra</th>
                                                 <th className="p-3 text-center bg-green-100 text-green-700">Total</th>
+                                                <th className="p-3 text-right text-blue-700">Nota</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {viaje.vehiculos.map((v, idx) => {
                                                 const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
+                                                const notaRegistro = (v.comentarioRegistro || "").trim();
+                                                const notaRecepcion = (v.comentarioRecepcion || "").trim();
+                                                const tieneNota = notaRegistro !== "" || notaRecepcion !== "";
                                                 return (
                                                     <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                                                         <td className="p-3 font-mono text-xs font-black text-blue-700">{v.lote}</td>
@@ -618,6 +667,25 @@ const ReporteViajesPagados = ({ user }) => {
                                                         <td className="p-3 text-center font-mono text-[11px] font-black">${v.sPeso || 0}</td>
                                                         <td className="p-3 text-center font-mono text-[11px] font-black">${v.gExtra || 0}</td>
                                                         <td className="p-3 text-center font-black bg-green-50 text-green-700">${total.toLocaleString()}</td>
+                                                        <td className="p-3 text-right">
+                                                            {tieneNota ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setModalNota({
+                                                                        show: true,
+                                                                        lote: v.lote,
+                                                                        notaRegistro,
+                                                                        notaRecepcion
+                                                                    })}
+                                                                    className="text-blue-600 hover:text-blue-800 transition-colors inline-flex"
+                                                                    title="Ver nota"
+                                                                >
+                                                                    <FaCommentDots size={20} />
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-gray-200">—</span>
+                                                            )}
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
@@ -628,6 +696,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                 <td className="p-3 text-center font-black text-lg bg-green-100 text-green-700 border-l-4 border-green-600">
                                                     ${viaje.resumenFinanciero?.granTotal?.toLocaleString() || '0'}
                                                 </td>
+                                                <td className="p-3 bg-gray-50"></td>
                                             </tr>
                                         </tbody>
                                     </table>

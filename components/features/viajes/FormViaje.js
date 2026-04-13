@@ -106,26 +106,13 @@ const FormViaje = ({user, onViajeCreado}) => {
         return () => unsubProvincias();
     }, [user]);
 
-    // --- FUNCIÓN PARA FOLIO AUTOMÁTICO O MANUAL ---
+    // --- FUNCIÓN PARA INICIAR VIAJE (número se asigna al pagar) ---
     const iniciarViajeConFolio = async () => {
         setLoading(true);
         try {
-            // Si es Admin Master y ya ingresó un número manual, usarlo
-            if (isAdminMaster && encabezado.numViaje && encabezado.numViaje.trim() !== "") {
-                setViajeIniciado(true);
-                setLoading(false);
-                return;
-            }
-
-            // Si no, obtener el siguiente folio automático
-            const conRef = firestore().collection("config").doc("consecutivos");
-            const doc = await conRef.get();
-            const proximo = (doc.data()["viajesPendientes"] || 0) + 1;
-
-            setEncabezado(prev => ({...prev, numViaje: String(proximo)}));
             setViajeIniciado(true);
         } catch (e) {
-            setAlertMessage({msg: "Error al obtener folio", tipo: 'error'});
+            setAlertMessage({msg: "Error al iniciar viaje", tipo: 'error'});
         } finally {
             setLoading(false);
         }
@@ -298,88 +285,67 @@ const FormViaje = ({user, onViajeCreado}) => {
         if (!esValido) return;
         setGuardando(true);
         try {
-            const conRef = firestore().collection("config").doc("consecutivos");
+            // Generar un ID temporal para el documento (el número real se asigna al pagar)
+            const docId = `TEMP_${Date.now()}`;
 
-            // Verificar si Admin Master usó número manual
-            const usaNumeroManual = isAdminMaster && encabezado.numViaje && encabezado.numViaje.trim() !== "";
+            const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
 
-            await firestore().runTransaction(async (transaction) => {
-                const conDoc = await transaction.get(conRef);
-                const consecutivoActual = conDoc.data()["viajesPendientes"] || 0;
+            // Verificar si es chofer temporal (con token)
+            const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_");
+            let choferData;
 
-                // Usar número manual si Admin Master lo ingresó, sino usar automático
-                let numViajeFinal;
-                let actualizarConsecutivo = false;
-
-                if (usaNumeroManual) {
-                    numViajeFinal = String(encabezado.numViaje).trim();
-                } else {
-                    numViajeFinal = String(consecutivoActual + 1);
-                    actualizarConsecutivo = true;
-                }
-
-                const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
-
-                // Verificar si es chofer temporal (con token)
-                const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_");
-                let choferData;
-
-                if (esChoferTemporal) {
-                    // Chofer temporal ingresado con token
-                    choferData = {
-                        id: encabezado.choferId,
-                        nombre: encabezado.choferManual,
-                        empresa: "PENDIENTE DE ASIGNAR",
-                        telefono: "",
-                        esTemporal: true,
-                        tokenUsado: tokenUsado
-                    };
-                } else {
-                    // Chofer normal de la lista
-                    choferData = choferes.find(c => c.id === encabezado.choferId);
-                }
-
-                const viajeData = {
-                    numViaje: numViajeFinal,
-                    chofer: choferData,
-                    choferTemporal: esChoferTemporal, // Flag para identificar viajes con chofer temporal
-                    empresaId: user.id, // ID del creador (Carrier o Admin)
-                    empresaLiderId: esChoferTemporal ? "" : (choferData?.empresaLiderId || ""), // Guardamos quién es el líder de este chofer
-                    estatus: "PENDIENTE",
-                    fechaCreacion: new Date(),
-                    creadoPor: {
-                        id: user?.id || "N/A",
-                        nombre: user?.nombre || "Admin",
-                        tipo: user?.tipo || "desconocido"
-                    },
-                    resumenFinanciero: {
-                        totalFletes: tFlete,
-                        totalSoloGastos: vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) + parseFloat(v.sPeso) + parseFloat(v.gExtra)), 0),
-                        totalVehiculos: vehiculos.length
-                    },
-                    vehiculos: vehiculos.map((v, index) => ({...v, order: index + 1}))
+            if (esChoferTemporal) {
+                choferData = {
+                    id: encabezado.choferId,
+                    nombre: encabezado.choferManual,
+                    empresa: "PENDIENTE DE ASIGNAR",
+                    telefono: "",
+                    esTemporal: true,
+                    tokenUsado: tokenUsado
                 };
+            } else {
+                choferData = choferes.find(c => c.id === encabezado.choferId);
+            }
 
-                transaction.set(firestore().collection("viajesPendientes").doc(numViajeFinal), viajeData);
+            const viajeData = {
+                numViaje: "",
+                chofer: choferData,
+                choferTemporal: esChoferTemporal,
+                empresaId: user.id,
+                empresaLiderId: esChoferTemporal ? "" : (choferData?.empresaLiderId || ""),
+                estatus: "PENDIENTE",
+                fechaCreacion: new Date(),
+                creadoPor: {
+                    id: user?.id || "N/A",
+                    nombre: user?.nombre || "Admin",
+                    tipo: user?.tipo || "desconocido"
+                },
+                resumenFinanciero: {
+                    totalFletes: tFlete,
+                    totalSoloGastos: vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) + parseFloat(v.sPeso) + parseFloat(v.gExtra)), 0),
+                    totalVehiculos: vehiculos.length
+                },
+                vehiculos: vehiculos.map((v, index) => ({...v, order: index + 1}))
+            };
 
-                vehiculos.forEach(v => {
-                    transaction.set(firestore().collection("lotesEnTransito").doc(v.lote), {
-                        viajeAsignado: numViajeFinal,
-                        choferNombre: choferData?.nombre || encabezado.choferManual,
-                        fechaBloqueo: new Date()
-                    });
+            const batch = firestore().batch();
+
+            batch.set(firestore().collection("viajesPendientes").doc(docId), viajeData);
+
+            vehiculos.forEach(v => {
+                batch.set(firestore().collection("lotesEnTransito").doc(v.lote), {
+                    viajeAsignado: docId,
+                    choferNombre: choferData?.nombre || encabezado.choferManual,
+                    fechaBloqueo: new Date()
                 });
-
-                // Solo actualizar consecutivo si se usó número automático
-                if (actualizarConsecutivo) {
-                    transaction.update(conRef, {"viajesPendientes": consecutivoActual + 1});
-                }
-                setViajeReciente(viajeData);
             });
+
+            await batch.commit();
+            setViajeReciente(viajeData);
 
             // Si hay callback de redirección (modo administrativo), redirigir automáticamente
             if (onViajeCreado) {
-                setAlertMessage({msg: `Viaje #${viajeReciente?.numViaje || ''} creado exitosamente. Redirigiendo...`, tipo: 'success'});
+                setAlertMessage({msg: `Viaje creado exitosamente. Redirigiendo...`, tipo: 'success'});
                 setGuardando(false);
 
                 // Limpiar estados y redirigir después de un breve momento
@@ -423,8 +389,8 @@ const FormViaje = ({user, onViajeCreado}) => {
                         <div className="text-blue-600 text-6xl flex justify-center mb-4"><FaCheckCircle/></div>
                         <h4 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">Viaje
                             Registrado</h4>
-                        <p className="text-[11px] font-bold text-gray-400 uppercase mt-2">Folio:
-                            #{viajeReciente?.numViaje}</p>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase mt-2">
+                            El número de viaje se asignará al momento del pago</p>
 
                         <div className="my-6 p-4 bg-blue-50 rounded-lg border border-dashed border-blue-200">
                             <p className="text-lg font-black text-gray-800 uppercase leading-none">{viajeReciente?.chofer?.nombre}</p>
@@ -630,18 +596,15 @@ const FormViaje = ({user, onViajeCreado}) => {
             <div
                 className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200 items-end">
                 <div>
-                    <label className="block text-[10px] md:text-[10px] font-black text-red-600 uppercase mb-1 italic">
-                        Núm. Viaje {isAdminMaster ? "*" : "(Auto)"}
+                    <label className="block text-[10px] md:text-[10px] font-black text-gray-400 uppercase mb-1 italic">
+                        Núm. Viaje
                     </label>
                     <input
                         type="text"
-                        disabled={!isAdminMaster}
-                        className={`input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] ${
-                            isAdminMaster ? "bg-white" : "bg-gray-100"
-                        }`}
-                        value={encabezado.numViaje}
-                        onChange={(e) => isAdminMaster && setEncabezado({...encabezado, numViaje: e.target.value})}
-                        placeholder={isAdminMaster ? "Ingresa el número" : "Automático"}
+                        disabled={true}
+                        className="input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] bg-gray-100"
+                        value=""
+                        placeholder="Se asigna al pagar"
                         style={{fontSize: '16px'}}
                     />
                 </div>

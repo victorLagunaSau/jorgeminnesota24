@@ -80,7 +80,7 @@ const EstadosPrecios = () => {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="bg-warning shadow-md p-1">${region.price}</div>
+                                                    <div className="bg-warning shadow-md p-1">${region.precioPagina || region.price}</div>
                                                 </li>
                                             </div>
 

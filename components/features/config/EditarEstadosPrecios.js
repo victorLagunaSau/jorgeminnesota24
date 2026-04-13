@@ -8,10 +8,12 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
 
     useEffect(() => {
         if (currentRegions?.regions) {
+            const esTexas = (currentRegions.state || "").toUpperCase().includes("TEXAS");
+            const incremento = esTexas ? 50 : 100;
             const data = currentRegions.regions.map(r => ({
                 ...r,
                 cost: r.cost || "0",
-                // Aseguramos que profit exista al cargar, si no, lo calculamos
+                precioPagina: r.precioPagina || (parseFloat(r.price || 0) + incremento).toString(),
                 profit: r.profit || (parseFloat(r.price || 0) - parseFloat(r.cost || 0)).toString()
             })).sort((a, b) => a.order - b.order);
             setUpdatedRegions(data);
@@ -41,7 +43,8 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
             city: '',
             price: '0',
             cost: '0',
-            profit: '0', // Inicializamos en 0
+            precioPagina: '0',
+            profit: '0',
             isNew: true,
             order: nextOrder
         }, ...updatedRegions]);
@@ -55,7 +58,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
     };
 
     const handleSave = async () => {
-        const hasEmpty = updatedRegions.some(r => !r.city || r.price === "" || r.cost === "");
+        const hasEmpty = updatedRegions.some(r => !r.city || r.price === "" || r.cost === "" || r.precioPagina === "");
         if (hasEmpty) {
             setAlertMessage({ msg: "Todos los campos son obligatorios.", tipo: 'error' });
             return;
@@ -122,6 +125,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                         <tr className="text-[10px] uppercase text-gray-400 bg-gray-50 border-b">
                             <th className="w-8 text-center">New</th>
                             <th>Ciudad / Destino</th>
+                            <th className="w-24 text-purple-700 font-black text-center">Página ($)</th>
                             <th className="w-24 text-blue-700 font-black text-center">Cobro ($)</th>
                             <th className="w-24 text-red-600 font-black text-center">Pago ($)</th>
                             <th className="w-24 text-green-700 font-black text-center bg-green-50">Profit (BD)</th>
@@ -145,6 +149,14 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
                                         value={region.city}
                                         onChange={(e) => handleFieldChange(index, 'city', e.target.value.toUpperCase())}
                                         className="input input-bordered input-xs w-full bg-white text-black font-bold uppercase focus:border-blue-500"
+                                    />
+                                </td>
+                                <td>
+                                    <input
+                                        type="number"
+                                        value={region.precioPagina}
+                                        onChange={(e) => handleFieldChange(index, 'precioPagina', e.target.value)}
+                                        className="input input-bordered input-xs w-full bg-purple-50 text-purple-800 font-mono font-bold text-center"
                                     />
                                 </td>
                                 <td>
