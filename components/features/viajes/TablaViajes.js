@@ -8,6 +8,7 @@ import HojaVerificacion from "./HojaVerificacion";
 const TablaViajes = ({user}) => {
     const [viajes, setViajes] = useState([]);
     const [clientes, setClientes] = useState([]);
+    const [provincias, setProvincias] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filtroGeneral, setFiltroGeneral] = useState("");
     const [busquedaCliente, setBusquedaCliente] = useState({});
@@ -59,9 +60,18 @@ const TablaViajes = ({user}) => {
             })));
         });
 
+        const unsubProvincias = firestore().collection("province").orderBy("state", "asc").onSnapshot(snap => {
+            setProvincias(snap.docs.map(doc => ({
+                id: doc.id,
+                state: doc.data().state,
+                regions: doc.data().regions || []
+            })));
+        });
+
         return () => {
             unsubViajes();
             unsubClientes();
+            unsubProvincias();
         };
     }, [user]);
 
@@ -83,6 +93,29 @@ const TablaViajes = ({user}) => {
                     nuevosVehiculos[vehiculoIdx].clienteId = value;
                     nuevosVehiculos[vehiculoIdx].clienteNombre = clienteEncontrado ? clienteEncontrado.nombre : "";
                     nuevosVehiculos[vehiculoIdx].clienteTelefono = clienteEncontrado ? clienteEncontrado.telefono : "";
+                } else if (field === 'estado') {
+                    nuevosVehiculos[vehiculoIdx].estado = value;
+                    const estadoData = provincias.find(p => p.state === value);
+                    if (estadoData && estadoData.regions?.length > 0) {
+                        nuevosVehiculos[vehiculoIdx].ciudad = estadoData.regions[0].city;
+                        nuevosVehiculos[vehiculoIdx].flete = (estadoData.regions[0].cost || 0).toString();
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(estadoData.regions[0].price || 0);
+                    } else {
+                        nuevosVehiculos[vehiculoIdx].ciudad = "";
+                        nuevosVehiculos[vehiculoIdx].flete = "0";
+                        nuevosVehiculos[vehiculoIdx].precioVenta = 0;
+                    }
+                } else if (field === 'ciudad') {
+                    nuevosVehiculos[vehiculoIdx].ciudad = value;
+                    const estadoData = provincias.find(p => p.state === nuevosVehiculos[vehiculoIdx].estado);
+                    const regionData = estadoData?.regions?.find(r => r.city === value);
+                    if (regionData) {
+                        nuevosVehiculos[vehiculoIdx].flete = (regionData.cost || 0).toString();
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(regionData.price || 0);
+                    } else {
+                        nuevosVehiculos[vehiculoIdx].flete = "0";
+                        nuevosVehiculos[vehiculoIdx].precioVenta = 0;
+                    }
                 } else {
                     nuevosVehiculos[vehiculoIdx][field] = valorFinal;
                 }
@@ -813,10 +846,33 @@ const TablaViajes = ({user}) => {
                                                 )}
                                             </td>
                                             <td className="p-3">
-                                                <div
-                                                    className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
-                                                <div
-                                                    className="text-[9px] font-bold text-gray-400 mt-1 uppercase italic">{v.almacen}</div>
+                                                {puedeEditar ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        <select
+                                                            value={v.estado || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'estado', e.target.value)}
+                                                            className="w-28 bg-gray-50 rounded border border-gray-200 outline-none text-[9px] uppercase font-bold text-gray-600 px-1 py-1 focus:border-blue-500"
+                                                        >
+                                                            <option value="">ESTADO</option>
+                                                            {provincias.map(p => <option key={p.id} value={p.state}>{p.state}</option>)}
+                                                        </select>
+                                                        <select
+                                                            value={v.ciudad || ""}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'ciudad', e.target.value)}
+                                                            className="w-28 bg-gray-50 rounded border border-gray-200 outline-none text-[10px] uppercase font-black text-red-700 px-1 py-1 focus:border-blue-500"
+                                                        >
+                                                            <option value="">CIUDAD</option>
+                                                            {(provincias.find(p => p.state === v.estado)?.regions || []).map((r, i) => (
+                                                                <option key={i} value={r.city}>{r.city}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                ) : (
+                                                    <div>
+                                                        <div className="text-[11px] font-black text-red-700 uppercase leading-none">{v.ciudad}</div>
+                                                        <div className="text-[9px] font-bold text-gray-400 mt-1 uppercase italic">{v.estado}</div>
+                                                    </div>
+                                                )}
                                             </td>
 
                                             {/* CLIENTE */}
