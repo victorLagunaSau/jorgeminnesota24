@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import { firestore } from "../../../firebase/firebaseIni";
-import { FaMoneyBillWave, FaCheckCircle, FaExclamationTriangle, FaSearch } from 'react-icons/fa';
+import { FaMoneyBillWave, FaCheckCircle, FaExclamationTriangle, FaSearch, FaPrint } from 'react-icons/fa';
 import moment from 'moment';
+import ReciboAdelanto from './ReciboAdelanto';
 
 const PagoAdelantado = ({ user }) => {
     // Datos del vehículo
@@ -28,8 +29,10 @@ const PagoAdelantado = ({ user }) => {
     const [vehiculoExistente, setVehiculoExistente] = useState(null);
     const [buscando, setBuscando] = useState(false);
 
-    // Modal de confirmación
+    // Modal de confirmación y recibo
     const [modalConfirmar, setModalConfirmar] = useState(false);
+    const [modalRecibo, setModalRecibo] = useState(false);
+    const [datosRecibo, setDatosRecibo] = useState(null);
 
     // Cargar estados/provincias
     useEffect(() => {
@@ -212,7 +215,15 @@ const PagoAdelantado = ({ user }) => {
                 timestamp: timestamp,
             });
 
+            setDatosRecibo({
+                binNip: lote,
+                marca, modelo, cliente, telefonoCliente,
+                estado, ciudad, price,
+                anticipoPago: parseFloat(montoAdelanto),
+                usuario: user.nombre || "Admin",
+            });
             setMensajeExito(`Pago adelantado de $${montoAdelanto} DLL registrado para lote ${lote}`);
+            setModalRecibo(true);
             limpiarFormulario();
         } catch (error) {
             console.error("Error registrando pago adelantado:", error);
@@ -455,6 +466,18 @@ const PagoAdelantado = ({ user }) => {
                                 Confirmar
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de recibo para imprimir */}
+            {modalRecibo && datosRecibo && (
+                <div className="fixed inset-0 flex justify-center items-center z-50">
+                    <div className="modal-box max-w-5xl w-full bg-white">
+                        <ReciboAdelanto
+                            onClose={() => setModalRecibo(false)}
+                            data={datosRecibo}
+                        />
                     </div>
                 </div>
             )}

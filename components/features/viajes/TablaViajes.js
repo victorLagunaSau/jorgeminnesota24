@@ -589,8 +589,14 @@ const TablaViajes = ({user}) => {
                                     {modal.accion ? 'Cancelar' : 'Cerrar'}
                                 </button>
                             )}
-                            {modal.accion && <button
-                                onClick={modal.accion}
+                            {(modal.accion || modal.viajeAPagar) && <button
+                                onClick={() => {
+                                    if (modal.tipo === 'pago' && modal.viajeAPagar) {
+                                        ejecutarPago(modal.viajeAPagar);
+                                    } else if (modal.accion) {
+                                        modal.accion();
+                                    }
+                                }}
                                 disabled={modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim())}
                                 className={`btn btn-sm text-white font-black uppercase text-[10px] ${
                                     modal.tipo === 'eliminar' ? 'btn-error' :
@@ -1029,10 +1035,11 @@ const TablaViajes = ({user}) => {
                                                                                     });
                                                                                 } else {
                                                                                     setEstadoOrigen(""); // Limpiar estado anterior
+                                                                                    setNumViajePago(""); // Limpiar número de viaje anterior
                                                                                     setModal({
                                                                                         show: true,
                                                                                         mensaje: `¿Confirmar pago del viaje? Escribe el número de viaje y el estado de origen para procesar el pago y generar el PDF automáticamente.`,
-                                                                                        accion: () => ejecutarPago(viaje),
+                                                                                        viajeAPagar: viaje,
                                                                                         tipo: "pago"
                                                                                     });
                                                                                 }
