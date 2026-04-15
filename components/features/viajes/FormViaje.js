@@ -40,6 +40,7 @@ const FormViaje = ({user, onViajeCreado}) => {
     // Estado para dropdown de cliente en cada fila
     const [clienteDropdownId, setClienteDropdownId] = useState(null);
     const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+    const [clienteDropdownIdx, setClienteDropdownIdx] = useState(0);
 
     // Estados para token de chofer temporal
     const [mostrarModalToken, setMostrarModalToken] = useState(false);
@@ -263,10 +264,25 @@ const FormViaje = ({user, onViajeCreado}) => {
                 }
                 setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: true} : v));
             } else if (docT.exists) {
-                // Lote en tránsito - No permitir
-                setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito`, tipo: 'error'});
-                setVehiculos(vehiculos.map(v => v.id === id ? {...v, lote: ""} : v));
-                setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                // Validar si el viaje asignado realmente sigue existiendo; si no, es huérfano
+                const viajeAsignadoId = docT.data()?.viajeAsignado;
+                let huerfano = false;
+                if (!viajeAsignadoId) {
+                    huerfano = true;
+                } else {
+                    const viajeDoc = await firestore().collection("viajesPendientes").doc(viajeAsignadoId).get();
+                    if (!viajeDoc.exists) huerfano = true;
+                }
+
+                if (huerfano) {
+                    await firestore().collection("lotesEnTransito").doc(loteLimpio).delete();
+                    setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
+                } else {
+                    // Lote en tránsito - No permitir
+                    setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito`, tipo: 'error'});
+                    setVehiculos(vehiculos.map(v => v.id === id ? {...v, lote: ""} : v));
+                    setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                }
             } else {
                 // Lote nuevo - Limpiar marca de pagado si existía
                 setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
@@ -277,8 +293,33 @@ const FormViaje = ({user, onViajeCreado}) => {
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim() !== "" && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
+        v.lote.trim().length === 8 && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
     );
+
+    const getClientesFiltrados = (vehiculoId) => {
+        const vehiculoActual = vehiculos.find(v => v.id === vehiculoId);
+        const busqueda = vehiculoActual?.clienteAlt || '';
+        return clientesRaw.filter(c =>
+            c.cliente?.toLowerCase().includes(busqueda.toLowerCase())
+        ).slice(0, 10);
+    };
+
+    const seleccionarCliente = (vehiculoId, c) => {
+        setVehiculos(prev => prev.map(veh =>
+            veh.id === vehiculoId
+                ? {
+                    ...veh,
+                    clienteAlt: c.cliente,
+                    clienteId: c.id,
+                    clienteNombre: c.cliente,
+                    clienteTelefono: c.telefonoCliente || "",
+                    clienteConfirmado: true
+                }
+                : veh
+        ));
+        setClienteDropdownId(null);
+        setClienteDropdownIdx(0);
+    };
 
     // --- ACCIÓN FINALIZAR CON TRANSACCIÓN ---
     const finalizarViaje = async () => {
@@ -531,35 +572,21 @@ const FormViaje = ({user, onViajeCreado}) => {
                     <div
                         className="fixed z-[100] w-64 bg-white border-2 shadow-2xl rounded-lg max-h-52 overflow-y-auto border-blue-400"
                         style={{ top: dropdownPos.top, left: dropdownPos.left }}
+                        onMouseDown={(e) => e.preventDefault()}
                     >
                         {(() => {
-                            const vehiculoActual = vehiculos.find(v => v.id === clienteDropdownId);
-                            const busqueda = vehiculoActual?.clienteAlt || '';
-                            const filtrados = clientesRaw.filter(c =>
-                                c.cliente?.toLowerCase().includes(busqueda.toLowerCase())
-                            ).slice(0, 10);
+                            const filtrados = getClientesFiltrados(clienteDropdownId);
 
                             return (
                                 <>
-                                    {filtrados.map(c => (
+                                    {filtrados.map((c, idx) => (
                                         <div
                                             key={c.id}
-                                            className="p-3 hover:bg-blue-600 hover:text-white cursor-pointer text-[12px] font-black uppercase border-b last:border-none transition-colors"
-                                            onClick={() => {
-                                                setVehiculos(vehiculos.map(veh =>
-                                                    veh.id === clienteDropdownId
-                                                        ? {
-                                                            ...veh,
-                                                            clienteAlt: c.cliente,
-                                                            clienteId: c.id,
-                                                            clienteNombre: c.cliente,
-                                                            clienteTelefono: c.telefonoCliente || "",
-                                                            clienteConfirmado: true
-                                                        }
-                                                        : veh
-                                                ));
-                                                setClienteDropdownId(null);
-                                            }}
+                                            className={`p-3 cursor-pointer text-[12px] font-black uppercase border-b last:border-none transition-colors ${
+                                                idx === clienteDropdownIdx ? 'bg-blue-600 text-white' : 'hover:bg-blue-100'
+                                            }`}
+                                            onMouseEnter={() => setClienteDropdownIdx(idx)}
+                                            onClick={() => seleccionarCliente(clienteDropdownId, c)}
                                         >
                                             <span>{c.cliente}</span>
                                             {c.apodoCliente && (
@@ -788,36 +815,68 @@ const FormViaje = ({user, onViajeCreado}) => {
                                            className="input input-sm md:input-xs w-full bg-white uppercase font-bold text-[14px] md:text-[12px]"
                                            style={{fontSize: '16px'}}/></td>
                                 <td className="p-1">
-                                    <input
-                                        type="text"
-                                        value={v.clienteAlt}
-                                        onChange={(e) => {
-                                            const nuevoValor = e.target.value.toUpperCase();
-                                            setVehiculos(vehiculos.map(veh =>
-                                                veh.id === v.id
-                                                    ? { ...veh, clienteAlt: nuevoValor, clienteConfirmado: false, clienteId: '', clienteNombre: '' }
-                                                    : veh
-                                            ));
-                                        }}
-                                        onFocus={(e) => {
-                                            // Solo abrir dropdown si es admin
-                                            if (user?.admin) {
-                                                const rect = e.target.getBoundingClientRect();
-                                                setDropdownPos({ top: rect.bottom + 2, left: rect.left });
-                                                setClienteDropdownId(v.id);
-                                            }
-                                        }}
-                                        className={`input input-sm md:input-xs w-full uppercase font-bold text-[14px] md:text-[12px] ${
-                                            v.clienteConfirmado
-                                                ? 'bg-green-50 border-green-400 text-green-800'
-                                                : 'bg-white'
-                                        }`}
-                                        placeholder={user?.admin ? "Buscar cliente..." : "Cliente..."}
-                                        style={{fontSize: '16px'}}
-                                    />
-                                    {v.clienteConfirmado && (
-                                        <span className="text-[8px] font-black text-green-600 uppercase">✓ CONFIRMADO</span>
-                                    )}
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={v.clienteAlt}
+                                            onChange={(e) => {
+                                                const nuevoValor = e.target.value.toUpperCase();
+                                                setVehiculos(vehiculos.map(veh =>
+                                                    veh.id === v.id
+                                                        ? { ...veh, clienteAlt: nuevoValor, clienteConfirmado: false, clienteId: '', clienteNombre: '' }
+                                                        : veh
+                                                ));
+                                                setClienteDropdownIdx(0);
+                                            }}
+                                            onFocus={(e) => {
+                                                if (user?.admin) {
+                                                    const rect = e.target.getBoundingClientRect();
+                                                    setDropdownPos({ top: rect.bottom + 2, left: rect.left });
+                                                    setClienteDropdownId(v.id);
+                                                    setClienteDropdownIdx(0);
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                setTimeout(() => {
+                                                    setClienteDropdownId(prev => prev === v.id ? null : prev);
+                                                }, 150);
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (!user?.admin || clienteDropdownId !== v.id) return;
+                                                const lista = getClientesFiltrados(v.id);
+                                                if (e.key === 'ArrowDown') {
+                                                    e.preventDefault();
+                                                    setClienteDropdownIdx(i => Math.min(i + 1, Math.max(lista.length - 1, 0)));
+                                                } else if (e.key === 'ArrowUp') {
+                                                    e.preventDefault();
+                                                    setClienteDropdownIdx(i => Math.max(i - 1, 0));
+                                                } else if (e.key === 'Enter') {
+                                                    if (lista[clienteDropdownIdx]) {
+                                                        e.preventDefault();
+                                                        seleccionarCliente(v.id, lista[clienteDropdownIdx]);
+                                                    }
+                                                } else if (e.key === 'Tab') {
+                                                    if (lista[clienteDropdownIdx] && !v.clienteConfirmado) {
+                                                        seleccionarCliente(v.id, lista[clienteDropdownIdx]);
+                                                    } else {
+                                                        setClienteDropdownId(null);
+                                                    }
+                                                } else if (e.key === 'Escape') {
+                                                    setClienteDropdownId(null);
+                                                }
+                                            }}
+                                            className={`input input-sm md:input-xs w-full uppercase font-bold text-[14px] md:text-[12px] ${
+                                                v.clienteConfirmado
+                                                    ? 'bg-green-50 border-green-400 text-green-800'
+                                                    : 'bg-white'
+                                            }`}
+                                            placeholder={user?.admin ? "Buscar cliente..." : "Cliente..."}
+                                            style={{fontSize: '16px'}}
+                                        />
+                                        {v.clienteConfirmado && (
+                                            <span className="absolute -top-2 -right-1 text-[8px] font-black text-green-700 bg-white px-1 rounded pointer-events-none">✓</span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="p-1">
                                     <select value={v.almacen}

@@ -133,6 +133,32 @@ const FormRegistro = () => {
 
     return (
         <div>
+            <style>{`
+                .phone-input-fix .react-tel-input { width: 100%; }
+                .phone-input-fix .react-tel-input .form-control {
+                    width: 100% !important;
+                    height: 3rem !important;
+                    padding-left: 60px !important;
+                    border-radius: 0.5rem !important;
+                    border: 1px solid #570df8 !important;
+                    background: #fff !important;
+                    color: #1f2937 !important;
+                    font-size: 0.95rem !important;
+                }
+                .phone-input-fix .react-tel-input .flag-dropdown {
+                    border: 1px solid #570df8 !important;
+                    border-right: none !important;
+                    border-top-left-radius: 0.5rem !important;
+                    border-bottom-left-radius: 0.5rem !important;
+                    background: #f9fafb !important;
+                }
+                .phone-input-fix .react-tel-input .selected-flag {
+                    width: 50px !important;
+                    padding-left: 12px !important;
+                    border-top-left-radius: 0.5rem !important;
+                    border-bottom-left-radius: 0.5rem !important;
+                }
+            `}</style>
             <form onSubmit={handleSubmit} className="register-form">
                 {formError && showToast(formError)}
 
@@ -188,11 +214,11 @@ const FormRegistro = () => {
                         <div className="label">
                             <span className="label-text-alt">Ingresa tu teléfono con clave de pais:</span>
                         </div>
-                        <div className="form-group">
+                        <div className="form-group w-full max-w-xs phone-input-fix">
                             <PhoneInput
                                 onlyCountries={['us', 'mx']}
                                 country={'us'}
-                                value={telefonoDos}
+                                value={telefono}
                                 onChange={(value) => {
                                     if (value && value.length > 0 && value[0] !== '+') {
                                         value = '+' + value;
@@ -204,9 +230,26 @@ const FormRegistro = () => {
                                     required: true,
                                     maxLength: 60,
                                     placeholder: 'Teléfono',
-                                    className: 'input input-bordered input-primary w-full max-w-xs bg-white-100 text-black-500'
                                 }}
-                                inputStyle={{textAlign: 'right'}}
+                                containerStyle={{ width: '100%' }}
+                                inputStyle={{
+                                    width: '100%',
+                                    height: '3rem',
+                                    paddingLeft: '58px',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #570df8',
+                                    background: '#fff',
+                                    color: '#1f2937',
+                                    fontSize: '0.95rem'
+                                }}
+                                buttonStyle={{
+                                    borderTopLeftRadius: '0.5rem',
+                                    borderBottomLeftRadius: '0.5rem',
+                                    border: '1px solid #570df8',
+                                    borderRight: 'none',
+                                    background: '#f9fafb'
+                                }}
+                                dropdownStyle={{ zIndex: 50 }}
                             />
                         </div>
                     </div>
@@ -232,7 +275,7 @@ const FormRegistro = () => {
                         <div className="label">
                             <span className="label-text-alt">Ingresa teléfono de contacto (opcional)</span>
                         </div>
-                        <div className="form-group">
+                        <div className="form-group w-full max-w-xs phone-input-fix">
                              <PhoneInput
                                 onlyCountries={['us', 'mx']}
                                 country={'us'}
@@ -248,9 +291,26 @@ const FormRegistro = () => {
                                     required: true,
                                     maxLength: 60,
                                     placeholder: 'Teléfono',
-                                    className: 'input input-bordered input-primary w-full max-w-xs bg-white-100 text-black-500'
                                 }}
-                                inputStyle={{textAlign: 'right'}}
+                                containerStyle={{ width: '100%' }}
+                                inputStyle={{
+                                    width: '100%',
+                                    height: '3rem',
+                                    paddingLeft: '58px',
+                                    borderRadius: '0.5rem',
+                                    border: '1px solid #570df8',
+                                    background: '#fff',
+                                    color: '#1f2937',
+                                    fontSize: '0.95rem'
+                                }}
+                                buttonStyle={{
+                                    borderTopLeftRadius: '0.5rem',
+                                    borderBottomLeftRadius: '0.5rem',
+                                    border: '1px solid #570df8',
+                                    borderRight: 'none',
+                                    background: '#f9fafb'
+                                }}
+                                dropdownStyle={{ zIndex: 50 }}
                             />
                         </div>
                     </div>
