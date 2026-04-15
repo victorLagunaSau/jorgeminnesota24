@@ -115,6 +115,8 @@ const ReporteViajesPagados = ({ user }) => {
 
     // Verificar si el usuario puede eliminar viajes
     const puedeEliminarViajes = user?.adminMaster === true || user?.eliminarViajes === true;
+    // Solo Admin Master puede cambiar el número de viaje en el historial
+    const puedeEditarNumViaje = user?.adminMaster === true;
 
     // Abre modal de confirmación
     const eliminarViaje = (viaje) => {
@@ -657,44 +659,62 @@ const ReporteViajesPagados = ({ user }) => {
                                     <th className="border border-gray-600 px-2 py-2 text-right">S.Peso</th>
                                     <th className="border border-gray-600 px-2 py-2 text-right">G.Extra</th>
                                     <th className="border border-gray-600 px-2 py-2 text-center">Título</th>
-                                    <th className="border border-gray-600 px-2 py-2 text-right bg-green-900">Total</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right">Total</th>
                                     <th className="border border-gray-600 px-2 py-2 text-center">Nota</th>
-                                    <th className="border border-gray-600 px-2 py-2 text-center">Acc</th>
+                                    <th className="border border-gray-600 px-2 py-2 text-right bg-indigo-700">Total Viaje</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {viajes.map((viaje, vIndex) => {
                                     const bgViaje = ""; // se define por fila
                                     const fecha = viaje.fechaPago?.toDate ? moment(viaje.fechaPago.toDate()).format("D MMM YY") : "";
+                                    const totalViaje = (viaje.vehiculos || []).reduce((acc, v) =>
+                                        acc + (parseFloat(v.flete) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0), 0);
                                     return viaje.vehiculos.map((v, idx) => {
                                         const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
                                         const notaRegistro = (v.comentarioRegistro || "").trim();
                                         const notaRecepcion = (v.comentarioRecepcion || "").trim();
                                         const tieneNota = notaRegistro !== "" || notaRecepcion !== "";
                                         const lotePagado = lotesPagados[v.lote] === true;
-                                        const bgFila = lotePagado ? "bg-green-100" : "bg-white";
+                                        const bgFila = lotePagado ? "bg-green-300" : "bg-white";
                                         return (
                                             <tr key={`${vIndex}-${idx}`} className={`${bgFila} hover:bg-yellow-50 border-b border-gray-200`}>
                                                 <td className="border border-gray-200 px-2 py-1 text-center font-bold text-gray-600 whitespace-nowrap">{idx === 0 ? fecha : ""}</td>
                                                 <td className="border border-gray-200 px-2 py-1 text-center font-black whitespace-nowrap">
                                                     {idx === 0 ? (
-                                                        editandoViaje === viaje.numViaje ? (
+                                                        puedeEditarNumViaje && editandoViaje === viaje.docId ? (
                                                             <div className="flex items-center gap-1 justify-center">
                                                                 <input
                                                                     type="text"
-                                                                    className="w-16 border border-gray-400 rounded text-center text-[11px] font-black px-1 py-0.5"
+                                                                    className="w-20 border-2 border-blue-500 rounded text-center text-[11px] font-black px-1 py-1 focus:outline-none focus:border-blue-700"
                                                                     value={nuevoNumViaje}
                                                                     onChange={(e) => setNuevoNumViaje(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') cambiarNumeroViaje(viaje, nuevoNumViaje);
+                                                                        if (e.key === 'Escape') setEditandoViaje(null);
+                                                                    }}
                                                                     autoFocus
                                                                 />
-                                                                <button onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)} className="text-green-600 hover:text-green-800"><FaCheck size={10}/></button>
-                                                                <button onClick={() => setEditandoViaje(null)} className="text-red-400 hover:text-red-600"><FaTimes size={10}/></button>
+                                                                <button
+                                                                    onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)}
+                                                                    className="w-5 h-5 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                                                                    title="Guardar"
+                                                                >
+                                                                    <FaCheck size={8}/>
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setEditandoViaje(null)}
+                                                                    className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-400 hover:bg-gray-500 text-white shadow-sm"
+                                                                    title="Cancelar"
+                                                                >
+                                                                    <FaTimes size={8}/>
+                                                                </button>
                                                             </div>
                                                         ) : (
                                                             <span
-                                                                className="cursor-pointer hover:text-blue-600"
-                                                                onDoubleClick={() => { setEditandoViaje(viaje.numViaje); setNuevoNumViaje(viaje.numViaje); }}
-                                                                title="Doble clic para editar"
+                                                                className={puedeEditarNumViaje ? "cursor-pointer hover:text-blue-600" : ""}
+                                                                onDoubleClick={puedeEditarNumViaje ? () => { setEditandoViaje(viaje.docId); setNuevoNumViaje(viaje.numViaje); } : undefined}
+                                                                title={puedeEditarNumViaje ? "Doble clic para editar" : ""}
                                                             >
                                                                 #{viaje.numViaje}
                                                             </span>
@@ -713,7 +733,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                 <td className="border border-gray-200 px-2 py-1 text-right font-mono">${v.sPeso || 0}</td>
                                                 <td className="border border-gray-200 px-2 py-1 text-right font-mono">${v.gExtra || 0}</td>
                                                 <td className="border border-gray-200 px-2 py-1 text-center font-bold">{v.titulo || "NO"}</td>
-                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono font-black text-green-700 bg-green-50">${total.toLocaleString()}</td>
+                                                <td className="border border-gray-200 px-2 py-1 text-right font-mono font-black text-gray-800">${total.toLocaleString()}</td>
                                                 <td className="border border-gray-200 px-2 py-1 text-center">
                                                     {tieneNota ? (
                                                         <button
@@ -725,18 +745,26 @@ const ReporteViajesPagados = ({ user }) => {
                                                         </button>
                                                     ) : ""}
                                                 </td>
-                                                <td className="border border-gray-200 px-2 py-1 text-center">
-                                                    {idx === 0 && puedeEliminarViajes ? (
-                                                        <button
-                                                            onClick={() => eliminarViaje(viaje)}
-                                                            disabled={loading}
-                                                            className="text-red-400 hover:text-red-600"
-                                                            title="Eliminar viaje"
-                                                        >
-                                                            <FaTrashAlt size={12} />
-                                                        </button>
-                                                    ) : ""}
-                                                </td>
+                                                {idx === 0 && (
+                                                    <td
+                                                        rowSpan={viaje.vehiculos.length}
+                                                        className="border border-gray-200 px-2 py-1 text-right font-mono font-black text-indigo-800 bg-indigo-50 align-middle whitespace-nowrap"
+                                                    >
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            <span className="text-[13px]">${totalViaje.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                                            {puedeEliminarViajes && (
+                                                                <button
+                                                                    onClick={() => eliminarViaje(viaje)}
+                                                                    disabled={loading}
+                                                                    className="text-red-400 hover:text-red-600 text-[10px]"
+                                                                    title="Eliminar viaje"
+                                                                >
+                                                                    <FaTrashAlt size={11} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     });

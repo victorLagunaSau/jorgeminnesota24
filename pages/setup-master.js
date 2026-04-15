@@ -6,10 +6,15 @@ const SetupMaster = () => {
     const [status, setStatus] = useState("idle"); // idle, loading, success, error
     const [message, setMessage] = useState("");
     const [userFound, setUserFound] = useState(null);
-
-    const EMAIL_MASTER = "jorgeminnesota19@gmail.com";
+    const [emailInput, setEmailInput] = useState("jorgeminnesota19@gmail.com");
 
     const configurarAdminMaster = async () => {
+        const EMAIL_MASTER = emailInput.trim().toLowerCase();
+        if (!EMAIL_MASTER) {
+            setStatus("error");
+            setMessage("Escribe un email");
+            return;
+        }
         setStatus("loading");
         setMessage("Buscando usuario...");
 
@@ -70,17 +75,26 @@ const SetupMaster = () => {
                 <h1 className="text-2xl font-black uppercase text-gray-800 mb-2">
                     Configurar Admin Master
                 </h1>
-                <p className="text-gray-500 text-sm mb-6">
-                    Email: <span className="font-bold text-gray-700">{EMAIL_MASTER}</span>
+                <p className="text-gray-500 text-sm mb-4">
+                    Escribe el email de la cuenta que será Admin Master:
                 </p>
 
                 {status === "idle" && (
+                    <>
+                    <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        placeholder="correo@ejemplo.com"
+                        className="input input-bordered w-full mb-4 font-bold text-center bg-white text-black"
+                    />
                     <button
                         onClick={configurarAdminMaster}
                         className="btn btn-lg bg-gradient-to-r from-yellow-400 to-yellow-500 border-none text-white font-black uppercase gap-2 shadow-lg hover:from-yellow-500 hover:to-yellow-600 w-full"
                     >
                         <FaCrown /> Activar Admin Master
                     </button>
+                    </>
                 )}
 
                 {status === "loading" && (
