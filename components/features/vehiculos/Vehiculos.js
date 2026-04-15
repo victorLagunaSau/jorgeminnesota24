@@ -19,13 +19,20 @@ const Vehiculos = ({user}) => {
     const [sortOrder, setSortOrder] = useState("desc");
     const itemsPerPage = 20;
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
-    const edicionPermitida = user.id === ID_USUARIO_PERMITIDO;
+    const isAdminMaster = user?.adminMaster === true;
+    const edicionPermitida = isAdminMaster || user.id === ID_USUARIO_PERMITIDO;
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteTargetVehiculo, setDeleteTargetVehiculo] = useState(null);
     const [pinInput, setPinInput] = useState("");
     const [pinError, setPinError] = useState("");
     const CORRECT_PIN = "9571";
+
+    const [isLoteModalOpen, setIsLoteModalOpen] = useState(false);
+    const [loteTargetVehiculo, setLoteTargetVehiculo] = useState(null);
+    const [nuevoLote, setNuevoLote] = useState("");
+    const [loteError, setLoteError] = useState("");
+    const [cambiandoLote, setCambiandoLote] = useState(false);
 
 
     const handleSortByDate = () => {
@@ -134,11 +141,82 @@ const Vehiculos = ({user}) => {
 
     const handleBorrarVehiculoClick = (vehiculo) => {
         setDeleteTargetVehiculo(vehiculo);
-        setIsDeleteModalOpen(true);
         setPinInput("");
-        setTimeout(() => {
-            document.getElementById("modal_borrar_vehiculo")?.showModal();
-        }, 100);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleCambiarLoteClick = (vehiculo) => {
+        setLoteTargetVehiculo(vehiculo);
+        setNuevoLote(vehiculo.binNip || "");
+        setLoteError("");
+        setIsLoteModalOpen(true);
+    };
+
+    const handleConfirmCambiarLote = async () => {
+        setLoteError("");
+        const loteAnterior = loteTargetVehiculo.binNip;
+        const loteNuevo = nuevoLote.trim().toUpperCase();
+
+        if (!loteNuevo) { setLoteError("Ingresa un número de lote"); return; }
+        if (loteNuevo === loteAnterior) { setLoteError("El lote es el mismo que el actual"); return; }
+
+        setCambiandoLote(true);
+        try {
+            const db = firestore();
+
+            const existeNuevo = await db.collection("vehiculos").doc(loteNuevo).get();
+            if (existeNuevo.exists) {
+                setLoteError(`El lote ${loteNuevo} ya existe en vehículos`);
+                setCambiandoLote(false);
+                return;
+            }
+            const existeTransito = await db.collection("lotesEnTransito").doc(loteNuevo).get();
+            if (existeTransito.exists) {
+                setLoteError(`El lote ${loteNuevo} está en tránsito`);
+                setCambiandoLote(false);
+                return;
+            }
+
+            const vehiculoData = { ...loteTargetVehiculo, binNip: loteNuevo };
+            delete vehiculoData.id;
+
+            const batch = db.batch();
+
+            batch.set(db.collection("vehiculos").doc(loteNuevo), vehiculoData);
+            batch.delete(db.collection("vehiculos").doc(loteAnterior));
+
+            const movSnap = await db.collection("movimientos").where("binNip", "==", loteAnterior).get();
+            movSnap.forEach(doc => batch.update(doc.ref, { binNip: loteNuevo }));
+
+            const transitoDoc = await db.collection("lotesEnTransito").doc(loteAnterior).get();
+            if (transitoDoc.exists) {
+                batch.set(db.collection("lotesEnTransito").doc(loteNuevo), transitoDoc.data());
+                batch.delete(db.collection("lotesEnTransito").doc(loteAnterior));
+            }
+
+            for (const col of ["viajesPendientes", "viajesPagados"]) {
+                const snap = await db.collection(col).get();
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (Array.isArray(data.vehiculos) && data.vehiculos.some(v => v.lote === loteAnterior)) {
+                        const nuevos = data.vehiculos.map(v => v.lote === loteAnterior ? { ...v, lote: loteNuevo } : v);
+                        batch.update(doc.ref, { vehiculos: nuevos });
+                    }
+                });
+            }
+
+            await batch.commit();
+
+            alert(`Lote cambiado de ${loteAnterior} a ${loteNuevo} correctamente.`);
+            setIsLoteModalOpen(false);
+            setLoteTargetVehiculo(null);
+            setNuevoLote("");
+        } catch (e) {
+            console.error("Error al cambiar lote:", e);
+            setLoteError("Error al cambiar el lote: " + e.message);
+        } finally {
+            setCambiandoLote(false);
+        }
     };
 
     const handleConfirmDelete = async () => {
@@ -161,6 +239,15 @@ const Vehiculos = ({user}) => {
             movimientosSnapshot.forEach((doc) => {
                 batch.delete(doc.ref);
             });
+
+            // Liberar lote en tránsito si aún existe, para permitir reutilización
+            const transitoDoc = await firestoreInstance
+                .collection("lotesEnTransito")
+                .doc(deleteTargetVehiculo.id)
+                .get();
+            if (transitoDoc.exists) {
+                batch.delete(transitoDoc.ref);
+            }
 
             await batch.commit();
 
@@ -374,12 +461,20 @@ const Vehiculos = ({user}) => {
                                         </button>
 
                                         {edicionPermitida && (
-                                            <button
-                                                className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
-                                                onClick={() => handleBorrarVehiculoClick(vehiculo)}
-                                            >
-                                                Borrar
-                                            </button>
+                                            <>
+                                                <button
+                                                    className="btn btn-xs btn-outline border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white font-bold"
+                                                    onClick={() => handleCambiarLoteClick(vehiculo)}
+                                                >
+                                                    Cambiar Lote
+                                                </button>
+                                                <button
+                                                    className="btn btn-xs btn-outline border-red-600 text-red-700 hover:bg-red-600 hover:text-white font-bold"
+                                                    onClick={() => handleBorrarVehiculoClick(vehiculo)}
+                                                >
+                                                    Borrar
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -409,6 +504,51 @@ const Vehiculos = ({user}) => {
                     Siguiente →
                 </button>
             </div>
+
+            {/* MODAL CAMBIAR LOTE */}
+            <dialog className="modal" open={isLoteModalOpen}>
+                <div className="modal-box bg-white border-2 border-blue-600">
+                    <h3 className="font-black text-xl uppercase text-black">Cambiar Número de Lote</h3>
+                    <p className="py-2 text-black font-semibold text-sm">
+                        Lote actual: <span className="font-mono font-black">{loteTargetVehiculo?.binNip}</span>
+                    </p>
+                    <p className="pb-3 text-xs text-gray-600">
+                        Se actualizará el vehículo y todas sus referencias (movimientos, viajes).
+                    </p>
+
+                    <input
+                        type="text"
+                        value={nuevoLote}
+                        onChange={(e) => setNuevoLote(e.target.value.toUpperCase())}
+                        className="input input-bordered border-blue-600 w-full mb-2 text-center text-lg font-mono font-black tracking-wider text-black uppercase"
+                        placeholder="NUEVO LOTE"
+                        maxLength={30}
+                    />
+                    {loteError && <p className="text-red-600 text-xs font-bold mb-2">{loteError}</p>}
+
+                    <div className="modal-action flex justify-between">
+                        <button
+                            className="btn btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                            onClick={() => {
+                                setIsLoteModalOpen(false);
+                                setLoteTargetVehiculo(null);
+                                setNuevoLote("");
+                                setLoteError("");
+                            }}
+                            disabled={cambiandoLote}
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            className="btn bg-blue-600 text-white hover:bg-blue-700 border-none font-black"
+                            onClick={handleConfirmCambiarLote}
+                            disabled={cambiandoLote}
+                        >
+                            {cambiandoLote ? "Cambiando..." : "Confirmar Cambio"}
+                        </button>
+                    </div>
+                </div>
+            </dialog>
 
             {/* MODAL ELIMINAR */}
             <dialog id="modal_borrar_vehiculo" className="modal" open={isDeleteModalOpen}>

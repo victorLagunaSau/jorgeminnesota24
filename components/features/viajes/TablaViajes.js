@@ -140,7 +140,7 @@ const TablaViajes = ({user}) => {
 
 
     const filtrados = viajes.filter(v =>
-        v.numViaje.toLowerCase().includes(filtroGeneral.toLowerCase()) ||
+        (v.numViaje || "").toLowerCase().includes(filtroGeneral.toLowerCase()) ||
         v.chofer?.nombre?.toLowerCase().includes(filtroGeneral.toLowerCase())
     );
 
@@ -428,6 +428,12 @@ const TablaViajes = ({user}) => {
 
                 // --- 3. LIMPIEZA Y ACTUALIZACIÓN DE CONSECUTIVO ---
                 transaction.delete(firestore().collection("viajesPendientes").doc(viaje.id));
+                // Liberar los lotes de lotesEnTransito para que puedan reutilizarse
+                viaje.vehiculos.forEach((v) => {
+                    if (v.lote && v.lote.trim() !== "") {
+                        transaction.delete(firestore().collection("lotesEnTransito").doc(v.lote));
+                    }
+                });
                 transaction.update(consecutivoRef, {"Viajes pagados": proximoFolio});
             });
 
@@ -531,48 +537,62 @@ const TablaViajes = ({user}) => {
                                         maxLength={30}
                                     />
                                 </div>
-                                <div className="mt-3 p-3 bg-gray-50 border-l-4 border-gray-400 rounded">
-                                    <label className="text-[9px] font-black text-gray-600 uppercase block mb-2">
-                                        Método de Pago (opcional):
-                                    </label>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <div>
-                                            <label className="text-[8px] font-bold text-gray-500 uppercase">Efectivo</label>
-                                            <input
-                                                type="number"
-                                                value={metodoPago.efectivo}
-                                                onChange={(e) => setMetodoPago({...metodoPago, efectivo: e.target.value})}
-                                                placeholder="$0"
-                                                className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-green-500 focus:outline-none"
-                                            />
+                                {(() => {
+                                    const viajePagar = modal.viajeAPagar;
+                                    const totalEsperado = viajePagar ? viajePagar.vehiculos.reduce((acc, v) =>
+                                        acc + (parseFloat(v.flete) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0), 0) : 0;
+                                    const sumaPagos = (parseFloat(metodoPago.efectivo) || 0) + (parseFloat(metodoPago.cheque) || 0) + (parseFloat(metodoPago.zelle) || 0);
+                                    const diferencia = +(totalEsperado - sumaPagos).toFixed(2);
+                                    const cuadra = Math.abs(diferencia) < 0.01;
+                                    return (
+                                        <div className={`mt-3 p-3 rounded border-l-4 ${cuadra ? 'bg-green-50 border-green-600' : 'bg-gray-50 border-gray-400'}`}>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="text-[9px] font-black text-gray-700 uppercase">
+                                                    Método de Pago (requerido):
+                                                </label>
+                                                <span className="text-[10px] font-black text-gray-800 uppercase">
+                                                    Total: ${totalEsperado.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div>
+                                                    <label className="text-[8px] font-bold text-gray-500 uppercase">Efectivo</label>
+                                                    <input
+                                                        type="number"
+                                                        value={metodoPago.efectivo}
+                                                        onChange={(e) => setMetodoPago({...metodoPago, efectivo: e.target.value})}
+                                                        placeholder="$0"
+                                                        className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-green-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[8px] font-bold text-gray-500 uppercase">Cheque</label>
+                                                    <input
+                                                        type="number"
+                                                        value={metodoPago.cheque}
+                                                        onChange={(e) => setMetodoPago({...metodoPago, cheque: e.target.value})}
+                                                        placeholder="$0"
+                                                        className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-blue-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[8px] font-bold text-gray-500 uppercase">Zelle</label>
+                                                    <input
+                                                        type="number"
+                                                        value={metodoPago.zelle}
+                                                        onChange={(e) => setMetodoPago({...metodoPago, zelle: e.target.value})}
+                                                        placeholder="$0"
+                                                        className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-purple-500 focus:outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className={`mt-2 flex justify-between text-[10px] font-black uppercase ${cuadra ? 'text-green-700' : 'text-red-700'}`}>
+                                                <span>Suma: ${sumaPagos.toFixed(2)}</span>
+                                                <span>{cuadra ? '✓ Cuadra' : `Diferencia: $${diferencia.toFixed(2)}`}</span>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="text-[8px] font-bold text-gray-500 uppercase">Cheque</label>
-                                            <input
-                                                type="number"
-                                                value={metodoPago.cheque}
-                                                onChange={(e) => setMetodoPago({...metodoPago, cheque: e.target.value})}
-                                                placeholder="$0"
-                                                className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-blue-500 focus:outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[8px] font-bold text-gray-500 uppercase">Zelle</label>
-                                            <input
-                                                type="number"
-                                                value={metodoPago.zelle}
-                                                onChange={(e) => setMetodoPago({...metodoPago, zelle: e.target.value})}
-                                                placeholder="$0"
-                                                className="w-full px-2 py-1 border-2 border-gray-300 rounded text-sm font-bold text-center focus:border-purple-500 focus:outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mt-3 p-3 bg-green-50 border-l-4 border-green-700 rounded">
-                                    <p className="text-[10px] font-black text-green-700 uppercase flex items-center gap-1">
-                                        ✓ Se procesará el pago y se generará el PDF
-                                    </p>
-                                </div>
+                                    );
+                                })()}
                             </>
                         )}
                         <div className="flex justify-end gap-3 mt-8">
@@ -589,7 +609,14 @@ const TablaViajes = ({user}) => {
                                     {modal.accion ? 'Cancelar' : 'Cerrar'}
                                 </button>
                             )}
-                            {(modal.accion || modal.viajeAPagar) && <button
+                            {(modal.accion || modal.viajeAPagar) && (() => {
+                                const viajePagar = modal.viajeAPagar;
+                                const totalEsperado = viajePagar ? viajePagar.vehiculos.reduce((acc, v) =>
+                                    acc + (parseFloat(v.flete) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0), 0) : 0;
+                                const sumaPagos = (parseFloat(metodoPago.efectivo) || 0) + (parseFloat(metodoPago.cheque) || 0) + (parseFloat(metodoPago.zelle) || 0);
+                                const pagosCuadran = Math.abs(totalEsperado - sumaPagos) < 0.01;
+                                const pagoInvalido = modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim() || !pagosCuadran);
+                                return (<button
                                 onClick={() => {
                                     if (modal.tipo === 'pago' && modal.viajeAPagar) {
                                         ejecutarPago(modal.viajeAPagar);
@@ -597,16 +624,17 @@ const TablaViajes = ({user}) => {
                                         modal.accion();
                                     }
                                 }}
-                                disabled={modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim())}
+                                disabled={pagoInvalido}
                                 className={`btn btn-sm text-white font-black uppercase text-[10px] ${
                                     modal.tipo === 'eliminar' ? 'btn-error' :
                                     modal.tipo === 'pago' ? 'btn-success' :
                                     'btn-error'
-                                } ${modal.tipo === 'pago' && (!estadoOrigen.trim() || !numViajePago.trim()) ? 'btn-disabled' : ''}`}>
+                                } ${pagoInvalido ? 'btn-disabled' : ''}`}>
                                 {modal.tipo === 'eliminar' ? 'Eliminar Viaje' :
                                  modal.tipo === 'pago' ? 'Confirmar Pago' :
                                  'Continuar'}
-                            </button>}
+                            </button>);
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -706,35 +734,8 @@ const TablaViajes = ({user}) => {
 
                         <div className="bg-gray-100 p-3 flex justify-between items-center text-white">
                             <div className="flex items-center gap-4">
-                                <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2">
-                                    {user.admin ? (
-                                        <>
-                                            <span>VIAJE #</span>
-                                            <input
-                                                type="text"
-                                                value={viaje.numViaje}
-                                                onChange={async (e) => {
-                                                    const nuevoNumero = e.target.value.toUpperCase();
-                                                    // Actualizar localmente
-                                                    setViajes(viajes.map(v =>
-                                                        v.id === viaje.id ? {...v, numViaje: nuevoNumero} : v
-                                                    ));
-                                                    // Guardar en Firestore
-                                                    try {
-                                                        await firestore().collection("viajesPendientes").doc(viaje.id).update({
-                                                            numViaje: nuevoNumero
-                                                        });
-                                                    } catch (error) {
-                                                        console.error("Error al actualizar número de viaje:", error);
-                                                    }
-                                                }}
-                                                className="bg-white text-red-600 px-2 py-1 rounded text-center font-black w-20 focus:outline-none focus:ring-2 focus:ring-white"
-                                                maxLength={10}
-                                            />
-                                        </>
-                                    ) : (
-                                        viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"
-                                    )}
+                                <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2 text-white">
+                                    {viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"}
                                 </div>
                                 <div>
                                     <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>

@@ -248,8 +248,8 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
                     <label className="block text-[11px] font-bold text-gray-600 uppercase italic">Phone: *</label>
                     <PhoneInput onlyCountries={['us', 'mx']} country={'us'} value={datos.telefonoEmpresa}
                                 onChange={(val) => setDatos({ ...datos, telefonoEmpresa: val })}
-                                inputStyle={{ width: '100%', height: '32px' }}
-                                inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white' }} />
+                                inputStyle={{ paddingLeft: '45px', width: '100%', height: '32px' }}
+                                inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white font-bold' }} />
                 </div>
             </div>
 

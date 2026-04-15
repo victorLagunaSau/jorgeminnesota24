@@ -44,6 +44,7 @@ const ReporteViajesPagados = ({ user }) => {
 
     // Lotes que ya fueron cobrados en Caja (estatus "EN")
     const [lotesPagados, setLotesPagados] = useState({});
+    const [modalEliminar, setModalEliminar] = useState({ show: false, viaje: null });
 
     // Cargar datos para agregar viajes
     useEffect(() => {
@@ -115,50 +116,43 @@ const ReporteViajesPagados = ({ user }) => {
     // Verificar si el usuario puede eliminar viajes
     const puedeEliminarViajes = user?.adminMaster === true || user?.eliminarViajes === true;
 
-    // Función para eliminar un viaje completo
-    const eliminarViaje = async (viaje) => {
-        if (!puedeEliminarViajes) {
-            alert("No tienes permisos para eliminar viajes.");
-            return;
-        }
+    // Abre modal de confirmación
+    const eliminarViaje = (viaje) => {
+        if (!puedeEliminarViajes) return;
+        setModalEliminar({ show: true, viaje });
+    };
 
-        const confirmar = window.confirm(
-            `¿Estás seguro de eliminar el viaje #${viaje.numViaje}?\n\nEsto eliminará:\n- El registro del viaje\n- Las referencias en ${viaje.vehiculos?.length || 0} vehículos\n\nEsta acción NO se puede deshacer.`
-        );
-        if (!confirmar) return;
-
-        // Segunda confirmación para mayor seguridad
-        const confirmar2 = window.confirm(
-            `⚠️ ÚLTIMA CONFIRMACIÓN ⚠️\n\n¿Realmente deseas eliminar el viaje #${viaje.numViaje}?`
-        );
-        if (!confirmar2) return;
-
+    // Ejecuta la eliminación tras confirmar
+    const confirmarEliminarViaje = async () => {
+        const viaje = modalEliminar.viaje;
+        if (!viaje) return;
+        setModalEliminar({ show: false, viaje: null });
         setLoading(true);
         try {
             const batch = firestore().batch();
             const docId = viaje.docId || viaje.numViaje;
 
-            // Eliminar el documento del viaje
             batch.delete(firestore().collection("viajesPagados").doc(docId));
 
-            // Limpiar las referencias de numViaje en los vehículos
             if (viaje.vehiculos && viaje.vehiculos.length > 0) {
-                for (const v of viaje.vehiculos) {
-                    if (v.lote) {
-                        batch.update(firestore().collection("vehiculos").doc(v.lote), {
+                const lotes = viaje.vehiculos.map(v => v.lote).filter(Boolean);
+                const existenciaSnaps = await Promise.all(
+                    lotes.map(lote => firestore().collection("vehiculos").doc(lote).get())
+                );
+                existenciaSnaps.forEach((snap, idx) => {
+                    if (snap.exists) {
+                        batch.update(firestore().collection("vehiculos").doc(lotes[idx]), {
                             numViaje: firebase.firestore.FieldValue.delete(),
                             folioPago: firebase.firestore.FieldValue.delete()
                         });
                     }
-                }
+                });
             }
 
             await batch.commit();
-            alert(`Viaje #${viaje.numViaje} eliminado correctamente.`);
             consultarViajes(periodoSeleccionado);
         } catch (error) {
             console.error(error);
-            alert("Error al eliminar: " + error.message);
         } finally {
             setLoading(false);
         }
@@ -453,6 +447,27 @@ const ReporteViajesPagados = ({ user }) => {
 
     return (
         <div className="bg-gray-100 min-h-screen font-sans text-black">
+            {/* MODAL CONFIRMAR ELIMINAR VIAJE */}
+            {modalEliminar.show && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl shadow-2xl border-t-8 border-red-600 max-w-xs w-full p-6 text-center">
+                        <h3 className="text-base font-black uppercase tracking-tight text-gray-800">¿Seguro que desea eliminar?</h3>
+                        <div className="flex justify-center gap-3 mt-6">
+                            <button
+                                onClick={() => setModalEliminar({ show: false, viaje: null })}
+                                className="btn btn-sm btn-ghost font-black uppercase text-[11px] px-6">
+                                No
+                            </button>
+                            <button
+                                onClick={confirmarEliminarViaje}
+                                className="btn btn-sm btn-error text-white font-black uppercase text-[11px] px-6">
+                                Sí
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DE NOTA DEL VEHÍCULO */}
             {modalNota.show && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-md p-4">
