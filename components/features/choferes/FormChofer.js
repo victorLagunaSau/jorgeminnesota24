@@ -3,12 +3,12 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import { firestore } from "../../../firebase/firebaseIni";
 
-const FormChofer = ({ user, onSuccess }) => {
+const FormChofer = ({ user, choferAEditar, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [empresas, setEmpresas] = useState([]);
     const [alerta, setAlerta] = useState({ mostrar: false, mensaje: "", tipo: "" });
 
-    const [datos, setDatos] = useState({
+    const datosVacios = {
         nombreChofer: "",
         apodoChofer: "",
         telefonoChofer: "",
@@ -18,7 +18,9 @@ const FormChofer = ({ user, onSuccess }) => {
         empresaNombre: "",
         empresaLiderId: "",
         empresaLiderNombre: ""
-    });
+    };
+
+    const [datos, setDatos] = useState(datosVacios);
 
     useEffect(() => {
         const unsub = firestore().collection("empresas").orderBy("nombreEmpresa", "asc")
@@ -27,6 +29,24 @@ const FormChofer = ({ user, onSuccess }) => {
             });
         return () => unsub();
     }, []);
+
+    useEffect(() => {
+        if (choferAEditar) {
+            setDatos({
+                nombreChofer: choferAEditar.nombreChofer || "",
+                apodoChofer: choferAEditar.apodoChofer || "",
+                telefonoChofer: choferAEditar.telefonoChofer || "",
+                paisChofer: choferAEditar.paisChofer || "United States",
+                licencia: choferAEditar.licencia || "",
+                empresaId: choferAEditar.empresaId || "",
+                empresaNombre: choferAEditar.empresaNombre || "",
+                empresaLiderId: choferAEditar.empresaLiderId || "",
+                empresaLiderNombre: choferAEditar.empresaLiderNombre || ""
+            });
+        } else {
+            setDatos(datosVacios);
+        }
+    }, [choferAEditar]);
 
     const mostrarAviso = (mensaje, tipo = "info") => {
         setAlerta({ mostrar: true, mensaje, tipo });
@@ -54,52 +74,63 @@ const FormChofer = ({ user, onSuccess }) => {
 
         setLoading(true);
         try {
-            const conRef = firestore().collection("config").doc("consecutivos");
-            const docCon = await conRef.get();
-            const nuevoFolio = (docCon.data().choferes || 0) + 1;
+            if (choferAEditar) {
+                await firestore().collection("choferes").doc(choferAEditar.id).update({
+                    nombreChofer: datos.nombreChofer.toUpperCase(),
+                    apodoChofer: datos.apodoChofer.toUpperCase(),
+                    telefonoChofer: datos.telefonoChofer,
+                    paisChofer: datos.paisChofer,
+                    licencia: datos.licencia || "N/A",
+                    empresaId: datos.empresaId,
+                    empresaNombre: datos.empresaNombre,
+                    empresaLiderId: datos.empresaLiderId || "",
+                    empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
+                });
+                mostrarAviso(`Chofer #${choferAEditar.folio} actualizado`, "success");
+            } else {
+                const conRef = firestore().collection("config").doc("consecutivos");
+                const docCon = await conRef.get();
+                const nuevoFolio = (docCon.data().choferes || 0) + 1;
 
-            const choferFinal = {
-                folio: nuevoFolio,
-                nombreChofer: datos.nombreChofer.toUpperCase(),
-                apodoChofer: datos.apodoChofer.toUpperCase(),
-                telefonoChofer: datos.telefonoChofer,
-                paisChofer: datos.paisChofer,
-                licencia: datos.licencia || "N/A",
-                // Datos Fiscales (Dueño del Chofer)
-                empresaId: datos.empresaId,
-                empresaNombre: datos.empresaNombre,
-                // Datos de Operación (Quien asigna viajes)
-                empresaLiderId: datos.empresaLiderId || "",
-                empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
-                registro: {
-                    usuario: user?.nombre || "Admin",
-                    idUsuario: user?.id || "N/A",
-                    timestamp: new Date()
-                }
-            };
+                const choferFinal = {
+                    folio: nuevoFolio,
+                    nombreChofer: datos.nombreChofer.toUpperCase(),
+                    apodoChofer: datos.apodoChofer.toUpperCase(),
+                    telefonoChofer: datos.telefonoChofer,
+                    paisChofer: datos.paisChofer,
+                    licencia: datos.licencia || "N/A",
+                    empresaId: datos.empresaId,
+                    empresaNombre: datos.empresaNombre,
+                    empresaLiderId: datos.empresaLiderId || "",
+                    empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
+                    registro: {
+                        usuario: user?.nombre || "Admin",
+                        idUsuario: user?.id || "N/A",
+                        timestamp: new Date()
+                    }
+                };
 
-            await firestore().collection("choferes").add(choferFinal);
-            await conRef.update({ choferes: nuevoFolio });
+                await firestore().collection("choferes").add(choferFinal);
+                await conRef.update({ choferes: nuevoFolio });
+                mostrarAviso(`Chofer #${nuevoFolio} guardado`, "success");
+            }
 
-            mostrarAviso(`Chofer #${nuevoFolio} guardado`, "success");
-            setDatos({
-                nombreChofer: "", apodoChofer: "", telefonoChofer: "",
-                paisChofer: "United States", licencia: "",
-                empresaId: "", empresaNombre: "",
-                empresaLiderId: "", empresaLiderNombre: ""
-            });
+            setDatos(datosVacios);
             if (onSuccess) onSuccess();
         } catch (e) {
             console.error(e);
             mostrarAviso("Error de conexión", "error");
+        } finally {
+            setLoading(false);
         }
-        finally { setLoading(false); }
     };
 
+    const esEdicion = !!choferAEditar;
     const listo = datos.nombreChofer && datos.empresaId && datos.telefonoChofer.length > 5;
+    const modalId = esEdicion ? "modal-confirm-chofer-edit" : "modal-confirm-chofer";
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative mb-6 font-sans">
+        <div className={`p-4 rounded-lg shadow-sm border relative mb-6 font-sans ${esEdicion ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200'}`}>
             {alerta.mostrar && (
                 <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
                     <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} py-2 px-6 text-white font-bold shadow-lg uppercase text-[11px]`}>
@@ -160,26 +191,35 @@ const FormChofer = ({ user, onSuccess }) => {
                         className="input input-bordered w-full input-sm bg-white text-black font-mono" placeholder="Alfanumérico" />
                 </div>
                 <div className="flex-grow flex justify-end p-1">
-                    <label htmlFor={listo ? "modal-confirm-chofer" : ""}
-                        className={`btn btn-sm px-10 ${listo ? 'btn-error text-white font-bold' : 'btn-disabled opacity-40'}`}>
-                        {loading ? "Registrando..." : "+ Guardar Chofer"}
+                    <label htmlFor={listo ? modalId : ""}
+                        className={`btn btn-sm px-10 ${listo ? (esEdicion ? 'btn-info text-white font-bold' : 'btn-error text-white font-bold') : 'btn-disabled opacity-40'}`}>
+                        {loading ? "Guardando..." : (esEdicion ? "Guardar Cambios" : "+ Guardar Chofer")}
                     </label>
                 </div>
             </div>
 
             {/* MODAL CONFIRMACIÓN */}
-            <input type="checkbox" id="modal-confirm-chofer" className="modal-toggle" />
+            <input type="checkbox" id={modalId} className="modal-toggle" />
             <div className="modal">
-                <div className="modal-box bg-white border-t-4 border-red-600">
-                    <h3 className="font-bold text-lg text-black uppercase">Confirmar Alta de Chofer</h3>
+                <div className={`modal-box bg-white border-t-4 ${esEdicion ? 'border-blue-600' : 'border-red-600'}`}>
+                    <h3 className="font-bold text-lg text-black uppercase">
+                        {esEdicion ? 'Confirmar Cambios en Chofer' : 'Confirmar Alta de Chofer'}
+                    </h3>
                     <div className="py-4 text-[13px] text-gray-700 space-y-1">
                         <p>Nombre: <span className="font-bold text-black">{datos.nombreChofer}</span></p>
+                        <p>Apodo: <span className="font-bold text-black">{datos.apodoChofer || '—'}</span></p>
+                        <p>Teléfono: <span className="font-bold text-black">{datos.telefonoChofer}</span></p>
+                        <p>Licencia: <span className="font-bold text-black">{datos.licencia || 'N/A'}</span></p>
                         <p>Empresa Fiscal: <span className="font-bold text-red-600">{datos.empresaNombre}</span></p>
                         <p>Líder Asignado: <span className="font-bold text-blue-700">{datos.empresaLiderNombre || 'Ninguno'}</span></p>
                     </div>
                     <div className="modal-action">
-                        <label htmlFor="modal-confirm-chofer" className="btn btn-sm btn-outline">Cancelar</label>
-                        <label htmlFor="modal-confirm-chofer" className="btn btn-sm btn-error text-white" onClick={ejecutarGuardado}>Confirmar Registro</label>
+                        <label htmlFor={modalId} className="btn btn-sm btn-outline">Cancelar</label>
+                        <label htmlFor={modalId}
+                            className={`btn btn-sm text-white ${esEdicion ? 'btn-info' : 'btn-error'}`}
+                            onClick={ejecutarGuardado}>
+                            {esEdicion ? 'Confirmar Cambios' : 'Confirmar Registro'}
+                        </label>
                     </div>
                 </div>
             </div>

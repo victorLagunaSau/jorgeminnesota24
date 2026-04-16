@@ -276,8 +276,17 @@ const Clientes = ({ user }) => {
     if (clienteSeleccionado) {
         const deudaVehiculos = calcularDeudaVehiculos();
         const deudaCargos = calcularCargosNoPagados();
-        const deudaTotal = deudaVehiculos + deudaCargos;
         const vehiculosPendientes = vehiculosCliente.filter(vehiculoConDeuda);
+
+        const vehiculosFiadosCliente = vehiculosCliente.filter(
+            (v) => v.estadoPago === "fiado" || (v.pagosPendientes === true && v.estadoPago !== "pagado")
+        );
+        const deudaFiadaCliente = vehiculosFiadosCliente.reduce(
+            (sum, v) => sum + (parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0),
+            0
+        );
+
+        const deudaTotal = deudaVehiculos + deudaCargos + deudaFiadaCliente;
 
         return (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
@@ -340,15 +349,19 @@ const Clientes = ({ user }) => {
                         <p className="text-2xl font-black text-gray-800">${deudaVehiculos.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                         <p className="text-xs text-gray-400 mt-1">{vehiculosPendientes.length} pendientes</p>
                     </div>
-                    <div className="bg-white rounded-xl p-5 shadow-md border border-gray-100">
+                    <div className="rounded-xl p-5 shadow-md border-2" style={{ backgroundColor: '#f5e6c8', borderColor: '#c9a96e' }}>
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-                                <FaFileInvoiceDollar className="text-orange-600" />
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#c9a96e' }}>
+                                <FaFileInvoiceDollar className="text-white" />
                             </div>
-                            <p className="text-xs font-bold text-gray-500 uppercase">Cargos Extra</p>
+                            <p className="text-xs font-black uppercase" style={{ color: '#8b6914' }}>Deuda Fiada</p>
                         </div>
-                        <p className="text-2xl font-black text-gray-800">${deudaCargos.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                        <p className="text-xs text-gray-400 mt-1">{cargosExtra.filter(c => !c.pagado).length} pendientes</p>
+                        <p className="text-2xl font-black" style={{ color: '#6b4f10' }}>
+                            ${deudaFiadaCliente.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-xs font-black uppercase mt-1" style={{ color: '#a07d2e' }}>
+                            {vehiculosFiadosCliente.length} fiada{vehiculosFiadosCliente.length !== 1 ? 's' : ''}
+                        </p>
                     </div>
                     <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl p-5 shadow-md text-white">
                         <p className="text-xs font-bold text-white uppercase">Total a Pagar</p>

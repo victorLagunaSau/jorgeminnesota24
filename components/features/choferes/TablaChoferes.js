@@ -6,7 +6,7 @@ import {
     FaCheck, FaIdCard, FaEdit, FaTimes, FaSave, FaFilter, FaExclamationTriangle, FaTruck, FaUserTie
 } from "react-icons/fa";
 
-const TablaChoferes = () => {
+const TablaChoferes = ({ onEditarChofer }) => {
     // Usar datos del contexto compartido (ya no hace queries propias)
     const { choferes: lista, empresas: empresasRaw } = useAdminData();
     const empresas = empresasRaw.map(e => ({ id: e.id, nombre: e.nombreEmpresa }));
@@ -99,6 +99,7 @@ const TablaChoferes = () => {
                         <th>Empresa Fiscal / Líder de Despacho</th>
                         <th className="text-center">Contacto</th>
                         <th>Documentación</th>
+                        {onEditarChofer && <th className="text-center">Acción</th>}
                     </tr>
                 </thead>
                 <tbody className="text-black text-[11px]">
@@ -177,16 +178,18 @@ const TablaChoferes = () => {
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setEditandoId(c.id);
-                                                        setNuevaEmpresaFiscal({ id: c.empresaId, nombre: c.empresaNombre });
-                                                        setNuevaEmpresaLider({ id: c.empresaLiderId || "", nombre: c.empresaLiderNombre || "" });
-                                                    }}
-                                                    className="btn btn-ghost btn-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <FaEdit />
-                                                </button>
+                                                {onEditarChofer && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditandoId(c.id);
+                                                            setNuevaEmpresaFiscal({ id: c.empresaId, nombre: c.empresaNombre });
+                                                            setNuevaEmpresaLider({ id: c.empresaLiderId || "", nombre: c.empresaLiderNombre || "" });
+                                                        }}
+                                                        className="btn btn-ghost btn-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <FaEdit />
+                                                    </button>
+                                                )}
                                             </div>
                                             {!fiscalExiste && (
                                                 <div className="flex items-center gap-1 text-[8px] text-red-500 font-black uppercase italic">
@@ -217,6 +220,17 @@ const TablaChoferes = () => {
                                         </span>
                                     </div>
                                 </td>
+
+                                {onEditarChofer && (
+                                    <td className="text-center">
+                                        <button
+                                            onClick={() => onEditarChofer(c)}
+                                            className="btn btn-xs btn-outline btn-info font-black uppercase text-[9px] gap-1"
+                                        >
+                                            <FaEdit /> Editar
+                                        </button>
+                                    </td>
+                                )}
                             </tr>
                         );
                     })}

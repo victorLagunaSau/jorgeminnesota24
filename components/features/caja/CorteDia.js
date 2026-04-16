@@ -18,6 +18,8 @@ const ReporteMovimientos = React.forwardRef(({
                                                  abonosData,
                                                  totalAbonosEfectivo,
                                                  totalAbonosCC,
+                                                 anticiposData,
+                                                 totalAnticipos,
                                                  entradasData,
                                                  totalRecibido,
                                                  salidasData,
@@ -81,6 +83,45 @@ const ReporteMovimientos = React.forwardRef(({
             </div>
         )}
 
+        {/* Tabla de Anticipos (Pagos Adelantados) */}
+        {anticiposData && anticiposData.length > 0 && (
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold text-green-800">Pagos Adelantados (Anticipos)</h3>
+                <table className="min-w-full bg-white border text-xs">
+                    <thead>
+                        <tr className="bg-green-50">
+                            <th className="px-2 py-1 border">Fecha</th>
+                            <th className="px-2 py-1 border">Lote</th>
+                            <th className="px-2 py-1 border">Cliente / Vehículo</th>
+                            <th className="px-2 py-1 border text-right">Anticipo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {anticiposData.map((a) => (
+                            <tr key={a.id}>
+                                <td className="px-2 py-1 border">
+                                    {a.timestamp?.seconds
+                                        ? new Date(a.timestamp.seconds * 1000).toLocaleDateString()
+                                        : "-"}
+                                </td>
+                                <td className="px-2 py-1 border font-bold">{a.binNip}</td>
+                                <td className="px-2 py-1 border">
+                                    {a.cliente} — {a.marca} {a.modelo}
+                                </td>
+                                <td className="px-2 py-1 border text-right font-bold text-green-700">
+                                    ${(parseFloat(a.anticipoPago) || 0).toFixed(2)}
+                                </td>
+                            </tr>
+                        ))}
+                        <tr className="bg-green-50 font-semibold">
+                            <td colSpan="3" className="px-2 py-1 border text-right">Total Anticipos:</td>
+                            <td className="px-2 py-1 border text-right text-green-700">${totalAnticipos.toFixed(2)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        )}
+
         {/* Tabla de Entradas */}
         <TablaEntradas entradasData={entradasData} totalRecibido={totalRecibido}/>
 
@@ -110,6 +151,12 @@ const ReporteMovimientos = React.forwardRef(({
                 </td>
             </tr>
             <tr>
+                <td className="border px-4 py-2 font-semibold text-green-700">Anticipos (Pagos Adelantados):</td>
+                <td className="border px-4 py-2 font-semibold text-right text-green-700">
+                    ${totalAnticipos.toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            <tr>
                 <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
                 <td className="border px-4 py-2 font-semibold text-right">
                     ${totalRecibido.toFixed(2).toLocaleString('en-US')}
@@ -125,7 +172,7 @@ const ReporteMovimientos = React.forwardRef(({
                 <td className="border px-4 py-2 font-bold">Total General:</td>
                 <td className="border px-4 py-2 font-bold text-right">
                     ${(
-                        totalCaja + totalAbonosEfectivo + totalAbonosCC + totalRecibido - totalSalidas
+                        totalCaja + totalAbonosEfectivo + totalAbonosCC + totalAnticipos + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
                 </td>
             </tr>
@@ -148,6 +195,7 @@ const CorteDia = ({user}) => {
     const [entradasData, setEntradasData] = useState([]);
     const [salidasData, setSalidasData] = useState([]);
     const [abonosData, setAbonosData] = useState([]);
+    const [anticiposData, setAnticiposData] = useState([]);
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
@@ -181,17 +229,13 @@ const CorteDia = ({user}) => {
         const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
         const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
         const filteredAbonos = filteredUserID.filter((movement) => movement.tipo === "Abono");
-
-        // Y en lugar de usar "filteredUserID", usa directamente "movements":
-        // const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
-        // const filteredEntradas = movements.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
-        // const filteredSalidas = movements.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
-
+        const filteredAnticipos = filteredUserID.filter((movement) => movement.tipo === "Anticipo");
 
         setVehiculosData(filteredVehiculos);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
         setAbonosData(filteredAbonos);
+        setAnticiposData(filteredAnticipos);
     };
 
     const totalPago = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.totalPago) || 0), 0);
@@ -218,6 +262,10 @@ const CorteDia = ({user}) => {
     );
     const totalAbonosCC = abonosData.reduce(
         (total, m) => total + (parseFloat(m.cajaCC) || 0),
+        0
+    );
+    const totalAnticipos = anticiposData.reduce(
+        (total, m) => total + (parseFloat(m.anticipoPago) || 0),
         0
     );
 
@@ -276,6 +324,8 @@ const CorteDia = ({user}) => {
                 abonosData={abonosData}
                 totalAbonosEfectivo={totalAbonosEfectivo}
                 totalAbonosCC={totalAbonosCC}
+                anticiposData={anticiposData}
+                totalAnticipos={totalAnticipos}
                 entradasData={entradasData}
                 totalRecibido={totalRecibido}
                 salidasData={salidasData}
