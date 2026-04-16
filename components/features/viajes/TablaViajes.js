@@ -171,14 +171,15 @@ const TablaViajes = ({user}) => {
                 { chofer: nuevoChoferObj }
             );
 
-            viaje.vehiculos.forEach((v) => {
+            for (const v of viaje.vehiculos) {
                 if (v.lote && v.lote.trim() !== "") {
-                    batch.update(
-                        firestore().collection("lotesEnTransito").doc(v.lote),
-                        { choferNombre: choferNuevo.nombreChofer }
-                    );
+                    const loteRef = firestore().collection("lotesEnTransito").doc(v.lote);
+                    const loteDoc = await loteRef.get();
+                    if (loteDoc.exists) {
+                        batch.update(loteRef, { choferNombre: choferNuevo.nombreChofer });
+                    }
                 }
-            });
+            }
 
             await batch.commit();
             setConfirmarChofer(null);

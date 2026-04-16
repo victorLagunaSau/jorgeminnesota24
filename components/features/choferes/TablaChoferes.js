@@ -6,7 +6,7 @@ import {
     FaCheck, FaIdCard, FaEdit, FaTimes, FaSave, FaFilter, FaExclamationTriangle, FaTruck, FaUserTie
 } from "react-icons/fa";
 
-const TablaChoferes = () => {
+const TablaChoferes = ({ onEditarChofer }) => {
     // Usar datos del contexto compartido (ya no hace queries propias)
     const { choferes: lista, empresas: empresasRaw } = useAdminData();
     const empresas = empresasRaw.map(e => ({ id: e.id, nombre: e.nombreEmpresa }));
@@ -99,6 +99,7 @@ const TablaChoferes = () => {
                         <th>Empresa Fiscal / Líder de Despacho</th>
                         <th className="text-center">Contacto</th>
                         <th>Documentación</th>
+                        <th className="text-center">Acción</th>
                     </tr>
                 </thead>
                 <tbody className="text-black text-[11px]">
@@ -216,6 +217,15 @@ const TablaChoferes = () => {
                                             {c.paisChofer || 'UNITED STATES'}
                                         </span>
                                     </div>
+                                </td>
+
+                                <td className="text-center">
+                                    <button
+                                        onClick={() => onEditarChofer && onEditarChofer(c)}
+                                        className="btn btn-xs btn-outline btn-info font-black uppercase text-[9px] gap-1"
+                                    >
+                                        <FaEdit /> Editar
+                                    </button>
                                 </td>
                             </tr>
                         );
