@@ -4,6 +4,7 @@ import FormChofer from "./FormChofer";
 import TablaChoferes from "./TablaChoferes";
 
 const Choferes = ({ user }) => {
+    const isAdminMaster = user?.adminMaster === true;
     const [choferAEditar, setChoferAEditar] = useState(null);
 
     const handleEditar = (chofer) => {
@@ -45,7 +46,7 @@ const Choferes = ({ user }) => {
                 onSuccess={handleCancelarEdicion}
             />
 
-            <TablaChoferes onEditarChofer={handleEditar} />
+            <TablaChoferes onEditarChofer={isAdminMaster ? handleEditar : null} />
         </motion.div>
     );
 };

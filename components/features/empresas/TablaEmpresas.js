@@ -67,7 +67,7 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
                         <th>Tax ID / MC#</th>
                         <th>Ubicación</th>
                         <th className="text-center">W-9</th>
-                        <th className="text-center">Acciones</th>
+                        {onEditar && <th className="text-center">Acciones</th>}
                     </tr>
                 </thead>
                 <tbody className="text-black text-[12px]">
@@ -106,15 +106,17 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
                                 ) : <span className="text-[9px] text-gray-300 uppercase">N/A</span>}
                             </td>
 
-                            <td className="text-center">
-                                <button
-                                    onClick={() => onEditar(e)}
-                                    className="btn btn-circle btn-ghost btn-xs text-orange-600 hover:bg-orange-100"
-                                    title="Editar datos y acceso"
-                                >
-                                    <FaPencilAlt size={14} />
-                                </button>
-                            </td>
+                            {onEditar && (
+                                <td className="text-center">
+                                    <button
+                                        onClick={() => onEditar(e)}
+                                        className="btn btn-circle btn-ghost btn-xs text-orange-600 hover:bg-orange-100"
+                                        title="Editar datos y acceso"
+                                    >
+                                        <FaPencilAlt size={14} />
+                                    </button>
+                                </td>
+                            )}
                         </tr>
                     ))}
                 </tbody>

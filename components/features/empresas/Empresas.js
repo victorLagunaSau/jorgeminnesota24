@@ -5,7 +5,7 @@ import TablaEmpresas from "./TablaEmpresas";
 import { FaTimes } from "react-icons/fa";
 
 const Empresas = ({ user }) => {
-    // Estado para saber qué empresa estamos editando
+    const isAdminMaster = user?.adminMaster === true;
     const [empresaAEditar, setEmpresaAEditar] = useState(null);
 
     const handleEditar = (empresa) => {
@@ -51,7 +51,7 @@ const Empresas = ({ user }) => {
                 onSuccess={cancelarEdicion}
             />
 
-            <TablaEmpresas onEditar={handleEditar} />
+            <TablaEmpresas onEditar={isAdminMaster ? handleEditar : null} />
         </motion.div>
     );
 };
