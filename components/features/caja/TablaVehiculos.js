@@ -1,30 +1,26 @@
 import React from "react";
 
-const TablaVehiculos = ({ vehiculosData, totalPago, totalCaja, totalCC, totalPendientes }) => {
-  // Función para agrupar los vehículos solo por fecha
+const TablaVehiculos = ({ vehiculosData, totalPago, totalCaja, totalCC, totalPendientes, totalCredito = 0 }) => {
   const groupByDate = () => {
     const grouped = {};
-
-    // Filtramos movimientos con totalPago = 0 (comentado para posible futuro uso)
-    const filteredData = vehiculosData.filter(movement => {
-      // Si en el futuro quieres quitar este filtro, solo comenta la siguiente línea
-      return parseFloat(movement.totalPago) !== 0;
-    });
-
+    const filteredData = vehiculosData.filter(movement => parseFloat(movement.totalPago) !== 0);
     filteredData.forEach((movement) => {
       const date = new Date(movement.timestamp.seconds * 1000).toLocaleDateString();
-
-      if (!grouped[date]) {
-        grouped[date] = [];
-      }
-
+      if (!grouped[date]) grouped[date] = [];
       grouped[date].push(movement);
     });
-
     return grouped;
   };
 
   const groupedData = groupByDate();
+
+  // Monto pendiente/crédito individual: usa nuevo modelo (creditoOtorgado / saldoFiado)
+  // o cae al legacy (pagoTotalPendiente).
+  const getCreditoRow = (m) => parseFloat(m.creditoOtorgado) || 0;
+  const getPendienteRow = (m) =>
+    typeof m.saldoFiado === "number"
+      ? parseFloat(m.saldoFiado)
+      : (parseFloat(m.pagoTotalPendiente) || 0);
 
   return (
     <div className="table-container">
@@ -38,78 +34,60 @@ const TablaVehiculos = ({ vehiculosData, totalPago, totalCaja, totalCC, totalPen
             <th className="px-2 py-1 border">Venta</th>
             <th className="px-2 py-1 border">Caja</th>
             <th className="px-2 py-1 border">CC</th>
-            <th className="px-2 py-1 border">Pendientes</th>
+            <th className="px-2 py-1 border">Crédito</th>
+            <th className="px-2 py-1 border">Saldo</th>
           </tr>
         </thead>
         <tbody>
           {Object.keys(groupedData).length === 0 ? (
             <tr>
-              <td colSpan="7" className="px-2 py-1 border text-center">No se encontraron movimientos.</td>
+              <td colSpan="8" className="px-2 py-1 border text-center">No se encontraron movimientos.</td>
             </tr>
           ) : (
             Object.entries(groupedData).map(([date, movements]) => {
-              // Calcular subtotales por día
               const subtotalPago = movements.reduce((sum, m) => sum + (parseFloat(m.totalPago) || 0), 0);
               const subtotalCaja = movements.reduce((sum, m) => sum + ((parseFloat(m.cajaRecibo) || 0) - (parseFloat(m.cajaCambio) || 0)), 0);
               const subtotalCC = movements.reduce((sum, m) => sum + (parseFloat(m.cajaCC) || 0), 0);
-              const subtotalPendientes = movements.reduce((sum, m) => sum + (parseFloat(m.pagoTotalPendiente) || 0), 0);
+              const subtotalCredito = movements.reduce((sum, m) => sum + getCreditoRow(m), 0);
+              const subtotalPendientes = movements.reduce((sum, m) => sum + getPendienteRow(m), 0);
 
               return (
                 <React.Fragment key={date}>
-                  {movements.map((movement, index) => {
-                    const totalPago = parseFloat(movement.totalPago) || 0;
+                  {movements.map((movement) => {
+                    const totalPagoRow = parseFloat(movement.totalPago) || 0;
                     const caja = (parseFloat(movement.cajaRecibo) || 0) - (parseFloat(movement.cajaCambio) || 0);
                     const cc = parseFloat(movement.cajaCC) || 0;
-                    const pendientes = parseFloat(movement.pagoTotalPendiente) || 0;
+                    const credito = getCreditoRow(movement);
+                    const pendientes = getPendienteRow(movement);
+                    const esFiado = movement.estadoPago === "fiado" || (movement.pagosPendientes && movement.estadoPago !== "pagado");
 
                     return (
-                      <tr key={movement.id}>
-                        <td className="px-2 py-1 border">
-                          {date}
-                        </td>
-                        <td className="px-2 py-1 border">
-                          {movement.usuario || "Sin usuario"}
-                        </td>
+                      <tr key={movement.id} className={esFiado ? "bg-orange-50" : ""}>
+                        <td className="px-2 py-1 border">{date}</td>
+                        <td className="px-2 py-1 border">{movement.usuario || "Sin usuario"}</td>
                         <td className="px-2 py-1 border">
                           <p>Bin: <strong>{movement.binNip}</strong></p>
                           <p>Modelo: <strong>{movement.marca} {movement.modelo}</strong></p>
                           <p>Cliente: <strong>{movement.cliente} - {movement.ciudad}</strong></p>
+                          {esFiado && <p className="text-orange-700 font-bold">FIADO</p>}
                         </td>
-                        <td className="px-2 py-1 border text-right">
-                          {totalPago.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                        </td>
-                        <td className="px-2 py-1 border text-right">
-                          {caja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                        </td>
-                        <td className="px-2 py-1 border text-right">
-                          {cc.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                        </td>
-                        <td className="px-2 py-1 border text-right">
-                          {pendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                        </td>
+                        <td className="px-2 py-1 border text-right">{totalPagoRow.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                        <td className="px-2 py-1 border text-right">{caja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                        <td className="px-2 py-1 border text-right">{cc.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                        <td className="px-2 py-1 border text-right text-orange-700">{credito.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                        <td className="px-2 py-1 border text-right">{pendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
                       </tr>
                     );
                   })}
-                  {/* Subtotal por día */}
                   <tr className="bg-gray-100 font-semibold">
                     <td colSpan="3" className="px-2 py-1 border text-right">Subtotal del día:</td>
-                    <td className="px-2 py-1 border text-right">
-                      {subtotalPago.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                    </td>
-                    <td className="px-2 py-1 border text-right">
-                      {subtotalCaja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                    </td>
-                    <td className="px-2 py-1 border text-right">
-                      {subtotalCC.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                    </td>
-                    <td className="px-2 py-1 border text-right">
-                      {subtotalPendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-                    </td>
+                    <td className="px-2 py-1 border text-right">{subtotalPago.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                    <td className="px-2 py-1 border text-right">{subtotalCaja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                    <td className="px-2 py-1 border text-right">{subtotalCC.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                    <td className="px-2 py-1 border text-right text-orange-700">{subtotalCredito.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+                    <td className="px-2 py-1 border text-right">{subtotalPendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
                   </tr>
-                  {/* Espacio entre días */}
-                  <tr>
-                    <td colSpan="7" className="py-2"></td>
-                  </tr>
+                  <tr><td colSpan="8" className="py-2"></td></tr>
                 </React.Fragment>
               );
             })
@@ -118,21 +96,17 @@ const TablaVehiculos = ({ vehiculosData, totalPago, totalCaja, totalCC, totalPen
         <tfoot>
           <tr>
             <td colSpan="3" className="px-2 py-1 border font-semibold text-right">Totales Generales:</td>
-            <td className="px-2 py-1 border font-semibold text-right">
-              {totalPago.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </td>
-            <td className="px-2 py-1 border font-semibold text-right">
-              {totalCaja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </td>
-            <td className="px-2 py-1 border font-semibold text-right">
-              {totalCC.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </td>
-            <td className="px-2 py-1 border font-semibold text-right">
-              {totalPendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-            </td>
+            <td className="px-2 py-1 border font-semibold text-right">{totalPago.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+            <td className="px-2 py-1 border font-semibold text-right">{totalCaja.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+            <td className="px-2 py-1 border font-semibold text-right">{totalCC.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+            <td className="px-2 py-1 border font-semibold text-right text-orange-700">{totalCredito.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
+            <td className="px-2 py-1 border font-semibold text-right">{totalPendientes.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</td>
           </tr>
         </tfoot>
       </table>
+      <p className="text-xs italic text-gray-600 mt-1">
+        * Crédito = monto fiado al cliente al dar salida (informativo, no suma a caja).
+      </p>
     </div>
   );
 };

@@ -27,6 +27,11 @@ const Pagado = ({vehiculo}) => {
         pagos003 = 0,
         pagos004 = 0,
         pagos005 = 0,
+        estadoPago = "pagado",
+        creditoOtorgado = 0,
+        saldoFiado = 0,
+        cajaRecibo = 0,
+        cajaCC = 0,
         pagoTardioFlete = 0, // Nuevo campo
         estacionamiento = 0, // Nuevo campo
         registro = {seconds: 0, nanoseconds: 0},
@@ -87,6 +92,17 @@ const Pagado = ({vehiculo}) => {
                     <p className="mt-4 text-xl">Total: <strong>$ {totalPago} DLL</strong></p>
                 </div>
 
+                {estadoPago === "fiado" && (
+                    <div className="mt-4 p-4 rounded-xl border-l-8 border-orange-600 bg-orange-100">
+                        <h2 className="text-lg font-bold text-orange-800 uppercase">
+                            Vehículo salió FIADO
+                        </h2>
+                        <p>Efectivo cobrado: <strong>${parseFloat(cajaRecibo).toFixed(2)}</strong></p>
+                        <p>CC cobrado: <strong>${parseFloat(cajaCC).toFixed(2)}</strong></p>
+                        <p>Crédito otorgado al cliente: <strong>${parseFloat(creditoOtorgado).toFixed(2)}</strong></p>
+                        <p>Saldo pendiente: <strong>${parseFloat(saldoFiado).toFixed(2)}</strong></p>
+                    </div>
+                )}
                 {pagosPendientes && (
                     <div className="mt-4 p-4 bg-yellow-100 rounded">
                         <h2 className="text-lg font-bold text-red-500">Pagos Pendientes</h2>
@@ -110,7 +126,7 @@ const Pagado = ({vehiculo}) => {
             {showModal && (
                 <div className="fixed inset-0 flex justify-center items-center z-50">
                     <div className="modal-box max-w-5xl w-full bg-white-500">
-                        {pagosPendientes ? (
+                        {(pagosPendientes || estadoPago === "fiado") ? (
                             <ImprimeSalidaSinPendientes
                                 onClose={closeModal}
                                 vehiculoData={vehiculoData}

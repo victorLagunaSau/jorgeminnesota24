@@ -22,8 +22,10 @@ const Clientes = ({ user }) => {
     const [cargosExtra, setCargosExtra] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(false);
 
-    // Todos los vehículos no entregados para calcular deudas
+    // Vehículos no entregados + entregados con fiado pendiente (nuevo o legacy)
     const [todosVehiculos, setTodosVehiculos] = useState([]);
+    const [vehiculosFiados, setVehiculosFiados] = useState([]);
+    const [vehiculosLegacy, setVehiculosLegacy] = useState([]);
 
     const [showCargoForm, setShowCargoForm] = useState(false);
     const [nuevoCargo, setNuevoCargo] = useState({ monto: "", descripcion: "" });
@@ -31,14 +33,39 @@ const Clientes = ({ user }) => {
 
     const xPagina = 15;
 
-    // Cargar todos los vehículos no entregados una vez
+    // Vehículos aún no entregados (adeudan precio completo)
     useEffect(() => {
         const unsub = firestore()
             .collection("vehiculos")
             .where("estatus", "!=", "EN")
             .onSnapshot((snap) => {
-                const vehiculos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setTodosVehiculos(vehiculos);
+                setTodosVehiculos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        return () => unsub();
+    }, []);
+
+    // Vehículos entregados con fiado pendiente (modelo nuevo)
+    useEffect(() => {
+        const unsub = firestore()
+            .collection("vehiculos")
+            .where("estadoPago", "==", "fiado")
+            .onSnapshot((snap) => {
+                setVehiculosFiados(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        return () => unsub();
+    }, []);
+
+    // Legacy: entregados con pagos pendientes en el esquema viejo
+    useEffect(() => {
+        const unsub = firestore()
+            .collection("vehiculos")
+            .where("pagosPendientes", "==", true)
+            .onSnapshot((snap) => {
+                setVehiculosLegacy(
+                    snap.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                        .filter(v => v.estadoPago !== "pagado")
+                );
             });
         return () => unsub();
     }, []);
@@ -52,22 +79,44 @@ const Clientes = ({ user }) => {
         return price + storage + sobrePeso + gastosExtra;
     };
 
-    // Calcular deuda y vehículos por cliente
+    // Calcular deuda y vehículos por cliente combinando:
+    //  - vehículos aún no entregados (precio completo)
+    //  - vehículos entregados con fiado (saldoFiado)
+    //  - vehículos legacy con pagosPendientes (pagoTotalPendiente)
     const getDeudaCliente = (nombreCliente) => {
-        const vehiculosDelCliente = todosVehiculos.filter(v => v.cliente === nombreCliente);
-        const total = vehiculosDelCliente.reduce((sum, v) => sum + calcularPrecioVehiculo(v), 0);
-        return { vehiculos: vehiculosDelCliente.length, deuda: total };
+        const enPatio = todosVehiculos.filter(v => v.cliente === nombreCliente);
+        const deudaPatio = enPatio.reduce((sum, v) => sum + calcularPrecioVehiculo(v), 0);
+
+        const fiadosCliente = vehiculosFiados.filter(v => v.cliente === nombreCliente);
+        const deudaFiado = fiadosCliente.reduce(
+            (sum, v) => sum + (parseFloat(v.saldoFiado) || 0),
+            0
+        );
+
+        // Legacy: solo los que NO están ya contados como fiado nuevo
+        const idsFiado = new Set(fiadosCliente.map(v => v.id));
+        const legacyCliente = vehiculosLegacy.filter(
+            v => v.cliente === nombreCliente && !idsFiado.has(v.id)
+        );
+        const deudaLegacy = legacyCliente.reduce(
+            (sum, v) => sum + (parseFloat(v.pagoTotalPendiente) || 0),
+            0
+        );
+
+        return {
+            vehiculos: enPatio.length + fiadosCliente.length + legacyCliente.length,
+            deuda: deudaPatio + deudaFiado + deudaLegacy,
+        };
     };
 
-    // Ordenar clientes por deuda (mayor a menor)
     const clientes = useMemo(() => {
         return [...clientesRaw]
             .map(c => ({
                 ...c,
-                ...getDeudaCliente(c.cliente)
+                ...getDeudaCliente(c.cliente),
             }))
             .sort((a, b) => b.deuda - a.deuda);
-    }, [clientesRaw, todosVehiculos]);
+    }, [clientesRaw, todosVehiculos, vehiculosFiados, vehiculosLegacy]);
 
     const filtrados = clientes.filter(c => {
         const b = busqueda.toLowerCase();
@@ -119,11 +168,23 @@ const Clientes = ({ user }) => {
         };
     }, [clienteSeleccionado]);
 
-    const calcularDeudaVehiculos = () => {
-        return vehiculosCliente
-            .filter(v => v.estatus !== "EN")
-            .reduce((sum, v) => sum + calcularPrecioVehiculo(v), 0);
+    // Un vehículo tiene deuda si aún no sale del patio, o si salió fiado (nuevo/legacy)
+    const vehiculoConDeuda = (v) =>
+        v.estatus !== "EN" ||
+        v.estadoPago === "fiado" ||
+        (v.pagosPendientes === true && v.estadoPago !== "pagado");
+
+    const montoDeudaVehiculo = (v) => {
+        if (v.estatus !== "EN") return calcularPrecioVehiculo(v);
+        if (v.estadoPago === "fiado") return parseFloat(v.saldoFiado) || 0;
+        if (v.pagosPendientes) return parseFloat(v.pagoTotalPendiente) || 0;
+        return 0;
     };
+
+    const calcularDeudaVehiculos = () =>
+        vehiculosCliente
+            .filter(vehiculoConDeuda)
+            .reduce((sum, v) => sum + montoDeudaVehiculo(v), 0);
 
     const calcularCargosNoPagados = () => {
         return cargosExtra
@@ -216,7 +277,7 @@ const Clientes = ({ user }) => {
         const deudaVehiculos = calcularDeudaVehiculos();
         const deudaCargos = calcularCargosNoPagados();
         const deudaTotal = deudaVehiculos + deudaCargos;
-        const vehiculosPendientes = vehiculosCliente.filter(v => v.estatus !== "EN");
+        const vehiculosPendientes = vehiculosCliente.filter(vehiculoConDeuda);
 
         return (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
@@ -326,21 +387,24 @@ const Clientes = ({ user }) => {
                                 </thead>
                                 <tbody>
                                     {vehiculosPendientes.map((v) => {
-                                        const total = calcularPrecioVehiculo(v);
+                                        const deuda = montoDeudaVehiculo(v);
+                                        const esFiado =
+                                            v.estadoPago === "fiado" ||
+                                            (v.pagosPendientes && v.estadoPago !== "pagado");
                                         return (
                                             <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50">
                                                 <td className="font-mono font-bold text-blue-700">{v.binNip}</td>
                                                 <td className="font-semibold text-gray-800">{v.modelo}</td>
                                                 <td className="text-gray-600 text-sm">{v.ciudad}, {v.estado}</td>
                                                 <td>
-                                                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-full uppercase">
-                                                        {v.estatus}
+                                                    <span className={`px-2 py-1 text-xs font-bold rounded-full uppercase ${esFiado ? 'bg-orange-200 text-orange-800' : 'bg-gray-100 text-gray-600'}`}>
+                                                        {esFiado ? 'FIADO' : v.estatus}
                                                     </span>
                                                 </td>
                                                 <td className="text-right text-gray-700">${parseFloat(v.price || 0).toFixed(2)}</td>
                                                 <td className="text-right text-gray-700">${parseFloat(v.storage || 0).toFixed(2)}</td>
                                                 <td className="text-right text-gray-700">${(parseFloat(v.sobrePeso || 0) + parseFloat(v.gastosExtra || 0)).toFixed(2)}</td>
-                                                <td className="text-right font-black text-gray-900">${total.toFixed(2)}</td>
+                                                <td className="text-right font-black text-gray-900">${deuda.toFixed(2)}</td>
                                             </tr>
                                         );
                                     })}

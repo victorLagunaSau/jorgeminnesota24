@@ -14,26 +14,39 @@ const Cobranza = ({user}) => {
     const [filtroBinNip, setFiltroBinNip] = useState("");
 
     useEffect(() => {
-        const obtenerCobranza = () => {
-            try {
-                const unsubscribe = firestore()
-                    .collection("vehiculos")
-                    .where("pagosPendientes", "==", true)
-                    .onSnapshot((vehiculosSnapshot) => {
-                        const vehiculos = vehiculosSnapshot.docs.map((doc) => ({
-                            id: doc.id,
-                            ...doc.data(),
-                        }));
-                        setVehiculosConPagoPendiente(vehiculos);
-                    });
+        // Soporta modelo nuevo (estadoPago:"fiado") y legacy (pagosPendientes:true).
+        let datosNuevo = [];
+        let datosLegacy = [];
 
-                return () => unsubscribe();
-            } catch (error) {
-                console.error("Error al obtener los vehículos con pago pendiente:", error);
-            }
+        const combinar = () => {
+            const porId = new Map();
+            [...datosNuevo, ...datosLegacy].forEach((v) => porId.set(v.id, v));
+            setVehiculosConPagoPendiente(Array.from(porId.values()));
         };
 
-        obtenerCobranza();
+        const unsubNuevo = firestore()
+            .collection("vehiculos")
+            .where("estadoPago", "==", "fiado")
+            .onSnapshot((snap) => {
+                datosNuevo = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+                combinar();
+            });
+
+        const unsubLegacy = firestore()
+            .collection("vehiculos")
+            .where("pagosPendientes", "==", true)
+            .onSnapshot((snap) => {
+                datosLegacy = snap.docs
+                    .map((d) => ({ id: d.id, ...d.data() }))
+                    // si ya fue migrado y marcado como "pagado" no lo duplicamos
+                    .filter((v) => v.estadoPago !== "pagado");
+                combinar();
+            });
+
+        return () => {
+            unsubNuevo();
+            unsubLegacy();
+        };
     }, []);
 
     const filteredVehiculos = vehiculosConPagoPendiente.filter(
@@ -162,7 +175,13 @@ const Cobranza = ({user}) => {
                                 <   div className="font-semibold">{vehiculo.modelo}</div>
                                 <div className="text-sm text-gray-500"> Bin/Nip: {vehiculo.binNip}</div>
                             </td>
-                            <td className="border px-4 py-2">${vehiculo.pagoTotalPendiente || 0}</td>
+                            <td className="border px-4 py-2">
+                                ${(
+                                    (typeof vehiculo.saldoFiado === "number"
+                                        ? vehiculo.saldoFiado
+                                        : vehiculo.pagoTotalPendiente) || 0
+                                ).toFixed(2)}
+                            </td>
                             <td className="border px-4 py-2">
                                 <button
                                     className="btn btn-info btn-sm"
