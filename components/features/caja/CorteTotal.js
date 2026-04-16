@@ -16,6 +16,10 @@ const ReporteMovimientos = React.forwardRef(({
                                                  totalCaja,
                                                  totalCC,
                                                  totalPendientes,
+                                                 totalCredito,
+                                                 abonosData,
+                                                 totalAbonosEfectivo,
+                                                 totalAbonosCC,
                                                  entradasData,
                                                  totalRecibido,
                                                  salidasData,
@@ -35,6 +39,7 @@ const ReporteMovimientos = React.forwardRef(({
             totalCaja={totalCaja}
             totalCC={totalCC}
             totalPendientes={totalPendientes}
+            totalCredito={totalCredito}
         />
 
         {/* Tabla de Entradas */}
@@ -60,6 +65,18 @@ const ReporteMovimientos = React.forwardRef(({
                     </td>
                 </tr>
                 <tr>
+                    <td className="border px-4 py-2 font-semibold">Abonos Fiados (efectivo):</td>
+                    <td className="border px-4 py-2 font-semibold text-right">
+                        ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold">Abonos Fiados (CC):</td>
+                    <td className="border px-4 py-2 font-semibold text-right">
+                        ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
                     <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
                     <td className="border px-4 py-2 font-semibold text-right">
                         ${totalRecibido.toFixed(2).toLocaleString('en-US')}
@@ -69,7 +86,7 @@ const ReporteMovimientos = React.forwardRef(({
                     <td className="border px-4 py-2 font-bold">Total Ingresos:</td>
                     <td className="border px-4 py-2 font-bold text-right">
                         ${(
-                        totalCaja + totalCC + totalRecibido
+                        totalCaja + totalCC + totalAbonosEfectivo + totalAbonosCC + totalRecibido
                     ).toFixed(2).toLocaleString('en-US')}
                     </td>
                 </tr>
@@ -83,8 +100,14 @@ const ReporteMovimientos = React.forwardRef(({
                     <td className="border px-4 py-2 font-bold">Total General:</td>
                     <td className="border px-4 py-2 font-bold text-right">
                         ${(
-                        totalCaja + totalCC + totalRecibido - totalSalidas
+                        totalCaja + totalCC + totalAbonosEfectivo + totalAbonosCC + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border px-4 py-2 font-semibold text-orange-700">Crédito otorgado (informativo):</td>
+                    <td className="border px-4 py-2 font-semibold text-right text-orange-700">
+                        ${totalCredito.toFixed(2).toLocaleString('en-US')}
                     </td>
                 </tr>
                 </tbody>
@@ -108,6 +131,7 @@ const CorteTotal = () => {
     const [vehiculosPendientesData, setVehiculosPendientesData] = useState([]);
     const [entradasData, setEntradasData] = useState([]);
     const [salidasData, setSalidasData] = useState([]);
+    const [abonosData, setAbonosData] = useState([]);
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
@@ -141,9 +165,10 @@ const CorteTotal = () => {
         }));
 
         // Filtrar los movimientos para vehículos (sin filtrar por usuario)
-        const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
-        // Filtrar los movimientos para vehículos (sin filtrar por usuario)
-        const filteredVehiculosPendientes = movements.filter((movement) => movement.tipo !== "Pago");
+        const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago" && movement.tipo !== "Abono");
+        const filteredAbonos = movements.filter((movement) => movement.tipo === "Abono");
+        // Vehículos con pago pendiente (salidas que no son abonos ni pagos de caja)
+        const filteredVehiculosPendientes = movements.filter((movement) => movement.tipo !== "Pago" && movement.tipo !== "Abono");
         // Filtrar los movimientos para entradas (sin filtrar por usuario)
         const filteredEntradas = movements.filter((movement) =>
             movement.estatus === "EE" &&
@@ -159,7 +184,7 @@ const CorteTotal = () => {
         setVehiculosPendientesData(filteredVehiculosPendientes);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
-
+        setAbonosData(filteredAbonos);
     };
 
     const totalPago = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.totalPago) || 0), 0);
@@ -168,7 +193,26 @@ const CorteTotal = () => {
         return total + caja;
     }, 0);
     const totalCC = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.cajaCC) || 0), 0);
-    const totalPendientes = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.pagoTotalPendiente) || 0), 0);
+    const totalPendientes = vehiculosData.reduce(
+        (total, m) =>
+            total +
+            (typeof m.saldoFiado === "number"
+                ? parseFloat(m.saldoFiado)
+                : (parseFloat(m.pagoTotalPendiente) || 0)),
+        0
+    );
+    const totalCredito = vehiculosData.reduce(
+        (total, m) => total + (parseFloat(m.creditoOtorgado) || 0),
+        0
+    );
+    const totalAbonosEfectivo = abonosData.reduce(
+        (total, m) => total + (parseFloat(m.cajaRecibo) || 0),
+        0
+    );
+    const totalAbonosCC = abonosData.reduce(
+        (total, m) => total + (parseFloat(m.cajaCC) || 0),
+        0
+    );
 
 
     const totalRecibido = entradasData.reduce((total, movement) => total + (parseFloat(movement.cajaRecibo) || 0), 0);
@@ -236,6 +280,10 @@ const CorteTotal = () => {
                 totalCaja={totalCaja}
                 totalCC={totalCC}
                 totalPendientes={totalPendientes}
+                totalCredito={totalCredito}
+                abonosData={abonosData}
+                totalAbonosEfectivo={totalAbonosEfectivo}
+                totalAbonosCC={totalAbonosCC}
                 entradasData={entradasData}
                 totalRecibido={totalRecibido}
                 salidasData={salidasData}

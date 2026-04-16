@@ -14,6 +14,10 @@ const ReporteMovimientos = React.forwardRef(({
                                                  totalCaja,
                                                  totalCC,
                                                  totalPendientes,
+                                                 totalCredito,
+                                                 abonosData,
+                                                 totalAbonosEfectivo,
+                                                 totalAbonosCC,
                                                  entradasData,
                                                  totalRecibido,
                                                  salidasData,
@@ -33,7 +37,49 @@ const ReporteMovimientos = React.forwardRef(({
             totalCaja={totalCaja}
             totalCC={totalCC}
             totalPendientes={totalPendientes}
+            totalCredito={totalCredito}
         />
+
+        {/* Tabla de Abonos recibidos (cobros de fiados) */}
+        {abonosData && abonosData.length > 0 && (
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold">Abonos de Fiados recibidos</h3>
+                <table className="min-w-full bg-white border text-xs">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="px-2 py-1 border">Fecha</th>
+                            <th className="px-2 py-1 border">Cliente / Vehículo</th>
+                            <th className="px-2 py-1 border text-right">Efectivo</th>
+                            <th className="px-2 py-1 border text-right">CC</th>
+                            <th className="px-2 py-1 border text-right">Saldo después</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {abonosData.map((a) => (
+                            <tr key={a.id}>
+                                <td className="px-2 py-1 border">
+                                    {a.timestamp?.seconds
+                                        ? new Date(a.timestamp.seconds * 1000).toLocaleDateString()
+                                        : "-"}
+                                </td>
+                                <td className="px-2 py-1 border">
+                                    {a.cliente} — {a.marca} {a.modelo} (Bin: {a.binNip})
+                                </td>
+                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaRecibo) || 0).toFixed(2)}</td>
+                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaCC) || 0).toFixed(2)}</td>
+                                <td className="px-2 py-1 border text-right">${(parseFloat(a.saldoFiadoDespues) || 0).toFixed(2)}</td>
+                            </tr>
+                        ))}
+                        <tr className="bg-gray-100 font-semibold">
+                            <td colSpan="2" className="px-2 py-1 border text-right">Subtotal abonos:</td>
+                            <td className="px-2 py-1 border text-right">${totalAbonosEfectivo.toFixed(2)}</td>
+                            <td className="px-2 py-1 border text-right">${totalAbonosCC.toFixed(2)}</td>
+                            <td className="px-2 py-1 border"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        )}
 
         {/* Tabla de Entradas */}
         <TablaEntradas entradasData={entradasData} totalRecibido={totalRecibido}/>
@@ -52,6 +98,18 @@ const ReporteMovimientos = React.forwardRef(({
                 </td>
             </tr>
             <tr>
+                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (efectivo):</td>
+                <td className="border px-4 py-2 font-semibold text-right">
+                    ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            <tr>
+                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (CC):</td>
+                <td className="border px-4 py-2 font-semibold text-right">
+                    ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            <tr>
                 <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
                 <td className="border px-4 py-2 font-semibold text-right">
                     ${totalRecibido.toFixed(2).toLocaleString('en-US')}
@@ -67,8 +125,14 @@ const ReporteMovimientos = React.forwardRef(({
                 <td className="border px-4 py-2 font-bold">Total General:</td>
                 <td className="border px-4 py-2 font-bold text-right">
                     ${(
-                        totalCaja + totalRecibido - totalSalidas
+                        totalCaja + totalAbonosEfectivo + totalAbonosCC + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            <tr>
+                <td className="border px-4 py-2 font-semibold text-orange-700">Crédito otorgado hoy (informativo):</td>
+                <td className="border px-4 py-2 font-semibold text-right text-orange-700">
+                    ${totalCredito.toFixed(2).toLocaleString('en-US')}
                 </td>
             </tr>
         </tbody>
@@ -83,6 +147,7 @@ const CorteDia = ({user}) => {
     const [vehiculosData, setVehiculosData] = useState([]);
     const [entradasData, setEntradasData] = useState([]);
     const [salidasData, setSalidasData] = useState([]);
+    const [abonosData, setAbonosData] = useState([]);
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
@@ -112,9 +177,10 @@ const CorteDia = ({user}) => {
         }));
 
         const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
-        const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
+        const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago" && movement.tipo !== "Abono");
         const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
         const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
+        const filteredAbonos = filteredUserID.filter((movement) => movement.tipo === "Abono");
 
         // Y en lugar de usar "filteredUserID", usa directamente "movements":
         // const filteredVehiculos = movements.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago");
@@ -125,6 +191,7 @@ const CorteDia = ({user}) => {
         setVehiculosData(filteredVehiculos);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
+        setAbonosData(filteredAbonos);
     };
 
     const totalPago = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.totalPago) || 0), 0);
@@ -133,7 +200,26 @@ const CorteDia = ({user}) => {
         return total + caja;
     }, 0);
     const totalCC = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.cajaCC) || 0), 0);
-    const totalPendientes = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.pagoTotalPendiente) || 0), 0);
+    const totalPendientes = vehiculosData.reduce(
+        (total, m) =>
+            total +
+            (typeof m.saldoFiado === "number"
+                ? parseFloat(m.saldoFiado)
+                : (parseFloat(m.pagoTotalPendiente) || 0)),
+        0
+    );
+    const totalCredito = vehiculosData.reduce(
+        (total, m) => total + (parseFloat(m.creditoOtorgado) || 0),
+        0
+    );
+    const totalAbonosEfectivo = abonosData.reduce(
+        (total, m) => total + (parseFloat(m.cajaRecibo) || 0),
+        0
+    );
+    const totalAbonosCC = abonosData.reduce(
+        (total, m) => total + (parseFloat(m.cajaCC) || 0),
+        0
+    );
 
     const totalRecibido = entradasData.reduce((total, movement) => total + (parseFloat(movement.cajaRecibo) || 0), 0);
 
@@ -186,6 +272,10 @@ const CorteDia = ({user}) => {
                 totalCaja={totalCaja}
                 totalCC={totalCC}
                 totalPendientes={totalPendientes}
+                totalCredito={totalCredito}
+                abonosData={abonosData}
+                totalAbonosEfectivo={totalAbonosEfectivo}
+                totalAbonosCC={totalAbonosCC}
                 entradasData={entradasData}
                 totalRecibido={totalRecibido}
                 salidasData={salidasData}

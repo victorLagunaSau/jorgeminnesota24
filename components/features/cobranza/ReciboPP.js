@@ -1,67 +1,96 @@
-// src/components/ReciboPP.js
-import React, {forwardRef} from "react";
+import React, { forwardRef } from "react";
 import moment from "moment";
-import {toWords} from "number-to-words";
+import { toWords } from "number-to-words";
 
-const ReciboPP = forwardRef(({vehiculo, pago2, pago3, fechaPago, user}, ref) => {
-    const pago1 = parseFloat(vehiculo?.pagos001) || 0;
-    const pago2Val = parseFloat(pago2) || 0;
-    const pago3Val = parseFloat(pago3) || 0;
-    const totalPagado = pago1 + pago2Val + pago3Val;
-    const totalPendiente = parseFloat(vehiculo?.pagoTotalPendiente) || 0;
-    const precioTotal = parseFloat(vehiculo?.price) || 0;
+const ReciboPP = forwardRef(({ vehiculo, abono, fechaPago, user }, ref) => {
+    const montoAbono = parseFloat(abono?.monto) || 0;
+    const efectivoAbono = parseFloat(abono?.efectivo) || 0;
+    const ccAbono = parseFloat(abono?.cc) || 0;
 
-    const totalPagadoPalabras = toWords(totalPagado).toUpperCase() + " DÓLARES";
+    // Total pagado acumulado (modelo nuevo: totalPago - saldoFiado; legacy: suma pagos00X)
+    const totalVenta = parseFloat(vehiculo?.totalPago) || 0;
+    const saldoDespues = Math.max(
+        0,
+        (parseFloat(vehiculo?.saldoFiado) || parseFloat(vehiculo?.pagoTotalPendiente) || 0) -
+            montoAbono
+    );
+    const totalPagado = totalVenta - saldoDespues;
 
-    const Recibo = ({title}) => (
-        <div className="border-2 border-gray-400 p-4 my-4" style={{fontFamily: "Arial", fontSize: "14px"}}>
+    const totalPagadoPalabras = Number.isFinite(totalPagado)
+        ? toWords(Math.round(totalPagado)).toUpperCase() + " DÓLARES"
+        : "";
 
+    const abonosPrevios = Array.isArray(vehiculo?.abonosFiado)
+        ? vehiculo.abonosFiado
+        : [];
+
+    const Recibo = ({ title }) => (
+        <div
+            className="border-2 border-gray-400 p-4 my-4"
+            style={{ fontFamily: "Arial", fontSize: "14px" }}
+        >
             <div className="flex justify-between mb-2">
-                <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo"/>
-                <h2 className="text-lg font-bold">RECIBO DE PAGO PENDIENTE</h2>
+                <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo" />
+                <h2 className="text-lg font-bold">RECIBO DE ABONO / PAGO FIADO</h2>
                 <div>
-                    <p><strong>Fecha:</strong> {moment(fechaPago).format("DD/MM/YYYY")}</p>
+                    <p>
+                        <strong>Fecha:</strong> {moment(fechaPago).format("DD/MM/YYYY")}
+                    </p>
                     <p className="text-sm italic">{title}</p>
                 </div>
             </div>
-            <hr className="mb-2"/>
+            <hr className="mb-2" />
             <div className="mb-2">
-                <p><strong>Cliente:</strong> {vehiculo?.cliente} <strong>Vehículo:</strong> {vehiculo?.marca} {vehiculo?.modelo} <strong>Descripción:</strong> {vehiculo?.descripcion}</p>
+                <p>
+                    <strong>Cliente:</strong> {vehiculo?.cliente}{" "}
+                    <strong>Vehículo:</strong> {vehiculo?.marca} {vehiculo?.modelo}{" "}
+                    <strong>Descripción:</strong> {vehiculo?.descripcion}
+                </p>
+            </div>
+            <div className="mb-2 text-xl">
+                <p>Este comprobante corresponde a un abono por:</p>
+                <p>
+                    <strong>${montoAbono.toFixed(2)}</strong> dólares.
+                </p>
+                {efectivoAbono > 0 && (
+                    <p className="text-base">Efectivo: ${efectivoAbono.toFixed(2)}</p>
+                )}
+                {ccAbono > 0 && <p className="text-base">Tarjeta (CC): ${ccAbono.toFixed(2)}</p>}
             </div>
             <div className="mb-2">
-                {vehiculo?.pagos002 ? (
-                    pago3Val > 0 && (
-                        <div className="text-xl">
-                            <p>Este comprobante corresponde a: </p>
-                            <p>Tercer pago por: <strong>${pago3Val.toFixed(2)}</strong> dólares.</p>
-                        </div>
-
-                    )
-                ) : (
-                    pago2Val > 0 && (
-                        <div className="text-xl">
-                            <li>Este comprobante corresponde a: </li>
-                            <p>Segundo pago por: <strong>${pago2Val.toFixed(2)}</strong> dólares.</p>
-                        </div>
-                    )
+                <p>
+                    <strong>Total de Venta:</strong> ${totalVenta.toFixed(2)}
+                </p>
+                <p>
+                    <strong>Total Pagado acumulado:</strong> ${totalPagado.toFixed(2)} (
+                    {totalPagadoPalabras})
+                </p>
+                <p className="text-xl">
+                    <strong>Restante por Pagar:</strong> ${saldoDespues.toFixed(2)}
+                </p>
+                {abonosPrevios.length > 0 && (
+                    <div className="mt-2">
+                        <p className="font-semibold">Abonos previos:</p>
+                        <ul className="ml-4 list-disc text-sm">
+                            {abonosPrevios.map((a, i) => (
+                                <li key={i}>
+                                    ${parseFloat(a.monto).toFixed(2)}{" "}
+                                    {a.fecha?.toDate
+                                        ? `— ${a.fecha.toDate().toLocaleDateString()}`
+                                        : ""}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 )}
             </div>
-            <div className="mb-2">
-                <p><strong>Pagos Realizados:</strong></p>
-                <ul className="ml-4 list-disc">
-                    <li>Pago 1: ${pago1.toFixed(2)}</li>
-                    {vehiculo?.pagos002 ? <li>Pago 2: ${pago2Val.toFixed(2)}</li> : null}
-                    {vehiculo?.pagos002 ? <li>Pago 3: ${pago3Val.toFixed(2)}</li> :
-                        <li>Pago 2: ${pago2Val.toFixed(2)}</li>}
-                </ul>
-                <p className="mt-2"><strong>Total Pagado:</strong> ${totalPagado.toFixed(2)} ({totalPagadoPalabras})</p>
-                <p className="mt-2"><strong>Total de Venta:</strong> ${vehiculo.totalPago}</p>
-                <p className="text-xl"><strong>Restante por Pagar:</strong> ${totalPendiente.toFixed(2)}</p>
-            </div>
             <div className="mt-4 flex justify-between items-end">
-                <p><strong>Atendido por:</strong> {user?.nombre}</p>
+                <p>
+                    <strong>Atendido por:</strong> {user?.nombre}
+                </p>
                 <div className="text-center mt-8">
-                    __________________________<br/>
+                    __________________________
+                    <br />
                     <strong>Firma del Cliente</strong>
                 </div>
             </div>
@@ -69,9 +98,9 @@ const ReciboPP = forwardRef(({vehiculo, pago2, pago3, fechaPago, user}, ref) => 
     );
 
     return (
-        <div ref={ref} className="p-6" style={{maxWidth: "700px", margin: "auto"}}>
-            <Recibo title="Copia Cliente"/>
-            <Recibo title="Copia Oficina"/>
+        <div ref={ref} className="p-6" style={{ maxWidth: "700px", margin: "auto" }}>
+            <Recibo title="Copia Cliente" />
+            <Recibo title="Copia Oficina" />
         </div>
     );
 });

@@ -1,17 +1,23 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash, FaPlus, FaMinus} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash, FaPlus, FaMinus, FaUserEdit} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaVerificacion from "./HojaVerificacion";
+import {useAdminData} from "../../../context/adminData";
 
 const TablaViajes = ({user}) => {
+    const { choferes: choferesAdmin } = useAdminData();
     const [viajes, setViajes] = useState([]);
     const [clientes, setClientes] = useState([]);
     const [provincias, setProvincias] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filtroGeneral, setFiltroGeneral] = useState("");
     const [busquedaCliente, setBusquedaCliente] = useState({});
+    const [busquedaChofer, setBusquedaChofer] = useState({});
+    const [cambioChoferLoading, setCambioChoferLoading] = useState(null);
+    const [choferHighlight, setChoferHighlight] = useState(0);
+    const [confirmarChofer, setConfirmarChofer] = useState(null); // {viaje, choferNuevo}
 
     const componentRef = useRef();
     const [viajeAImprimir, setViajeAImprimir] = useState(null);
@@ -138,6 +144,52 @@ const TablaViajes = ({user}) => {
         }
     };
 
+
+    const handleCambiarChofer = (viaje, choferNuevo) => {
+        if (!user.admin) return;
+        setBusquedaChofer({});
+        setConfirmarChofer({ viaje, choferNuevo });
+    };
+
+    const ejecutarCambioChofer = async () => {
+        if (!confirmarChofer) return;
+        const { viaje, choferNuevo } = confirmarChofer;
+        setCambioChoferLoading(viaje.id);
+        try {
+            const nuevoChoferObj = {
+                id: choferNuevo.id,
+                nombre: choferNuevo.nombreChofer,
+                empresa: choferNuevo.empresaNombre || "",
+                telefono: choferNuevo.telefonoChofer || "",
+                empresaLiderId: choferNuevo.empresaLiderId || "",
+            };
+
+            const batch = firestore().batch();
+
+            batch.update(
+                firestore().collection("viajesPendientes").doc(viaje.id),
+                { chofer: nuevoChoferObj }
+            );
+
+            viaje.vehiculos.forEach((v) => {
+                if (v.lote && v.lote.trim() !== "") {
+                    batch.update(
+                        firestore().collection("lotesEnTransito").doc(v.lote),
+                        { choferNombre: choferNuevo.nombreChofer }
+                    );
+                }
+            });
+
+            await batch.commit();
+            setConfirmarChofer(null);
+        } catch (error) {
+            console.error("Error al cambiar chofer:", error);
+            setConfirmarChofer(null);
+            setModal({ show: true, mensaje: "Error al cambiar el chofer: " + error, tipo: "error" });
+        } finally {
+            setCambioChoferLoading(null);
+        }
+    };
 
     const filtrados = viajes.filter(v =>
         (v.numViaje || "").toLowerCase().includes(filtroGeneral.toLowerCase()) ||
@@ -478,6 +530,64 @@ const TablaViajes = ({user}) => {
                 documentTitle={`Hoja Pago - Folio ${viajeAImprimir?.numViaje}`}
             />
 
+            {/* MODAL DE CONFIRMACIÓN DE CAMBIO DE CHOFER */}
+            {confirmarChofer && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl border-t-8 border-red-600 w-full max-w-md overflow-hidden">
+                        <div className="bg-gray-900 px-6 py-4">
+                            <h3 className="text-xl font-black text-white uppercase italic tracking-tight">
+                                Confirmar Cambio
+                            </h3>
+                        </div>
+                        <div className="px-6 py-5">
+                            <p className="text-sm text-gray-600 font-semibold mb-4">
+                                Estás a punto de cambiar el chofer del viaje
+                                <span className="font-black text-black"> #{confirmarChofer.viaje.numViaje || "PENDIENTE"}</span>
+                            </p>
+
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="flex-1 bg-gray-100 rounded-xl p-3 text-center">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase">Actual</p>
+                                    <p className="text-base font-black text-gray-800 uppercase mt-1">
+                                        {confirmarChofer.viaje.chofer?.nombre || "—"}
+                                    </p>
+                                </div>
+                                <div className="text-2xl text-red-600 font-black">→</div>
+                                <div className="flex-1 bg-red-50 border-2 border-red-200 rounded-xl p-3 text-center">
+                                    <p className="text-[10px] font-bold text-red-400 uppercase">Nuevo</p>
+                                    <p className="text-base font-black text-red-700 uppercase mt-1">
+                                        {confirmarChofer.choferNuevo.nombreChofer}
+                                    </p>
+                                    {confirmarChofer.choferNuevo.empresaNombre && (
+                                        <p className="text-xs font-semibold text-gray-500 mt-0.5">
+                                            {confirmarChofer.choferNuevo.empresaNombre}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button
+                                    onClick={() => setConfirmarChofer(null)}
+                                    className="flex-1 btn bg-gray-200 hover:bg-gray-300 text-gray-700 border-none font-black uppercase text-sm h-12 rounded-xl"
+                                >
+                                    No, Cancelar
+                                </button>
+                                <button
+                                    onClick={ejecutarCambioChofer}
+                                    disabled={cambioChoferLoading === confirmarChofer.viaje.id}
+                                    className="flex-1 btn bg-red-600 hover:bg-red-700 text-white border-none font-black uppercase text-sm h-12 rounded-xl"
+                                >
+                                    {cambioChoferLoading === confirmarChofer.viaje.id
+                                        ? "Cambiando..."
+                                        : "Sí, Cambiar"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* MODAL DE CONFIRMACIÓN GENERAL */}
             {modal.show && (
                 <div
@@ -737,9 +847,122 @@ const TablaViajes = ({user}) => {
                                 <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2 text-white">
                                     {viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"}
                                 </div>
-                                <div>
+                                <div className="relative">
                                     <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>
-                                    <p className="text-sm font-black uppercase italic leading-none">{viaje.chofer?.nombre}</p>
+                                    {user.admin ? (
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-black uppercase italic leading-none">
+                                                {viaje.chofer?.nombre}
+                                            </p>
+                                            <button
+                                                onClick={() =>
+                                                    setBusquedaChofer((prev) =>
+                                                        prev[viaje.id] !== undefined
+                                                            ? {}
+                                                            : { [viaje.id]: "" }
+                                                    )
+                                                }
+                                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                                                title="Cambiar chofer"
+                                            >
+                                                <FaUserEdit size={14} />
+                                            </button>
+                                            {cambioChoferLoading === viaje.id && (
+                                                <span className="loading loading-spinner loading-xs text-blue-500"></span>
+                                            )}
+                                            {busquedaChofer[viaje.id] !== undefined && (() => {
+                                                const choferesFiltered = choferesAdmin
+                                                    .filter((c) =>
+                                                        c.nombreChofer
+                                                            ?.toLowerCase()
+                                                            .includes((busquedaChofer[viaje.id] || "").toLowerCase())
+                                                    )
+                                                    .slice(0, 20);
+
+                                                return (
+                                                    <div className="absolute top-full left-0 z-[100] mt-1 w-72">
+                                                        <div className="bg-white border-2 border-blue-500 rounded-xl shadow-2xl overflow-hidden">
+                                                            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-gray-50">
+                                                                <FaUserEdit className="text-blue-500" size={14} />
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Escribe el nombre del chofer..."
+                                                                    className="flex-1 bg-transparent outline-none text-sm font-bold text-black uppercase"
+                                                                    value={busquedaChofer[viaje.id] || ""}
+                                                                    onChange={(e) => {
+                                                                        setBusquedaChofer({ [viaje.id]: e.target.value });
+                                                                        setChoferHighlight(0);
+                                                                    }}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === "ArrowDown") {
+                                                                            e.preventDefault();
+                                                                            setChoferHighlight((prev) => Math.min(prev + 1, choferesFiltered.length - 1));
+                                                                        } else if (e.key === "ArrowUp") {
+                                                                            e.preventDefault();
+                                                                            setChoferHighlight((prev) => Math.max(prev - 1, 0));
+                                                                        } else if (e.key === "Enter") {
+                                                                            e.preventDefault();
+                                                                            if (choferesFiltered[choferHighlight]) {
+                                                                                handleCambiarChofer(viaje, choferesFiltered[choferHighlight]);
+                                                                            }
+                                                                        } else if (e.key === "Escape") {
+                                                                            setBusquedaChofer({});
+                                                                        }
+                                                                    }}
+                                                                    autoFocus
+                                                                />
+                                                                <button
+                                                                    onClick={() => setBusquedaChofer({})}
+                                                                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
+                                                                >
+                                                                    <FaTimes size={14} />
+                                                                </button>
+                                                            </div>
+                                                            <div className="max-h-56 overflow-y-auto">
+                                                                {choferesFiltered.length > 0 ? (
+                                                                    choferesFiltered.map((c, i) => (
+                                                                        <div
+                                                                            key={c.id}
+                                                                            className={`px-4 py-3 cursor-pointer border-b border-gray-100 transition-colors ${
+                                                                                i === choferHighlight
+                                                                                    ? "bg-blue-600 text-white"
+                                                                                    : "hover:bg-blue-50"
+                                                                            }`}
+                                                                            onClick={() => handleCambiarChofer(viaje, c)}
+                                                                            onMouseEnter={() => setChoferHighlight(i)}
+                                                                        >
+                                                                            <p className={`text-sm font-black uppercase ${
+                                                                                i === choferHighlight ? "text-white" : "text-black"
+                                                                            }`}>
+                                                                                {c.nombreChofer}
+                                                                            </p>
+                                                                            {c.empresaNombre && (
+                                                                                <p className={`text-xs font-semibold mt-0.5 ${
+                                                                                    i === choferHighlight ? "text-blue-100" : "text-gray-500"
+                                                                                }`}>
+                                                                                    {c.empresaNombre}
+                                                                                </p>
+                                                                            )}
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="px-4 py-4 text-center">
+                                                                        <p className="text-sm font-bold text-gray-400">
+                                                                            No se encontraron choferes
+                                                                        </p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm font-black uppercase italic leading-none">
+                                            {viaje.chofer?.nombre}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">

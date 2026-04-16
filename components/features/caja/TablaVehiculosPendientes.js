@@ -57,7 +57,10 @@ const TablaVehiculosPendientes = ({ vehiculosData }) => {
                   const venta = parseFloat(movement.price) || 0;
                   const caja = (parseFloat(movement.cajaRecibo) || 0) - (parseFloat(movement.cajaCambio) || 0);
                   const cc = parseFloat(movement.cajaCC) || 0;
-                  const pendientes = parseFloat(movement.pagoTotalPendiente) || 0;
+                  const pendientes =
+                      typeof movement.saldoFiado === "number"
+                          ? parseFloat(movement.saldoFiado)
+                          : (parseFloat(movement.pagoTotalPendiente) || 0);
 
                   subtotalVenta += venta;
                   subtotalCaja += caja;
