@@ -1,23 +1,52 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import PagoVehiculo from './PagoVehiculo';
+import ReciboAdelanto from './ReciboAdelanto';
+import { FaPrint } from 'react-icons/fa';
 
 const Cobrar = ({ vehiculo, user }) => {
-    const tieneAnticipo = parseFloat(vehiculo?.[0]?.anticipoPago || 0) > 0;
-    const montoAnticipo = parseFloat(vehiculo?.[0]?.anticipoPago || 0);
+    const [showRecibo, setShowRecibo] = useState(false);
+    const anticipoExplicito = parseFloat(vehiculo?.[0]?.anticipoPago || 0);
+    const folioPago = vehiculo?.[0]?.folioPago;
+    const anticipoReal = anticipoExplicito > 0
+        ? anticipoExplicito
+        : (folioPago ? parseFloat(vehiculo?.[0]?.flete || vehiculo?.[0]?.price || 0) : 0);
+    const tieneAnticipo = anticipoReal > 0;
+
+    const datosRecibo = tieneAnticipo ? {
+        binNip: vehiculo[0]?.binNip || '',
+        marca: vehiculo[0]?.marca || '',
+        modelo: vehiculo[0]?.modelo || '',
+        cliente: vehiculo[0]?.cliente || '',
+        telefonoCliente: vehiculo[0]?.telefonoCliente || '',
+        estado: vehiculo[0]?.estado || '',
+        ciudad: vehiculo[0]?.ciudad || '',
+        price: vehiculo[0]?.price || 0,
+        anticipoPago: anticipoReal,
+        usuario: vehiculo[0]?.anticipoUsuario || user?.nombre || 'Admin',
+    } : null;
 
     return (
         <div className="w-full max-w-3xl mx-auto mt-2">
             {tieneAnticipo && (
-                <div className="mb-4 p-3 rounded-lg border-l-8 border-green-600 bg-green-100 shadow">
-                    <p className="text-lg font-black text-green-800 uppercase">
-                        Este vehículo tiene un pago adelantado de ${montoAnticipo} DLL
-                    </p>
-                    <p className="text-sm text-green-700">
-                        Al cobrar, el sistema descontará automáticamente el anticipo del total.
-                    </p>
-                </div>
+                <button
+                    onClick={() => setShowRecibo(true)}
+                    className="btn btn-sm btn-outline mb-4 gap-2 text-gray-600"
+                >
+                    <FaPrint /> Reimprimir recibo de anticipo
+                </button>
             )}
             <PagoVehiculo vehiculo={vehiculo} user={user} />
+
+            {showRecibo && datosRecibo && (
+                <div className="fixed inset-0 flex justify-center items-center z-50">
+                    <div className="modal-box max-w-5xl w-full bg-white">
+                        <ReciboAdelanto
+                            onClose={() => setShowRecibo(false)}
+                            data={datosRecibo}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

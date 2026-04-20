@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FaCashRegister, FaFileInvoice, FaCar, FaUsers, FaCog, FaDollarSign, FaUserFriends, FaTruckMoving, FaTimes, FaChevronDown, FaChevronRight } from "react-icons/fa";
+import { FaCashRegister, FaFileInvoice, FaCar, FaUsers, FaCog, FaDollarSign, FaUserFriends, FaTruckMoving, FaTimes, FaChevronDown, FaChevronRight, FaChartBar } from "react-icons/fa";
 import { useAuthContext } from "../../context/auth";
 
 const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
@@ -9,7 +9,8 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
         caja: false,
         reportes: false,
         vehiculos: false,
-        viajesMenu: false
+        viajesMenu: false,
+        analisis: false
     });
 
     const toggleSubMenu = (menu) => {
@@ -18,6 +19,7 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
             reportes: false,
             vehiculos: false,
             viajesMenu: false,
+            analisis: false,
             [menu]: !prevState[menu],
         }));
     };
@@ -162,6 +164,25 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                     <li><button className={getButtonClass('reporteViajesPago')} onClick={() => handleSelectModule('reporteViajesPago')}>Historial</button></li>
                                     <li><button className={getButtonClass('choferes')} onClick={() => handleSelectModule('choferes')}>Choferes</button></li>
                                     <li><button className={getButtonClass('empresas')} onClick={() => handleSelectModule('empresas')}>Empresas Transportistas</button></li>
+                                </ul>
+                            </div>
+                        </li>
+
+                        {/* Submenú Análisis */}
+                        <li>
+                            <button
+                                className={getMenuButtonClass(openSubMenu.analisis)}
+                                onClick={() => toggleSubMenu('analisis')}
+                            >
+                                <span className="flex items-center">
+                                    <FaChartBar className="mr-3 text-red-600" size={18} />
+                                    Análisis
+                                </span>
+                                {openSubMenu.analisis ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
+                            </button>
+                            <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.analisis ? 'max-h-96' : 'max-h-0'}`}>
+                                <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
+                                    <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
                                 </ul>
                             </div>
                         </li>

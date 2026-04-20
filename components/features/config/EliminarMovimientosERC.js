@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import moment from 'moment';
 
 const MOVIMIENTO_TIPO = "ERC";
@@ -36,7 +37,7 @@ const EliminarMovimientosERC = () => {
 
             // 2. Consulta a Firestore: SOLO por rango de fechas (para evitar el índice compuesto)
             const querySnapshot = await firestore()
-                .collection("movimientos")
+                .collection(COLLECTIONS.MOVIMIENTOS)
                 .where("timestamp", ">=", tsInicio)             // Desigualdad 1
                 .where("timestamp", "<=", tsFin)                // Desigualdad 2
                 .get();
@@ -76,7 +77,7 @@ const EliminarMovimientosERC = () => {
         }
 
         try {
-            await firestore().collection("movimientos").doc(idMovimiento).delete();
+            await firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(idMovimiento).delete();
 
             setMovimientos(movs => movs.filter(mov => mov.id !== idMovimiento));
             setMensaje(`✅ Movimiento ${idMovimiento} eliminado exitosamente.`);

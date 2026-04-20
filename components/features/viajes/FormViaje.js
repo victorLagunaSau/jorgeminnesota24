@@ -3,11 +3,13 @@ import ReactToPrint from "react-to-print";
 import {firestore} from "../../../firebase/firebaseIni";
 import { useAdminData } from "../../../context/adminData";
 import {
-    FaTrash, FaCheckCircle, FaExclamationCircle,
+    FaTrash, FaCheckCircle,
     FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink,
     FaStickyNote, FaRegStickyNote, FaKey
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
+import { COLLECTIONS, FIELD_LIMITS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
+import Alert from "../../ui/Alert";
 
 const FormViaje = ({user, onViajeCreado}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
@@ -94,7 +96,7 @@ const FormViaje = ({user, onViajeCreado}) => {
     useEffect(() => {
         if (!user) return;
 
-        const unsubProvincias = firestore().collection("province").orderBy("state", "asc")
+        const unsubProvincias = firestore().collection(COLLECTIONS.PROVINCE).orderBy("state", "asc")
             .onSnapshot(snap => {
                 setProvincias(snap.docs.map(doc => ({
                     id: doc.id,
@@ -125,7 +127,7 @@ const FormViaje = ({user, onViajeCreado}) => {
 
         setValidandoToken(true);
         try {
-            const tokenDoc = await firestore().collection("tokensChofer").doc(tokenInput.toUpperCase()).get();
+            const tokenDoc = await firestore().collection(COLLECTIONS.TOKENS_CHOFER).doc(tokenInput.toUpperCase()).get();
 
             if (!tokenDoc.exists) {
                 setAlertMessage({ msg: "Token inválido", tipo: 'error' });
@@ -251,8 +253,8 @@ const FormViaje = ({user, onViajeCreado}) => {
         const loteLimpio = loteValue.toUpperCase().trim();
         try {
             const [docV, docT] = await Promise.all([
-                firestore().collection("vehiculos").doc(loteLimpio).get(),
-                firestore().collection("lotesEnTransito").doc(loteLimpio).get()
+                firestore().collection(COLLECTIONS.VEHICULOS).doc(loteLimpio).get(),
+                firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteLimpio).get()
             ]);
 
             if (docV.exists) {
@@ -270,12 +272,12 @@ const FormViaje = ({user, onViajeCreado}) => {
                 if (!viajeAsignadoId) {
                     huerfano = true;
                 } else {
-                    const viajeDoc = await firestore().collection("viajesPendientes").doc(viajeAsignadoId).get();
+                    const viajeDoc = await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeAsignadoId).get();
                     if (!viajeDoc.exists) huerfano = true;
                 }
 
                 if (huerfano) {
-                    await firestore().collection("lotesEnTransito").doc(loteLimpio).delete();
+                    await firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteLimpio).delete();
                     setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
                 } else {
                     // Lote en tránsito - No permitir
@@ -293,7 +295,7 @@ const FormViaje = ({user, onViajeCreado}) => {
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim().length === 8 && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
+        v.lote.trim().length === FIELD_LIMITS.LOT && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && parseFloat(v.flete) > 0
     );
 
     const getClientesFiltrados = (vehiculoId) => {
@@ -371,10 +373,10 @@ const FormViaje = ({user, onViajeCreado}) => {
 
             const batch = firestore().batch();
 
-            batch.set(firestore().collection("viajesPendientes").doc(docId), viajeData);
+            batch.set(firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(docId), viajeData);
 
             vehiculos.forEach(v => {
-                batch.set(firestore().collection("lotesEnTransito").doc(v.lote), {
+                batch.set(firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote), {
                     viajeAsignado: docId,
                     choferNombre: choferData?.nombre || encabezado.choferManual,
                     fechaBloqueo: new Date()
@@ -606,16 +608,12 @@ const FormViaje = ({user, onViajeCreado}) => {
                 </>
             )}
 
-            {alertMessage.msg && (
-                <div
-                    className={`alert ${
-                        alertMessage.tipo === 'success' ? 'alert-success' :
-                        alertMessage.tipo === 'warning' ? 'alert-warning' :
-                        'alert-error'
-                    } mb-4 font-bold text-[12px] ${alertMessage.tipo === 'warning' ? 'text-gray-800' : 'text-white'}`}>
-                    <FaExclamationCircle/> <span>{alertMessage.msg}</span>
-                </div>
-            )}
+            <Alert
+                mostrar={!!alertMessage.msg}
+                mensaje={alertMessage.msg}
+                tipo={alertMessage.tipo}
+                onClose={() => setAlertMessage({msg: '', tipo: ''})}
+            />
 
             <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Registra un Nuevo
                 Viaje</h2>
@@ -792,12 +790,12 @@ const FormViaje = ({user, onViajeCreado}) => {
                                     <input
                                         type="text"
                                         value={v.lote}
-                                        maxLength={8}
+                                        maxLength={FIELD_LIMITS.LOT}
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
                                         onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
                                         className={`input input-sm md:input-xs w-full font-black text-[14px] md:text-[12px] ${
                                             user.admin && v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
-                                            v.lote.length === 8 ? 'text-blue-700' : 'text-red-600'
+                                            v.lote.length === FIELD_LIMITS.LOT ? 'text-blue-700' : 'text-red-600'
                                         }`}
                                         placeholder="8 dígitos"
                                         style={{fontSize: '16px'}}
@@ -883,11 +881,7 @@ const FormViaje = ({user, onViajeCreado}) => {
                                             onChange={(e) => handleTableChange(v.id, 'almacen', e.target.value)}
                                             className="select select-sm md:select-xs w-full font-bold text-[14px] md:text-[12px]"
                                             style={{fontSize: '16px'}}>
-                                        <option value="Copart">Copart</option>
-                                        <option value="IAA">IAA</option>
-                                        <option value="Manheim">Manheim</option>
-                                        <option value="Adesa">Adesa</option>
-                                        <option value="Otra">Otra</option>
+                                        {WAREHOUSES.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                                     </select>
                                 </td>
                                 <td className="p-1">
@@ -941,8 +935,7 @@ const FormViaje = ({user, onViajeCreado}) => {
                                             onChange={(e) => handleTableChange(v.id, 'titulo', e.target.value)}
                                             className="select select-sm md:select-xs w-full font-bold text-[14px] md:text-[12px]"
                                             style={{fontSize: '16px'}}>
-                                        <option value="NO">NO</option>
-                                        <option value="SI">SI</option>
+                                        {TITLE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                                     </select>
                                 </td>
                                 <td className="p-1 text-center">

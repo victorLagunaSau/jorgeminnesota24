@@ -6,6 +6,7 @@ import Cobrar from './Cobrar';
 const SalidaVehiculo = ({user}) => {
     const [vehiculo, setVehiculo] = useState([]);
     const [estatus, setEstatus] = useState("");
+    const [binNip, setBinNip] = useState("");
 
     // Función para verificar si el usuario tiene permiso de caja
     const permiso = () => {
@@ -13,9 +14,10 @@ const SalidaVehiculo = ({user}) => {
     };
 
     // Maneja los datos del vehículo encontrados
-    const handleVehiculoEncontrado = (vehiculoData, estatusVehiculo) => {
+    const handleVehiculoEncontrado = (vehiculoData, estatusVehiculo, vehiculoBinNip) => {
         setVehiculo(vehiculoData ? [vehiculoData] : []);
         setEstatus(estatusVehiculo || "");
+        setBinNip(vehiculoBinNip || "");
     };
 
     if (!permiso()) {
@@ -55,7 +57,7 @@ const SalidaVehiculo = ({user}) => {
 
                 <div className="bg-gray-100 shadow-md p-6 rounded-md">
                     {estatus === "EN" ? (
-                        <Pagado vehiculo={vehiculo}/>
+                        <Pagado vehiculo={vehiculo} user={user} binNip={binNip} onVehiculoEliminado={() => handleVehiculoEncontrado(null, "", "")} />
                     ) : (
                         <Cobrar vehiculo={vehiculo} user={user}/>
                     )}

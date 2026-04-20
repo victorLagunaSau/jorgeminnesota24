@@ -1,5 +1,6 @@
 import React, {useState, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import ReactToPrint from "react-to-print";
 import TablaVehiculos from "./TablaVehiculos";
 import TablaEntradas from "./TablaEntradas";
@@ -214,7 +215,7 @@ const CorteDia = ({user}) => {
 
         // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
         const movementsSnapshot = await firestore()
-            .collection("movimientos")
+            .collection(COLLECTIONS.MOVIMIENTOS)
             .where("timestamp", ">", new Date(startTimestamp))
             .where("timestamp", "<", new Date(endTimestamp))
             .get();

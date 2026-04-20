@@ -4,9 +4,8 @@ import { useAdminData } from "../../../context/adminData";
 import { firestore } from "../../../firebase/firebaseIni";
 import FormCliente from "./FormCliente";
 import {
-    FaTimes, FaPlus, FaSearch, FaChevronLeft, FaChevronRight,
-    FaPhone, FaMapMarkerAlt, FaCar, FaFileInvoiceDollar,
-    FaCopy, FaCheck, FaEdit, FaTrash, FaUserPlus
+    FaTimes, FaSearch, FaChevronLeft, FaChevronRight,
+    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus
 } from "react-icons/fa";
 
 const Clientes = ({ user }) => {
@@ -19,17 +18,12 @@ const Clientes = ({ user }) => {
     const [clienteAEditar, setClienteAEditar] = useState(null);
     const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
     const [vehiculosCliente, setVehiculosCliente] = useState([]);
-    const [cargosExtra, setCargosExtra] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(false);
 
     // Vehículos no entregados + entregados con fiado pendiente (nuevo o legacy)
     const [todosVehiculos, setTodosVehiculos] = useState([]);
     const [vehiculosFiados, setVehiculosFiados] = useState([]);
     const [vehiculosLegacy, setVehiculosLegacy] = useState([]);
-
-    const [showCargoForm, setShowCargoForm] = useState(false);
-    const [nuevoCargo, setNuevoCargo] = useState({ monto: "", descripcion: "" });
-    const [savingCargo, setSavingCargo] = useState(false);
 
     const xPagina = 15;
 
@@ -137,7 +131,6 @@ const Clientes = ({ user }) => {
     useEffect(() => {
         if (!clienteSeleccionado) {
             setVehiculosCliente([]);
-            setCargosExtra([]);
             return;
         }
 
@@ -147,25 +140,11 @@ const Clientes = ({ user }) => {
             .collection("vehiculos")
             .where("cliente", "==", clienteSeleccionado.cliente)
             .onSnapshot((snap) => {
-                const vehiculos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setVehiculosCliente(vehiculos);
+                setVehiculosCliente(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setLoadingVehiculos(false);
             });
 
-        const unsubCargos = firestore()
-            .collection("clientes")
-            .doc(clienteSeleccionado.id)
-            .collection("cargosExtra")
-            .orderBy("fecha", "desc")
-            .onSnapshot((snap) => {
-                const cargos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setCargosExtra(cargos);
-            });
-
-        return () => {
-            unsubVehiculos();
-            unsubCargos();
-        };
+        return () => unsubVehiculos();
     }, [clienteSeleccionado]);
 
     // Un vehículo tiene deuda si aún no sale del patio, o si salió fiado (nuevo/legacy)
@@ -185,69 +164,6 @@ const Clientes = ({ user }) => {
         vehiculosCliente
             .filter(vehiculoConDeuda)
             .reduce((sum, v) => sum + montoDeudaVehiculo(v), 0);
-
-    const calcularCargosNoPagados = () => {
-        return cargosExtra
-            .filter(c => !c.pagado)
-            .reduce((sum, c) => sum + (parseFloat(c.monto) || 0), 0);
-    };
-
-    const agregarCargoExtra = async () => {
-        if (!nuevoCargo.monto || !nuevoCargo.descripcion.trim()) {
-            alert("Completa monto y descripción");
-            return;
-        }
-
-        setSavingCargo(true);
-        try {
-            await firestore()
-                .collection("clientes")
-                .doc(clienteSeleccionado.id)
-                .collection("cargosExtra")
-                .add({
-                    monto: parseFloat(nuevoCargo.monto),
-                    descripcion: nuevoCargo.descripcion.trim(),
-                    fecha: new Date(),
-                    pagado: false,
-                    registradoPor: user?.nombre || "Admin"
-                });
-
-            setNuevoCargo({ monto: "", descripcion: "" });
-            setShowCargoForm(false);
-        } catch (error) {
-            console.error("Error al agregar cargo:", error);
-            alert("Error al agregar cargo");
-        } finally {
-            setSavingCargo(false);
-        }
-    };
-
-    const marcarCargoPagado = async (cargoId) => {
-        try {
-            await firestore()
-                .collection("clientes")
-                .doc(clienteSeleccionado.id)
-                .collection("cargosExtra")
-                .doc(cargoId)
-                .update({ pagado: true, fechaPago: new Date() });
-        } catch (error) {
-            console.error("Error:", error);
-        }
-    };
-
-    const eliminarCargo = async (cargoId) => {
-        if (!confirm("¿Eliminar este cargo?")) return;
-        try {
-            await firestore()
-                .collection("clientes")
-                .doc(clienteSeleccionado.id)
-                .collection("cargosExtra")
-                .doc(cargoId)
-                .delete();
-        } catch (error) {
-            console.error("Error:", error);
-        }
-    };
 
     const handleEditarCliente = (cliente) => {
         setClienteAEditar(cliente);
@@ -275,8 +191,9 @@ const Clientes = ({ user }) => {
     // VISTA DETALLE DE CLIENTE
     if (clienteSeleccionado) {
         const deudaVehiculos = calcularDeudaVehiculos();
-        const deudaCargos = calcularCargosNoPagados();
         const vehiculosPendientes = vehiculosCliente.filter(vehiculoConDeuda);
+        const enEspera = vehiculosPendientes.filter(v => v.estatus !== "EN");
+        const totalEspera = enEspera.reduce((sum, v) => sum + montoDeudaVehiculo(v), 0);
 
         const vehiculosFiadosCliente = vehiculosCliente.filter(
             (v) => v.estadoPago === "fiado" || (v.pagosPendientes === true && v.estadoPago !== "pagado")
@@ -286,7 +203,7 @@ const Clientes = ({ user }) => {
             0
         );
 
-        const deudaTotal = deudaVehiculos + deudaCargos + deudaFiadaCliente;
+        const deudaTotal = deudaVehiculos;
 
         return (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
@@ -340,22 +257,12 @@ const Clientes = ({ user }) => {
                 {/* Resumen Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-white rounded-xl p-5 shadow-md border border-gray-100">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <FaCar className="text-blue-600" />
-                            </div>
-                            <p className="text-xs font-bold text-gray-500 uppercase">Vehículos</p>
-                        </div>
-                        <p className="text-2xl font-black text-gray-800">${deudaVehiculos.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                        <p className="text-xs text-gray-400 mt-1">{vehiculosPendientes.length} pendientes</p>
+                        <p className="text-xs font-bold text-gray-500 uppercase mb-2">En Espera</p>
+                        <p className="text-2xl font-black text-gray-800">${totalEspera.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs text-gray-400 mt-1">{enEspera.length} vehículo{enEspera.length !== 1 ? 's' : ''}</p>
                     </div>
                     <div className="rounded-xl p-5 shadow-md border-2" style={{ backgroundColor: '#f5e6c8', borderColor: '#c9a96e' }}>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#c9a96e' }}>
-                                <FaFileInvoiceDollar className="text-white" />
-                            </div>
-                            <p className="text-xs font-black uppercase" style={{ color: '#8b6914' }}>Deuda Fiada</p>
-                        </div>
+                        <p className="text-xs font-black uppercase mb-2" style={{ color: '#8b6914' }}>Deuda Fiada</p>
                         <p className="text-2xl font-black" style={{ color: '#6b4f10' }}>
                             ${deudaFiadaCliente.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </p>
@@ -364,68 +271,53 @@ const Clientes = ({ user }) => {
                         </p>
                     </div>
                     <div className="bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl p-5 shadow-md text-white">
-                        <p className="text-xs font-bold text-white uppercase">Total a Pagar</p>
-                        <p className="text-3xl font-black text-white mt-2">${deudaTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-xs font-bold text-white uppercase mb-2">Total a Pagar</p>
+                        <p className="text-3xl font-black text-white">${deudaTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                     </div>
                 </div>
 
-                {/* Vehículos Pendientes */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5 mb-6">
-                    <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight mb-4 flex items-center gap-2">
-                        <FaCar className="text-red-600" /> Vehículos Pendientes
-                    </h3>
+                {/* Tabla En Espera */}
+                <div className="mb-10">
+                    <p className="text-xs font-black text-gray-500 uppercase tracking-wide mb-3">
+                        En Espera ({enEspera.length})
+                    </p>
                     {loadingVehiculos ? (
-                        <div className="text-center py-8">
-                            <span className="loading loading-spinner text-red-600"></span>
-                        </div>
-                    ) : vehiculosPendientes.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                            <FaCar className="mx-auto text-4xl mb-2 opacity-30" />
-                            <p>No hay vehículos pendientes</p>
-                        </div>
+                        <span className="loading loading-spinner loading-sm text-gray-300"></span>
+                    ) : enEspera.length === 0 ? (
+                        <p className="text-gray-300 text-sm">Sin vehículos en espera</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="table w-full">
+                            <table className="table table-sm w-full">
                                 <thead>
-                                    <tr className="border-b-2 border-gray-100">
-                                        <th className="text-gray-500 font-bold uppercase text-xs py-3">Lote</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs">Modelo</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs">Origen</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs">Estatus</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs text-right">Flete</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs text-right">Storage</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs text-right">Extras</th>
-                                        <th className="text-gray-500 font-bold uppercase text-xs text-right">Total</th>
+                                    <tr className="border-b border-gray-200 text-[10px] text-gray-400 font-bold uppercase">
+                                        <th className="py-2">Lote</th>
+                                        <th>Vehículo</th>
+                                        <th>Origen</th>
+                                        <th>Estatus</th>
+                                        <th className="text-right">Flete</th>
+                                        <th className="text-right">Storage</th>
+                                        <th className="text-right">Extras</th>
+                                        <th className="text-right">Total</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    {vehiculosPendientes.map((v) => {
-                                        const deuda = montoDeudaVehiculo(v);
-                                        const esFiado =
-                                            v.estadoPago === "fiado" ||
-                                            (v.pagosPendientes && v.estadoPago !== "pagado");
-                                        return (
-                                            <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50">
-                                                <td className="font-mono font-bold text-blue-700">{v.binNip}</td>
-                                                <td className="font-semibold text-gray-800">{v.modelo}</td>
-                                                <td className="text-gray-600 text-sm">{v.ciudad}, {v.estado}</td>
-                                                <td>
-                                                    <span className={`px-2 py-1 text-xs font-bold rounded-full uppercase ${esFiado ? 'bg-orange-200 text-orange-800' : 'bg-gray-100 text-gray-600'}`}>
-                                                        {esFiado ? 'FIADO' : v.estatus}
-                                                    </span>
-                                                </td>
-                                                <td className="text-right text-gray-700">${parseFloat(v.price || 0).toFixed(2)}</td>
-                                                <td className="text-right text-gray-700">${parseFloat(v.storage || 0).toFixed(2)}</td>
-                                                <td className="text-right text-gray-700">${(parseFloat(v.sobrePeso || 0) + parseFloat(v.gastosExtra || 0)).toFixed(2)}</td>
-                                                <td className="text-right font-black text-gray-900">${deuda.toFixed(2)}</td>
-                                            </tr>
-                                        );
-                                    })}
+                                <tbody className="text-sm">
+                                    {enEspera.map((v) => (
+                                        <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                                            <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
+                                            <td className="text-gray-700">{v.marca} {v.modelo}</td>
+                                            <td className="text-gray-400">{v.ciudad}, {v.estado}</td>
+                                            <td className="text-xs font-bold text-gray-400">{v.estatus}</td>
+                                            <td className="text-right">${parseFloat(v.price || 0).toFixed(2)}</td>
+                                            <td className="text-right">${parseFloat(v.storage || 0).toFixed(2)}</td>
+                                            <td className="text-right">${(parseFloat(v.sobrePeso || 0) + parseFloat(v.gastosExtra || 0)).toFixed(2)}</td>
+                                            <td className="text-right font-bold">${montoDeudaVehiculo(v).toFixed(2)}</td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="bg-gray-50">
-                                        <td colSpan="7" className="text-right font-bold text-gray-600 uppercase text-sm">Total Vehículos:</td>
-                                        <td className="text-right font-black text-lg text-red-600">${deudaVehiculos.toFixed(2)}</td>
+                                    <tr className="text-sm">
+                                        <td colSpan="7" className="text-right text-gray-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
+                                        <td className="text-right font-black pt-2">${totalEspera.toFixed(2)}</td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -433,121 +325,52 @@ const Clientes = ({ user }) => {
                     )}
                 </div>
 
-                {/* Cargos Extra */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-100 p-5">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight flex items-center gap-2">
-                            <FaFileInvoiceDollar className="text-orange-500" /> Cargos Extra
-                        </h3>
-                        <button
-                            onClick={() => setShowCargoForm(!showCargoForm)}
-                            className="btn btn-sm bg-red-600 hover:bg-red-700 text-white border-none font-bold gap-2"
-                        >
-                            <FaPlus /> Agregar
-                        </button>
-                    </div>
-
-                    <AnimatePresence>
-                        {showCargoForm && (
-                            <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: "auto", opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="overflow-hidden"
-                            >
-                                <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
-                                    <div className="flex flex-col md:flex-row gap-4">
-                                        <div className="w-full md:w-36">
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Monto $</label>
-                                            <input
-                                                type="number"
-                                                value={nuevoCargo.monto}
-                                                onChange={(e) => setNuevoCargo({ ...nuevoCargo, monto: e.target.value })}
-                                                className="input input-bordered w-full bg-white text-gray-800 font-bold mt-1"
-                                                placeholder="200.00"
-                                            />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Descripción</label>
-                                            <input
-                                                type="text"
-                                                value={nuevoCargo.descripcion}
-                                                onChange={(e) => setNuevoCargo({ ...nuevoCargo, descripcion: e.target.value })}
-                                                className="input input-bordered w-full bg-white text-gray-800 mt-1"
-                                                placeholder="Ej: Storage adicional, Grúa, etc."
-                                            />
-                                        </div>
-                                        <div className="flex items-end gap-2">
-                                            <button
-                                                onClick={agregarCargoExtra}
-                                                disabled={savingCargo}
-                                                className="btn bg-green-600 hover:bg-green-700 text-white border-none font-bold"
-                                            >
-                                                {savingCargo ? "..." : "Guardar"}
-                                            </button>
-                                            <button
-                                                onClick={() => setShowCargoForm(false)}
-                                                className="btn bg-gray-200 hover:bg-gray-300 text-gray-700 border-none"
-                                            >
-                                                Cancelar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {cargosExtra.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
-                            <FaFileInvoiceDollar className="mx-auto text-4xl mb-2 opacity-30" />
-                            <p>No hay cargos extra</p>
-                        </div>
+                {/* Tabla Fiados */}
+                <div className="mb-10">
+                    <p className="text-xs font-black text-orange-500 uppercase tracking-wide mb-3">
+                        Fiados ({vehiculosFiadosCliente.length})
+                    </p>
+                    {loadingVehiculos ? (
+                        <span className="loading loading-spinner loading-sm text-gray-300"></span>
+                    ) : vehiculosFiadosCliente.length === 0 ? (
+                        <p className="text-gray-300 text-sm">Sin vehículos fiados</p>
                     ) : (
-                        <div className="space-y-2">
-                            {cargosExtra.map((cargo) => (
-                                <div
-                                    key={cargo.id}
-                                    className={`flex items-center justify-between p-4 rounded-xl ${cargo.pagado ? 'bg-gray-50' : 'bg-orange-50 border border-orange-200'}`}
-                                >
-                                    <div className="flex-1">
-                                        <p className={`font-bold ${cargo.pagado ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
-                                            {cargo.descripcion}
-                                        </p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {cargo.fecha?.toDate?.().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) || '-'}
-                                            {cargo.pagado && cargo.fechaPago && (
-                                                <span className="ml-2 text-green-600 font-semibold">
-                                                    • Pagado {cargo.fechaPago?.toDate?.().toLocaleDateString('es-MX')}
-                                                </span>
-                                            )}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <span className={`font-black text-xl ${cargo.pagado ? 'text-gray-400' : 'text-orange-600'}`}>
-                                            ${parseFloat(cargo.monto).toFixed(2)}
-                                        </span>
-                                        {!cargo.pagado && (
-                                            <>
-                                                <button
-                                                    onClick={() => marcarCargoPagado(cargo.id)}
-                                                    className="btn btn-sm bg-green-600 hover:bg-green-700 text-white border-none"
-                                                    title="Marcar pagado"
-                                                >
-                                                    <FaCheck />
-                                                </button>
-                                                <button
-                                                    onClick={() => eliminarCargo(cargo.id)}
-                                                    className="btn btn-sm bg-gray-200 hover:bg-red-100 text-gray-600 hover:text-red-600 border-none"
-                                                    title="Eliminar"
-                                                >
-                                                    <FaTrash />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="overflow-x-auto">
+                            <table className="table table-sm w-full">
+                                <thead>
+                                    <tr className="border-b border-orange-200 text-[10px] text-orange-400 font-bold uppercase">
+                                        <th className="py-2">Lote</th>
+                                        <th>Vehículo</th>
+                                        <th>Origen</th>
+                                        <th className="text-right">Cobrado</th>
+                                        <th className="text-right">Crédito</th>
+                                        <th className="text-right">Pendiente</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    {vehiculosFiadosCliente.map((v) => {
+                                        const saldo = parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0;
+                                        const credito = parseFloat(v.creditoOtorgado) || 0;
+                                        const totalCobrado = (parseFloat(v.cajaRecibo) || 0) + (parseFloat(v.cajaCC) || 0);
+                                        return (
+                                            <tr key={v.id} className="border-b border-gray-50 hover:bg-orange-50/30">
+                                                <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
+                                                <td className="text-gray-700">{v.marca} {v.modelo}</td>
+                                                <td className="text-gray-400">{v.ciudad}, {v.estado}</td>
+                                                <td className="text-right">${totalCobrado.toFixed(2)}</td>
+                                                <td className="text-right">${credito.toFixed(2)}</td>
+                                                <td className="text-right font-bold text-orange-600">${saldo.toFixed(2)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="text-sm">
+                                        <td colSpan="5" className="text-right text-orange-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
+                                        <td className="text-right font-black text-orange-600 pt-2">${deudaFiadaCliente.toFixed(2)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     )}
                 </div>

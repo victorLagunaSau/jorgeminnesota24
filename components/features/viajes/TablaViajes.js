@@ -5,6 +5,9 @@ import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDo
 import ReactToPrint from "react-to-print";
 import HojaVerificacion from "./HojaVerificacion";
 import {useAdminData} from "../../../context/adminData";
+import { COLLECTIONS, VEHICLE_STATUS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
+import Alert from "../../ui/Alert";
+import StatusBadge from "../../ui/StatusBadge";
 
 const TablaViajes = ({user}) => {
     const { choferes: choferesAdmin } = useAdminData();
@@ -33,7 +36,7 @@ const TablaViajes = ({user}) => {
 
     useEffect(() => {
         if (!user) return;
-        let q = firestore().collection("viajesPendientes");
+        let q = firestore().collection(COLLECTIONS.VIAJES_PENDIENTES);
         if (user.admin) {
             q = q.orderBy("fechaCreacion", "desc");
         }
@@ -58,7 +61,7 @@ const TablaViajes = ({user}) => {
             setLoading(false);
         });
 
-        const unsubClientes = firestore().collection("clientes").onSnapshot(snap => {
+        const unsubClientes = firestore().collection(COLLECTIONS.CLIENTES).onSnapshot(snap => {
             setClientes(snap.docs.map(doc => ({
                 id: doc.id,
                 nombre: doc.data().cliente,
@@ -66,7 +69,7 @@ const TablaViajes = ({user}) => {
             })));
         });
 
-        const unsubProvincias = firestore().collection("province").orderBy("state", "asc").onSnapshot(snap => {
+        const unsubProvincias = firestore().collection(COLLECTIONS.PROVINCE).orderBy("state", "asc").onSnapshot(snap => {
             setProvincias(snap.docs.map(doc => ({
                 id: doc.id,
                 state: doc.data().state,
@@ -135,7 +138,7 @@ const TablaViajes = ({user}) => {
         try {
             const viajeActualizado = nuevosViajes.find(v => v.id === viajeId);
             if (viajeActualizado) {
-                await firestore().collection("viajesPendientes").doc(viajeId).update({
+                await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).update({
                     vehiculos: viajeActualizado.vehiculos
                 });
             }
@@ -167,13 +170,13 @@ const TablaViajes = ({user}) => {
             const batch = firestore().batch();
 
             batch.update(
-                firestore().collection("viajesPendientes").doc(viaje.id),
+                firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viaje.id),
                 { chofer: nuevoChoferObj }
             );
 
             for (const v of viaje.vehiculos) {
                 if (v.lote && v.lote.trim() !== "") {
-                    const loteRef = firestore().collection("lotesEnTransito").doc(v.lote);
+                    const loteRef = firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote);
                     const loteDoc = await loteRef.get();
                     if (loteDoc.exists) {
                         batch.update(loteRef, { choferNombre: choferNuevo.nombreChofer });
@@ -208,7 +211,7 @@ const TablaViajes = ({user}) => {
 
             // El comentario ya está en el estado local gracias a handleLocalEdit,
             // así que solo lo confirmamos en Firestore.
-            await firestore().collection("viajesPendientes").doc(viajeId).update({
+            await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).update({
                 vehiculos: nuevosVehiculos
             });
 
@@ -227,12 +230,12 @@ const TablaViajes = ({user}) => {
 
         try {
             // Eliminar viaje de viajesPendientes
-            await firestore().collection("viajesPendientes").doc(viajeId).delete();
+            await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).delete();
 
             // Eliminar todos los lotes en tránsito asociados
             const batch = firestore().batch();
             viaje.vehiculos.forEach(v => {
-                const loteRef = firestore().collection("lotesEnTransito").doc(v.lote);
+                const loteRef = firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote);
                 batch.delete(loteRef);
             });
             await batch.commit();
@@ -272,7 +275,7 @@ const TablaViajes = ({user}) => {
         const nuevosVehiculos = [...viaje.vehiculos, nuevoVehiculo];
 
         try {
-            await firestore().collection("viajesPendientes").doc(viajeId).update({
+            await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).update({
                 vehiculos: nuevosVehiculos
             });
         } catch (error) {
@@ -296,13 +299,13 @@ const TablaViajes = ({user}) => {
 
         try {
             // Actualizar el viaje sin ese vehículo
-            await firestore().collection("viajesPendientes").doc(viajeId).update({
+            await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).update({
                 vehiculos: nuevosVehiculos
             });
 
             // Si el lote tenía un número, eliminar de lotesEnTransito
             if (lote && lote.trim() !== "") {
-                await firestore().collection("lotesEnTransito").doc(lote).delete();
+                await firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(lote).delete();
             }
 
             setModal({show: false});
@@ -327,12 +330,12 @@ const TablaViajes = ({user}) => {
         const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
 
         try {
-            const consecutivoRef = firestore().collection("config").doc("consecutivos");
+            const consecutivoRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
 
             // VERIFICAR LOTES YA PAGADOS
             const lotesExistentes = [];
             for (const v of viaje.vehiculos) {
-                const docExistente = await firestore().collection("vehiculos").doc(v.lote).get();
+                const docExistente = await firestore().collection(COLLECTIONS.VEHICULOS).doc(v.lote).get();
                 if (docExistente.exists) {
                     lotesExistentes.push(v.lote);
                 }
@@ -361,19 +364,20 @@ const TablaViajes = ({user}) => {
 
                 // --- 1. ACTIVACIÓN DE VEHÍCULOS Y REGISTRO DE MOVIMIENTOS ---
                 viaje.vehiculos.forEach((v) => {
-                    const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
-                    const movimientoRef = firestore().collection("movimientos").doc();
+                    const vehiculoRef = firestore().collection(COLLECTIONS.VEHICULOS).doc(v.lote);
+                    const movimientoRef = firestore().collection(COLLECTIONS.MOVIMIENTOS).doc();
 
                     // Verificar si el lote ya está pagado
                     const yaPagado = lotesExistentes.includes(v.lote);
 
                     if (yaPagado) {
-                        // LOTE YA PAGADO - Solo actualizar precios
+                        // LOTE YA PAGADO - Actualizar precios y asegurar anticipo
                         transaction.update(vehiculoRef, {
                             storage: parseFloat(v.storage || 0),
                             sobrePeso: parseFloat(v.sPeso || 0),
                             gastosExtra: parseFloat(v.gExtra || 0),
                             comentarioRecepcion: v.comentarioRecepcion || "",
+                            anticipoPago: parseFloat(v.precioVenta || v.flete || 0),
                             ultimaActualizacionPrecios: {
                                 fecha: fechaOperacionActual,
                                 usuario: user?.nombre || "Admin",
@@ -439,7 +443,8 @@ const TablaViajes = ({user}) => {
                             storage: parseFloat(v.storage || 0),
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
-                            titulo: v.titulo || "NO"
+                            titulo: v.titulo || "NO",
+                            anticipoPago: parseFloat(v.precioVenta || v.flete || 0),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)
@@ -477,14 +482,14 @@ const TablaViajes = ({user}) => {
                     }
                 };
 
-                transaction.set(firestore().collection("viajesPagados").doc(nuevoFolioContable), viajePagadoData);
+                transaction.set(firestore().collection(COLLECTIONS.VIAJES_PAGADOS).doc(nuevoFolioContable), viajePagadoData);
 
                 // --- 3. LIMPIEZA Y ACTUALIZACIÓN DE CONSECUTIVO ---
-                transaction.delete(firestore().collection("viajesPendientes").doc(viaje.id));
+                transaction.delete(firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viaje.id));
                 // Liberar los lotes de lotesEnTransito para que puedan reutilizarse
                 viaje.vehiculos.forEach((v) => {
                     if (v.lote && v.lote.trim() !== "") {
-                        transaction.delete(firestore().collection("lotesEnTransito").doc(v.lote));
+                        transaction.delete(firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote));
                     }
                 });
                 transaction.update(consecutivoRef, {"Viajes pagados": proximoFolio});
@@ -1213,8 +1218,9 @@ const TablaViajes = ({user}) => {
                                                     <select value={v.titulo || "NO"}
                                                             onChange={(e) => handleLocalEdit(viaje.id, idx, 'titulo', e.target.value)}
                                                             className="select select-bordered select-xs font-black text-[10px]">
-                                                        <option value="NO">NO</option>
-                                                        <option value="SI">SI</option>
+                                                        {TITLE_OPTIONS.map(opt => (
+                                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                        ))}
                                                     </select>
                                                 ) : (
                                                     <span className="text-[10px] font-black">{v.titulo}</span>

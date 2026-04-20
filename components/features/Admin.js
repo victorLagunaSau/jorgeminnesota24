@@ -37,6 +37,9 @@ import ReporteCobros from "./reportes/ReporteCobros";
 import Reports from "./reportes/Reports";
 import ReportPendientesPago from "./reportes/ReportPendientesPago";
 
+// Módulos - Análisis
+import HistorialAnticipos from "./analisis/HistorialAnticipos";
+
 // Módulos - Otros
 import Cobranza from "./cobranza/Cobranza";
 import Clientes from "./clientes/Clientes";
@@ -109,6 +112,8 @@ const Admin = () => {
                 return <ReportPendientesPago user={user} />;
             case 'cobranza':
                 return <Cobranza user={user} />;
+            case 'historialAnticipos':
+                return <HistorialAnticipos />;
             case 'users':
                 return <Users />;
             case 'registroMasivoVehiculos':

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { firestore } from '../../../firebase/firebaseIni';
+import { COLLECTIONS, VEHICLE_STATUS } from "../../../constants";
 import ReactToPrint from "react-to-print";
 
 // Componente para mostrar e imprimir la tabla de movimientos
@@ -85,7 +86,7 @@ const ReporteCobros = () => {
 
     // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
     const movementsSnapshot = await firestore()
-      .collection("movimientos")
+      .collection(COLLECTIONS.MOVIMIENTOS)
       .where("timestamp", ">=", new Date(startTimestamp))
       .where("timestamp", "<=", new Date(endTimestamp))
       .get();
@@ -96,7 +97,7 @@ const ReporteCobros = () => {
     }));
 
     // Filtrar por estatus = "EN"
-    const filteredMovements = movements.filter(movement => movement.estatus === "EN");
+    const filteredMovements = movements.filter(movement => movement.estatus === VEHICLE_STATUS.EN.code);
     setMovementsData(filteredMovements);
   };
 

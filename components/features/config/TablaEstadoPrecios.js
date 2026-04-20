@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import EditarEstadosPrecios from "./EditarEstadosPrecios";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaEdit, FaMapMarkedAlt } from "react-icons/fa";
+import LoadingSpinner from "../../ui/LoadingSpinner";
+import SearchBar from "../../ui/SearchBar";
+import { FaChevronLeft, FaChevronRight, FaEdit, FaMapMarkedAlt } from "react-icons/fa";
 
 // 1. RECIBIMOS EL USER AQUÍ
 const TablaEstadosPrecios = ({ user }) => {
@@ -14,7 +17,7 @@ const TablaEstadosPrecios = ({ user }) => {
     const xPagina = 8;
 
     useEffect(() => {
-        const unsub = firestore().collection("province").orderBy("state", "asc")
+        const unsub = firestore().collection(COLLECTIONS.PROVINCE).orderBy("state", "asc")
             .onSnapshot(snap => {
                 const data = snap.docs.map(doc => ({
                     id: doc.id,
@@ -46,7 +49,7 @@ const TablaEstadosPrecios = ({ user }) => {
         setIsModalOpen(true);
     };
 
-    if (loading) return <div className="text-center p-10"><span className="loading loading-spinner text-info"></span></div>;
+    if (loading) return <LoadingSpinner texto="Cargando estados..." />;
 
     return (
         <div className="w-full bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden font-sans">
@@ -67,16 +70,12 @@ const TablaEstadosPrecios = ({ user }) => {
 
             {/* ... Resto del código de la tabla igual ... */}
             <div className="p-4 flex justify-between items-center bg-gray-100 border-b">
-                <div className="relative w-96">
-                    <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar Estado..."
-                        className="input input-bordered input-sm w-full pl-10 bg-white text-black text-[13px] focus:border-blue-800"
-                        value={busqueda}
-                        onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
-                    />
-                </div>
+                <SearchBar
+                    value={busqueda}
+                    onChange={(val) => { setBusqueda(val); setPagina(1); }}
+                    placeholder="Buscar Estado..."
+                    className="w-96"
+                />
                 <div className="flex items-center gap-3">
                     <div className="text-[11px] font-bold text-gray-500 flex items-center gap-2 uppercase">
                         <FaMapMarkedAlt className="text-blue-800" /> Cobertura y Precios

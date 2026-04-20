@@ -4,6 +4,8 @@ import 'react-phone-input-2/lib/style.css';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import moment from 'moment';
+import { VEHICLE_TYPES, VEHICLE_WAREHOUSES, TITLE_OPTIONS, PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS, TIMEOUTS } from "../../../constants";
+import Alert from "../../ui/Alert";
 
 const FormDatosVehiculo = ({user, onClose}) => {
     const [estado, setEstado] = useState('');
@@ -26,13 +28,14 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const [sobrePeso, setSobrePeso] = useState(0);
     const [gastosExtra, setGastosExtra] = useState(0);
     const [titulo, setTitulo] = useState('NO');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         let timeoutId;
         if (error) {
             timeoutId = setTimeout(() => {
                 setError('');
-            }, 5000);
+            }, TIMEOUTS.ERROR);
         }
         return () => clearTimeout(timeoutId);
     }, [error]);
@@ -40,7 +43,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
     useEffect(() => {
         const fetchEstados = async () => {
             try {
-                const estadosSnapshot = await firebase.firestore().collection("province").get();
+                const estadosSnapshot = await firebase.firestore().collection(COLLECTIONS.PROVINCE).get();
                 const estadosData = estadosSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     state: doc.data().state,
@@ -70,17 +73,22 @@ const FormDatosVehiculo = ({user, onClose}) => {
             setError('Los campos Bin, Marca, Modelo y Teléfono del cliente son obligatorios.');
             return;
         }
-        if (!(await verificarBinNipEnFirebase(binNip))) {
-            await handleAgregarMovimiento();
-            setSuccess('Vehículo guardado con éxito.');
-            limpiarFormulario();
-        } else {
-            setError('El bin ingresado ya existe, por favor ingrese otro.');
+        setSaving(true);
+        try {
+            if (!(await verificarBinNipEnFirebase(binNip))) {
+                await handleAgregarMovimiento();
+                setSuccess('Vehículo guardado con éxito.');
+                limpiarFormulario();
+            } else {
+                setError('El bin ingresado ya existe, por favor ingrese otro.');
+            }
+        } finally {
+            setSaving(false);
         }
     };
 
     const verificarBinNipEnFirebase = async (binNip) => {
-        const vehiculoRef = firebase.firestore().collection('vehiculos').doc(binNip);
+        const vehiculoRef = firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip);
         const doc = await vehiculoRef.get();
         return doc.exists;
     };
@@ -88,7 +96,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const handleAgregarMovimiento = async () => {
         try {
             const timestamp = moment().toDate();
-            await firebase.firestore().collection("vehiculos").doc(binNip).set({
+            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).set({
                 asignado: false,
                 active: true,
                 binNip: binNip,
@@ -115,7 +123,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 comentariosChofer: null,
                 titulo: titulo,
             });
-            await firebase.firestore().collection("movimientos").add({
+            await firebase.firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
                 asignado: false,
                 tipo: "+",
                 binNip: binNip,
@@ -170,18 +178,8 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 X
             </button>
             <h2 className="text-xl font-bold mt-6 mb-2">Agregar Vehículos</h2>
-            {error && (
-                <div>
-                    <div role="alert" className="alert alert-warning">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none"
-                             viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <span>{error}</span>
-                    </div>
-                </div>
-            )}
+            <Alert mostrar={!!error} mensaje={error} tipo="warning" />
+            <Alert mostrar={!!success} mensaje={success} tipo="success" />
             <div className="flex flex-wrap">
                 <div className="w-1/2 p-1">
                     <label htmlFor="estado" className="block text-black-500">Estado:</label>
@@ -270,9 +268,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option value="">Seleccionar Título</option>
-                        <option value="NO">NO</option>
-                        <option value="SI">SI</option>
-                        {/* Agregar más opciones según sea necesario */}
+                        {TITLE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                 </div>
 
@@ -284,7 +280,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         type="text"
                         id="binNip"
                         value={binNip}
-                        maxLength={16}
+                        maxLength={FIELD_LIMITS.BIN_NIP}
                         onChange={(e) => setBinNip(e.target.value)}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     />
@@ -295,7 +291,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         type="text"
                         id="gatePass"
                         value={gatePass}
-                        maxLength={12}
+                        maxLength={FIELD_LIMITS.GATE_PASS}
                         onChange={(e) => setGatePass(e.target.value)}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     />
@@ -309,12 +305,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option key="S" value="">Seleciona</option>
-                        <option key="Copart" value="Copart">Copart</option>
-                        <option key="Adesa" value="Adesa">Adesa</option>
-                        <option key="Manheim" value="Manheim">Manheim</option>
-                        <option key="Insurance Auto Auctions" value="Insurance Auto Auctions">Insurance Auto Auctions
-                        </option>
-
+                        {VEHICLE_WAREHOUSES.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                     </select>
                 </div>
             </div>
@@ -328,10 +319,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option key="S" value="">Seleciona</option>
-                        <option key="A" value="A">A Ligero</option>
-                        <option key="B" value="B">B Mediano</option>
-                        <option key="C" value="C">C Pesado</option>
-                        {/*<option key="D" value="D">D Ultra pesado</option>*/}
+                        {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                 </div>
                 <div className="w-1/4 p-1">
@@ -369,8 +357,8 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 <div className="w-1/8 p-1">
                     <label htmlFor="telefonoCliente" className="block text-black-500">Telefono Cliente:</label>
                     <PhoneInput
-                        onlyCountries={['us', 'mx']}
-                        country={'us'}
+                        onlyCountries={PHONE_CONFIG.COUNTRIES}
+                        country={PHONE_CONFIG.DEFAULT_COUNTRY}
                         value={telefonoCliente}
                         onChange={(value) => {
                             if (typeof value === 'string') {
@@ -408,8 +396,9 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         type="button"
                         onClick={handleSubmit}
                         className="btn btn-sm btn-info mt-4"
+                        disabled={saving}
                     >
-                        + Agregar Vehículo
+                        {saving ? 'Guardando...' : '+ Agregar Vehículo'}
                     </button>
                 </div>
             </div>

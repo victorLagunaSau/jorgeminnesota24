@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import Pagado from './Pagado';
 import moment from 'moment';
 
@@ -16,10 +17,17 @@ const PagoVehiculo = ({ vehiculo, user }) => {
         comentarioRegistro,
         comentarioRecepcion,
         anticipoPago,
+        folioPago,
+        flete,
     } = vehiculo[0] || {};
 
-    const tieneAnticipo = parseFloat(anticipoPago || 0) > 0;
-    const montoAnticipo = parseFloat(anticipoPago || 0);
+    // Si tiene anticipoPago explícito, usarlo. Si no, pero viene de un viaje pagado (tiene folioPago),
+    // el flete del viaje ya fue cubierto, así que usarlo como anticipo.
+    const anticipoReal = parseFloat(anticipoPago || 0) > 0
+        ? parseFloat(anticipoPago)
+        : (folioPago ? parseFloat(flete || price || 0) : 0);
+    const tieneAnticipo = anticipoReal > 0;
+    const montoAnticipo = anticipoReal;
 
     const notaRegistroTxt = (comentarioRegistro || "").trim();
     const notaRecepcionTxt = (comentarioRecepcion || "").trim();
@@ -39,17 +47,11 @@ const PagoVehiculo = ({ vehiculo, user }) => {
     const [cobrado, setCobrado] = useState(false);
     const [vehiculoActualizado, setVehiculoActualizado] = useState([]);
 
-    const [pagoTardioFlete, setPagoTardioFlete] = useState(0);
-    const [estacionamientoDias, setEstacionamientoDias] = useState(0);
-    const [estacionamientoTotal, setEstacionamientoTotal] = useState(0);
-
     const total =
         parseFloat(sobrePesoState) +
         parseFloat(gastosExtraState) +
         parseFloat(storageState) +
-        parseFloat(pago) +
-        parseFloat(pagoTardioFlete) +
-        parseFloat(estacionamientoTotal);
+        parseFloat(pago);
     const totalConAnticipo = total - montoAnticipo;
     const restante = totalConAnticipo > 0 ? totalConAnticipo : 0;
     const montoACubrir = tieneAnticipo ? restante : total;
@@ -90,12 +92,10 @@ const PagoVehiculo = ({ vehiculo, user }) => {
 
         try {
             const totalPago = total;
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-
             let nuevoFolio = null;
 
             await firestore().runTransaction(async (transaction) => {
-                const folioRef = firestore().collection("config").doc("consecutivos");
+                const folioRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
                 const folioDoc = await transaction.get(folioRef);
 
                 if (!folioDoc.exists) {
@@ -120,8 +120,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 cajaCambio: parseFloat(cajaCambio) || 0,
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
-                pagoTardioFlete: pagoTardioFlete || 0,
-                estacionamiento: estacionamientoTotal || 0,
                 folioVenta: nuevoFolio,
                 anticipoPago: montoAnticipo || 0,
                 estadoPago: esFiado ? "fiado" : "pagado",
@@ -132,11 +130,11 @@ const PagoVehiculo = ({ vehiculo, user }) => {
             };
 
             await firestore()
-                .collection("vehiculos")
+                .collection(COLLECTIONS.VEHICULOS)
                 .doc(vehiculo[0].binNip)
                 .update(payload);
 
-            await firestore().collection("movimientos").add({
+            await firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
                 tipo: "Salida",
                 binNip: vehiculo[0].binNip,
                 marca: vehiculo[0].marca,
@@ -159,8 +157,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 cajaCC: pCC,
                 sobrePeso: parseFloat(sobrePesoState) || 0,
                 gastosExtra: parseFloat(gastosExtraState) || 0,
-                pagoTardioFlete: pagoTardioFlete || 0,
-                estacionamiento: estacionamientoTotal || 0,
                 folioVenta: nuevoFolio,
                 anticipoPago: montoAnticipo || 0,
                 estadoPago: esFiado ? "fiado" : "pagado",
@@ -192,8 +188,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                     cajaRecibo: pEfectivo,
                     cajaCambio: cajaCambio,
                     cajaCC: pCC,
-                    pagoTardioFlete: pagoTardioFlete || 0,
-                    estacionamiento: estacionamientoTotal || 0,
                     folioVenta: nuevoFolio,
                     anticipoPago: montoAnticipo || 0,
                     estadoPago: esFiado ? "fiado" : "pagado",
@@ -211,9 +205,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
             setRecibo(0);
             setReciboCC(0);
             setCredito(0);
-            setPagoTardioFlete(0);
-            setEstacionamientoDias(0);
-            setEstacionamientoTotal(0);
             setCobrado(true);
         } catch (error) {
             console.error("Error al registrar movimiento:", error);
@@ -225,12 +216,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
         } finally {
             setCargando(false);
         }
-    };
-
-    const handleEstacionamientoChange = (e) => {
-        const dias = parseInt(e.target.value) || 0;
-        setEstacionamientoDias(dias);
-        setEstacionamientoTotal(dias * 3);
     };
 
     return (
@@ -357,31 +342,6 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                             /> Dll
                         </div>
                     </div>
-                    <div className="p-1">
-                        <label className="block text-black-500">Pago Tardío de Flete:</label>
-                        <select
-                            value={pagoTardioFlete}
-                            onChange={(e) => setPagoTardioFlete(parseFloat(e.target.value))}
-                            className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
-                        >
-                            <option value={0}>No aplicar</option>
-                            <option value={50}>Aplicar (+50 USD)</option>
-                        </select>
-                    </div>
-                    <div className="p-1">
-                        <label className="block text-black-500">Estacionamiento (3 USD por día):</label>
-                        <div className="flex items-center">
-                            <input
-                                type="number"
-                                value={estacionamientoDias}
-                                onChange={handleEstacionamientoChange}
-                                className="input input-bordered w-full text-black-500 input-lg bg-white-100 mx-1"
-                                min="0"
-                                step="1"
-                            /> Días
-                        </div>
-                    </div>
-
                     <div className="p-1 mt-2">
                         <label className="block text-black-500 font-bold">Recibo Efectivo:</label>
                         <div className="flex items-center">
