@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaSearch, FaEdit, FaTrash, FaExchangeAlt } from 'react-icons/fa';
+import { FaSearch, FaEdit, FaTrash, FaExchangeAlt, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import moment from 'moment';
 
 const ACCIONES = {
@@ -44,16 +44,48 @@ const HistorialAutorizaciones = () => {
         return matchBusqueda && matchAccion;
     });
 
+    const CAMPOS_DINERO = ['price', 'storage', 'sobrePeso', 'gastosExtra'];
+
     const formatCambios = (cambios) => {
         if (!cambios) return null;
-        return Object.entries(cambios).map(([campo, val]) => (
-            <div key={campo} className="text-[11px] leading-tight">
-                <span className="font-semibold text-gray-500">{campo}:</span>{' '}
-                <span className="text-red-400 line-through">{String(val.antes || '-')}</span>
-                {' → '}
-                <span className="text-green-600 font-bold">{String(val.despues || '-')}</span>
-            </div>
-        ));
+        return Object.entries(cambios).map(([campo, val]) => {
+            const antes = val.antes;
+            const despues = val.despues;
+            const esDinero = CAMPOS_DINERO.includes(campo);
+            const antesNum = parseFloat(antes);
+            const despuesNum = parseFloat(despues);
+            const ambosNumericos = esDinero && !isNaN(antesNum) && !isNaN(despuesNum);
+            const subio = ambosNumericos && despuesNum > antesNum;
+            const bajo = ambosNumericos && despuesNum < antesNum;
+
+            if (ambosNumericos) {
+                const diff = Math.abs(despuesNum - antesNum);
+                return (
+                    <div key={campo} className={`flex items-center gap-1.5 text-[11px] leading-tight px-2 py-1 rounded-lg mb-0.5 ${subio ? 'bg-red-50' : 'bg-green-50'}`}>
+                        <span className="font-bold text-gray-600 uppercase">{campo}:</span>
+                        <span className="font-mono font-bold text-gray-500">${antesNum.toFixed(2)}</span>
+                        <span className="text-gray-400">→</span>
+                        <span className={`font-mono font-bold ${subio ? 'text-red-600' : 'text-green-600'}`}>
+                            ${despuesNum.toFixed(2)}
+                        </span>
+                        {subio && <FaArrowUp size={10} className="text-red-500" />}
+                        {bajo && <FaArrowDown size={10} className="text-green-500" />}
+                        <span className={`text-[10px] font-bold ${subio ? 'text-red-400' : 'text-green-400'}`}>
+                            ({subio ? '+' : '-'}${diff.toFixed(2)})
+                        </span>
+                    </div>
+                );
+            }
+
+            return (
+                <div key={campo} className="text-[11px] leading-tight mb-0.5">
+                    <span className="font-semibold text-gray-500">{campo}:</span>{' '}
+                    <span className="text-red-400 line-through">{String(antes || '-')}</span>
+                    {' → '}
+                    <span className="text-green-600 font-bold">{String(despues || '-')}</span>
+                </div>
+            );
+        });
     };
 
     if (loading) {
