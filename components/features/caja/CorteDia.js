@@ -1,6 +1,6 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
-import { COLLECTIONS } from "../../../constants";
+import { COLLECTIONS, USER_TYPES } from "../../../constants";
 import ReactToPrint from "react-to-print";
 import TablaVehiculos from "./TablaVehiculos";
 import TablaEntradas from "./TablaEntradas";
@@ -191,6 +191,7 @@ const ReporteMovimientos = React.forwardRef(({
 
 // Componente principal de Corte del Día
 const CorteDia = ({user}) => {
+    const isAdminMaster = user?.adminMaster === true;
     const [endDate, setEndDate] = useState("");
     const [vehiculosData, setVehiculosData] = useState([]);
     const [entradasData, setEntradasData] = useState([]);
@@ -200,9 +201,47 @@ const CorteDia = ({user}) => {
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
+    // Admin Master: lista de usuarios con caja
+    const [usuariosCaja, setUsuariosCaja] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState("");
+    const [selectedUserObj, setSelectedUserObj] = useState(null);
+
+    useEffect(() => {
+        if (!isAdminMaster) return;
+        const unsub = firestore()
+            .collection(COLLECTIONS.USERS)
+            .where("tipo", "==", USER_TYPES.ADMIN)
+            .onSnapshot((snap) => {
+                const todos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const conCaja = todos.filter(u => u.caja === true);
+                conCaja.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+                setUsuariosCaja(conCaja);
+            });
+        return () => unsub();
+    }, [isAdminMaster]);
+
+    // Cuando cambia el usuario seleccionado
+    useEffect(() => {
+        if (!isAdminMaster) {
+            setSelectedUserObj(user);
+            return;
+        }
+        if (selectedUserId) {
+            const found = usuariosCaja.find(u => u.id === selectedUserId);
+            setSelectedUserObj(found || null);
+        } else {
+            setSelectedUserObj(null);
+        }
+    }, [selectedUserId, usuariosCaja, isAdminMaster, user]);
+
     const handleButtonClick = async () => {
         if (!endDate) {
             setErrorMessage("Por favor, selecciona una fecha.");
+            return;
+        }
+        const targetUser = isAdminMaster ? selectedUserObj : user;
+        if (!targetUser) {
+            setErrorMessage("Por favor, selecciona un usuario.");
             return;
         }
         setErrorMessage("");
@@ -225,7 +264,7 @@ const CorteDia = ({user}) => {
             ...doc.data(),
         }));
 
-        const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
+        const filteredUserID = movements.filter((movement) => movement.idUsuario === targetUser.id);
         const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago" && movement.tipo !== "Abono");
         const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
         const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
@@ -274,25 +313,48 @@ const CorteDia = ({user}) => {
 
     const totalSalidas = salidasData.reduce((total, movement) => total + (parseFloat(movement.salidaCaja) || 0), 0);
 
+    const reportUser = isAdminMaster && selectedUserObj ? selectedUserObj : user;
+
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="home">
             <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
                 Reporte de <strong>Movimientos</strong>.
             </h3>
 
-            <div className="mb-4 md:mb-0">
-                <label className="block text-black-500">Fecha Final: {endDate}</label>
-                <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg"
-                    required
-                />
+            <div className="flex flex-col md:flex-row md:items-end gap-4 mt-4">
+                {/* Selector de usuario - Solo Admin Master */}
+                {isAdminMaster && (
+                    <div className="mb-4 md:mb-0">
+                        <label className="block text-black-500 font-semibold">Usuario:</label>
+                        <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg min-w-[200px]"
+                        >
+                            <option value="">-- Seleccionar usuario --</option>
+                            {usuariosCaja.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.nombre} {u.adminMaster ? '(Master)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div className="mb-4 md:mb-0">
+                    <label className="block text-black-500">Fecha Final: {endDate}</label>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        required
+                    />
+                </div>
             </div>
 
             {errorMessage && (
-                <div className="text-red-500 mb-2">{errorMessage}</div>
+                <div className="text-red-500 mb-2 mt-2">{errorMessage}</div>
             )}
 
             <button
@@ -313,7 +375,7 @@ const CorteDia = ({user}) => {
 
             {/* Reporte Movimientos */}
             <ReporteMovimientos
-                user={user}
+                user={reportUser}
                 ref={componentRef}
                 endDate={endDate}
                 vehiculosData={vehiculosData}
