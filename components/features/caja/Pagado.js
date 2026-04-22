@@ -4,6 +4,7 @@ import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes';
 import moment from 'moment';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
+import { registrarAuditLog } from "../../../utils/auditLog";
 import { FaTrash } from "react-icons/fa";
 
 const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
@@ -113,7 +114,15 @@ const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            // 5. Batch delete
+            // 5. Audit log
+            await registrarAuditLog("eliminacion", user, {
+                binNip,
+                cliente: vehiculoData.cliente,
+                marca: vehiculoData.marca,
+                modelo: vehiculoData.modelo,
+            });
+
+            // 6. Batch delete
             const batch = firestore().batch();
 
             // Movimientos

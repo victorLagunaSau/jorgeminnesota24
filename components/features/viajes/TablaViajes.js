@@ -371,13 +371,12 @@ const TablaViajes = ({user}) => {
                     const yaPagado = lotesExistentes.includes(v.lote);
 
                     if (yaPagado) {
-                        // LOTE YA PAGADO - Actualizar precios y asegurar anticipo
+                        // LOTE YA PAGADO - Actualizar precios, preservar anticipoPago existente
                         transaction.update(vehiculoRef, {
                             storage: parseFloat(v.storage || 0),
                             sobrePeso: parseFloat(v.sPeso || 0),
                             gastosExtra: parseFloat(v.gExtra || 0),
                             comentarioRecepcion: v.comentarioRecepcion || "",
-                            anticipoPago: parseFloat(v.precioVenta || v.flete || 0),
                             ultimaActualizacionPrecios: {
                                 fecha: fechaOperacionActual,
                                 usuario: user?.nombre || "Admin",
@@ -444,7 +443,6 @@ const TablaViajes = ({user}) => {
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
                             titulo: v.titulo || "NO",
-                            anticipoPago: parseFloat(v.precioVenta || v.flete || 0),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)

@@ -5,12 +5,8 @@ import { FaPrint } from 'react-icons/fa';
 
 const Cobrar = ({ vehiculo, user }) => {
     const [showRecibo, setShowRecibo] = useState(false);
-    const anticipoExplicito = parseFloat(vehiculo?.[0]?.anticipoPago || 0);
-    const folioPago = vehiculo?.[0]?.folioPago;
-    const anticipoReal = anticipoExplicito > 0
-        ? anticipoExplicito
-        : (folioPago ? parseFloat(vehiculo?.[0]?.flete || vehiculo?.[0]?.price || 0) : 0);
-    const tieneAnticipo = anticipoReal > 0;
+    const montoAnticipo = parseFloat(vehiculo?.[0]?.anticipoPago || 0);
+    const tieneAnticipo = montoAnticipo > 0;
 
     const datosRecibo = tieneAnticipo ? {
         binNip: vehiculo[0]?.binNip || '',
@@ -21,7 +17,7 @@ const Cobrar = ({ vehiculo, user }) => {
         estado: vehiculo[0]?.estado || '',
         ciudad: vehiculo[0]?.ciudad || '',
         price: vehiculo[0]?.price || 0,
-        anticipoPago: anticipoReal,
+        anticipoPago: montoAnticipo,
         usuario: vehiculo[0]?.anticipoUsuario || user?.nombre || 'Admin',
     } : null;
 

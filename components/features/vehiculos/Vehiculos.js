@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
+import { registrarAuditLog } from "../../../utils/auditLog";
 import * as XLSX from "xlsx";
 import FormDatosVehiculo from "./FormDatosVehiculo";
 import FormEditarVehiculo from "./FormEditarVehiculo";
@@ -214,6 +215,13 @@ const Vehiculos = ({user}) => {
 
             await batch.commit();
 
+            await registrarAuditLog("cambioLote", user, {
+                binNip: loteAnterior,
+                cliente: loteTargetVehiculo.cliente,
+                marca: loteTargetVehiculo.marca,
+                modelo: loteTargetVehiculo.modelo,
+            }, { lote: { antes: loteAnterior, despues: loteNuevo } });
+
             setAlertMsg({ mostrar: true, mensaje: `Lote cambiado de ${loteAnterior} a ${loteNuevo} correctamente`, tipo: "success" }); setTimeout(() => setAlertMsg({mostrar:false,mensaje:"",tipo:""}), 3500);
             setIsLoteModalOpen(false);
             setLoteTargetVehiculo(null);
@@ -235,6 +243,13 @@ const Vehiculos = ({user}) => {
         setIsDeleting(true);
         try {
             const firestoreInstance = firestore();
+
+            await registrarAuditLog("eliminacion", user, {
+                binNip: deleteTargetVehiculo.id,
+                cliente: deleteTargetVehiculo.cliente,
+                marca: deleteTargetVehiculo.marca,
+                modelo: deleteTargetVehiculo.modelo,
+            });
 
             await firestoreInstance.collection(COLLECTIONS.VEHICULOS).doc(deleteTargetVehiculo.id).delete();
 
@@ -321,7 +336,7 @@ const Vehiculos = ({user}) => {
                 <dialog open={isEditModalOpen} className="modal">
                     <div className="modal-box w-11/12 max-w-5xl bg-white">
                         {selectedVehiculo && (
-                            <FormEditarVehiculo vehiculo={selectedVehiculo} onClose={() => {
+                            <FormEditarVehiculo vehiculo={selectedVehiculo} user={user} onClose={() => {
                                 setSelectedVehiculo(null);
                                 setIsEditModalOpen(false);
                             }}/>

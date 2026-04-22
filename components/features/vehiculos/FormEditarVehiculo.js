@@ -4,9 +4,10 @@ import 'react-phone-input-2/lib/style.css';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import { VEHICLE_TYPES, VEHICLE_WAREHOUSES, TITLE_OPTIONS, PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS, TIMEOUTS, VEHICLE_STATUS_LIST } from "../../../constants";
+import { registrarAuditLog } from "../../../utils/auditLog";
 import Alert from "../../ui/Alert";
 
-const FormEditVehiculo = ({vehiculo, onClose}) => {
+const FormEditVehiculo = ({vehiculo, onClose, user}) => {
     const [estado, setEstado] = useState(vehiculo.estado);
     const [ciudad, setCiudad] = useState(vehiculo.ciudad);
     const [price, setPrice] = useState(0);
@@ -107,24 +108,21 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
 
     const handleActualizarVehiculo = async () => {
         try {
-            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update({
-                gatePass: gatePass,
-                almacen: almacen,
-                tipoVehiculo: tipoVehiculo,
-                marca: marca,
-                modelo: modelo,
-                cliente: cliente,
-                telefonoCliente: telefonoCliente,
-                descripcion: descripcion,
-                estado: estado,
-                ciudad: ciudad,
-                price: price,
-                storage: storage,
-                sobrePeso: sobrePeso,
-                gastosExtra: gastosExtra,
-                titulo: titulo,
-                estatus: estatus,
+            const nuevos = { gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad, price, storage, sobrePeso, gastosExtra, titulo, estatus };
+            const cambios = {};
+            Object.keys(nuevos).forEach(campo => {
+                const antes = vehiculo[campo] !== undefined ? vehiculo[campo] : '';
+                const despues = nuevos[campo] !== undefined ? nuevos[campo] : '';
+                if (String(antes) !== String(despues)) {
+                    cambios[campo] = { antes, despues };
+                }
             });
+
+            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update(nuevos);
+
+            if (Object.keys(cambios).length > 0) {
+                await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
+            }
         } catch (error) {
             console.error("Error al actualizar vehículo:", error);
             setError('Error al actualizar el vehículo. Por favor, intente nuevamente. Error:');

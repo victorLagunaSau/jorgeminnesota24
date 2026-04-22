@@ -17,17 +17,10 @@ const PagoVehiculo = ({ vehiculo, user }) => {
         comentarioRegistro,
         comentarioRecepcion,
         anticipoPago,
-        folioPago,
-        flete,
     } = vehiculo[0] || {};
 
-    // Si tiene anticipoPago explícito, usarlo. Si no, pero viene de un viaje pagado (tiene folioPago),
-    // el flete del viaje ya fue cubierto, así que usarlo como anticipo.
-    const anticipoReal = parseFloat(anticipoPago || 0) > 0
-        ? parseFloat(anticipoPago)
-        : (folioPago ? parseFloat(flete || price || 0) : 0);
-    const tieneAnticipo = anticipoReal > 0;
-    const montoAnticipo = anticipoReal;
+    const montoAnticipo = parseFloat(anticipoPago || 0);
+    const tieneAnticipo = montoAnticipo > 0;
 
     const notaRegistroTxt = (comentarioRegistro || "").trim();
     const notaRecepcionTxt = (comentarioRecepcion || "").trim();

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
+import { registrarAuditLog } from "../../../utils/auditLog";
 import { useBusquedaMovimientos } from './useBusquedaMovimientos';
 import { FaTrash, FaSearch, FaShieldAlt, FaExclamationTriangle } from "react-icons/fa";
 
@@ -242,6 +243,16 @@ const EliminaVehiculos = ({ user }) => {
             }
 
             await batch.commit();
+
+            // Registrar audit log para cada vehículo eliminado
+            for (const vehiculo of datosAptosJson) {
+                await registrarAuditLog("eliminacion", user, {
+                    binNip: vehiculo.binNip,
+                    cliente: vehiculo.cliente,
+                    marca: vehiculo.marca,
+                    modelo: vehiculo.modelo,
+                });
+            }
 
             let msg = `ELIMINACION EXITOSA:\n` +
                 `- ${aptos.length} vehiculo(s) eliminados\n` +

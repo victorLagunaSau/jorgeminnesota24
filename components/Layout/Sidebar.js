@@ -168,24 +168,27 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </div>
                         </li>
 
-                        {/* Submenú Análisis */}
-                        <li>
-                            <button
-                                className={getMenuButtonClass(openSubMenu.analisis)}
-                                onClick={() => toggleSubMenu('analisis')}
-                            >
-                                <span className="flex items-center">
-                                    <FaChartBar className="mr-3 text-red-600" size={18} />
-                                    Análisis
-                                </span>
-                                {openSubMenu.analisis ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
-                            </button>
-                            <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.analisis ? 'max-h-96' : 'max-h-0'}`}>
-                                <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
-                                    <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
-                                </ul>
-                            </div>
-                        </li>
+                        {/* Submenú Análisis - Solo Admin Master */}
+                        {isAdminMaster && (
+                            <li>
+                                <button
+                                    className={getMenuButtonClass(openSubMenu.analisis)}
+                                    onClick={() => toggleSubMenu('analisis')}
+                                >
+                                    <span className="flex items-center">
+                                        <FaChartBar className="mr-3 text-red-600" size={18} />
+                                        Análisis
+                                    </span>
+                                    {openSubMenu.analisis ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
+                                </button>
+                                <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.analisis ? 'max-h-96' : 'max-h-0'}`}>
+                                    <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
+                                        <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
+                                        <li><button className={getButtonClass('historialAutorizaciones')} onClick={() => handleSelectModule('historialAutorizaciones')}>Autorizaciones</button></li>
+                                    </ul>
+                                </div>
+                            </li>
+                        )}
 
                         {/* Vehículos */}
                         <li>
