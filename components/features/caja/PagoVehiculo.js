@@ -47,6 +47,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
         parseFloat(pago);
     const totalConAnticipo = total - montoAnticipo;
     const restante = totalConAnticipo > 0 ? totalConAnticipo : 0;
+    const anticipoExcedente = totalConAnticipo < 0 ? Math.abs(totalConAnticipo) : 0;
     const montoACubrir = tieneAnticipo ? restante : total;
 
     const pEfectivo = parseFloat(recibo) || 0;
@@ -108,6 +109,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 pago: parseFloat(pago) || 0,
                 storage: parseFloat(storageState) || 0,
                 totalPago: parseFloat(totalPago) || 0,
+                totalPagoNeto: montoACubrir,
                 cajaRecibo: pEfectivo,
                 cajaCC: pCC,
                 cajaCambio: parseFloat(cajaCambio) || 0,
@@ -115,6 +117,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 gastosExtra: parseFloat(gastosExtraState) || 0,
                 folioVenta: nuevoFolio,
                 anticipoPago: montoAnticipo || 0,
+                anticipoExcedente: anticipoExcedente,
                 estadoPago: esFiado ? "fiado" : "pagado",
                 creditoOtorgado: pCredito,
                 saldoFiado: pCredito,
@@ -145,6 +148,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 pago: parseFloat(pago) || 0,
                 storage: parseFloat(storageState) || 0,
                 totalPago: parseFloat(totalPago) || 0,
+                totalPagoNeto: montoACubrir,
                 cajaRecibo: pEfectivo,
                 cajaCambio: parseFloat(cajaCambio) || 0,
                 cajaCC: pCC,
@@ -152,6 +156,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 gastosExtra: parseFloat(gastosExtraState) || 0,
                 folioVenta: nuevoFolio,
                 anticipoPago: montoAnticipo || 0,
+                anticipoExcedente: anticipoExcedente,
                 estadoPago: esFiado ? "fiado" : "pagado",
                 creditoOtorgado: pCredito,
                 saldoFiado: pCredito,
@@ -175,6 +180,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                     pago,
                     storage: storageState,
                     totalPago,
+                    totalPagoNeto: montoACubrir,
                     sobrePeso: sobrePesoState,
                     gastosExtra: gastosExtraState,
                     titulo: vehiculo[0].titulo,
@@ -183,6 +189,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                     cajaCC: pCC,
                     folioVenta: nuevoFolio,
                     anticipoPago: montoAnticipo || 0,
+                    anticipoExcedente: anticipoExcedente,
                     estadoPago: esFiado ? "fiado" : "pagado",
                     creditoOtorgado: pCredito,
                     saldoFiado: pCredito,
@@ -265,6 +272,16 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                             <p className="text-2xl font-black text-green-700 mt-1">
                                 Resta por cobrar: ${restante.toFixed(2)} DLL
                             </p>
+                            {anticipoExcedente > 0 && (
+                                <div className="mt-2 p-2 rounded-lg bg-yellow-200 border border-yellow-500">
+                                    <p className="text-lg font-black text-yellow-800">
+                                        Anticipo excedente: ${anticipoExcedente.toFixed(2)} DLL
+                                    </p>
+                                    <p className="text-sm text-yellow-700">
+                                        El anticipo supera el total. Se registrará el excedente como saldo a favor.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
 

@@ -183,6 +183,7 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                 </button>
                                 <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.analisis ? 'max-h-96' : 'max-h-0'}`}>
                                     <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
+                                        <li><button className={getButtonClass('estadoFinanciero')} onClick={() => handleSelectModule('estadoFinanciero')}>Estado Financiero</button></li>
                                         <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
                                         <li><button className={getButtonClass('historialAutorizaciones')} onClick={() => handleSelectModule('historialAutorizaciones')}>Autorizaciones</button></li>
                                     </ul>

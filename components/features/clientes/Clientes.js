@@ -109,8 +109,21 @@ const Clientes = ({ user }) => {
                 ...c,
                 ...getDeudaCliente(c.cliente),
             }))
-            .sort((a, b) => b.deuda - a.deuda);
+            .sort((a, b) => {
+                // Primero los que tienen vehículos/deuda, luego por monto
+                if (a.vehiculos > 0 && b.vehiculos === 0) return -1;
+                if (a.vehiculos === 0 && b.vehiculos > 0) return 1;
+                return b.deuda - a.deuda;
+            });
     }, [clientesRaw, todosVehiculos, vehiculosFiados, vehiculosLegacy]);
+
+    // Mantener clienteSeleccionado sincronizado con datos en tiempo real
+    useEffect(() => {
+        if (clienteSeleccionado) {
+            const actualizado = clientes.find(c => c.id === clienteSeleccionado.id);
+            if (actualizado) setClienteSeleccionado(actualizado);
+        }
+    }, [clientes]);
 
     const filtrados = clientes.filter(c => {
         const b = busqueda.toLowerCase();
@@ -339,26 +352,33 @@ const Clientes = ({ user }) => {
                             <table className="table table-sm w-full">
                                 <thead>
                                     <tr className="border-b border-orange-200 text-[10px] text-orange-400 font-bold uppercase">
-                                        <th className="py-2">Lote</th>
+                                        <th className="py-2">Fecha Cobro</th>
+                                        <th>Lote</th>
                                         <th>Vehículo</th>
-                                        <th>Origen</th>
+                                        <th className="text-right">Precio</th>
+                                        <th className="text-right">Abono</th>
                                         <th className="text-right">Cobrado</th>
-                                        <th className="text-right">Crédito</th>
                                         <th className="text-right">Pendiente</th>
                                     </tr>
                                 </thead>
                                 <tbody className="text-sm">
                                     {vehiculosFiadosCliente.map((v) => {
                                         const saldo = parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0;
-                                        const credito = parseFloat(v.creditoOtorgado) || 0;
-                                        const totalCobrado = (parseFloat(v.cajaRecibo) || 0) + (parseFloat(v.cajaCC) || 0);
+                                        const precio = calcularPrecioVehiculo(v);
+                                        const cobrado = (parseFloat(v.cajaRecibo) || 0) - (parseFloat(v.cajaCambio) || 0) + (parseFloat(v.cajaCC) || 0);
+                                        const fechaCobro = v.timestamp?.seconds
+                                            ? new Date(v.timestamp.seconds * 1000).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                                            : v.timestamp instanceof Date
+                                                ? v.timestamp.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                : '-';
                                         return (
                                             <tr key={v.id} className="border-b border-gray-50 hover:bg-orange-50/30">
+                                                <td className="text-gray-500 text-xs whitespace-nowrap">{fechaCobro}</td>
                                                 <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
                                                 <td className="text-gray-700">{v.marca} {v.modelo}</td>
-                                                <td className="text-gray-400">{v.ciudad}, {v.estado}</td>
-                                                <td className="text-right">${totalCobrado.toFixed(2)}</td>
-                                                <td className="text-right">${credito.toFixed(2)}</td>
+                                                <td className="text-right">${precio.toFixed(2)}</td>
+                                                <td className="text-right text-green-600">${cobrado.toFixed(2)}</td>
+                                                <td className="text-right font-bold">${cobrado.toFixed(2)}</td>
                                                 <td className="text-right font-bold text-orange-600">${saldo.toFixed(2)}</td>
                                             </tr>
                                         );
@@ -366,7 +386,7 @@ const Clientes = ({ user }) => {
                                 </tbody>
                                 <tfoot>
                                     <tr className="text-sm">
-                                        <td colSpan="5" className="text-right text-orange-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
+                                        <td colSpan="6" className="text-right text-orange-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
                                         <td className="text-right font-black text-orange-600 pt-2">${deudaFiadaCliente.toFixed(2)}</td>
                                     </tr>
                                 </tfoot>
@@ -404,13 +424,7 @@ const Clientes = ({ user }) => {
                                     <FormCliente
                                         user={user}
                                         clienteAEditar={clienteAEditar}
-                                        onSuccess={() => {
-                                            cerrarForm();
-                                            if (clienteAEditar) {
-                                                const updatedCliente = clientes.find(c => c.id === clienteAEditar.id);
-                                                if (updatedCliente) setClienteSeleccionado(updatedCliente);
-                                            }
-                                        }}
+                                        onSuccess={cerrarForm}
                                     />
                                 </div>
                             </motion.div>

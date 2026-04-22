@@ -77,12 +77,10 @@ const ReporteCobros = () => {
     }
 
     setErrorMessage("");
-    const iniDia = new Date(iniDate);
-    const siguienteDia = new Date(endDate);
-    siguienteDia.setDate(siguienteDia.getDate() + 1);
-
-    const startTimestamp = new Date(iniDia).setHours(0, 0, 0, 0);
-    const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
+    const [anioI, mesI, diaI] = iniDate.split('-').map(Number);
+    const [anioF, mesF, diaF] = endDate.split('-').map(Number);
+    const startTimestamp = new Date(anioI, mesI - 1, diaI, 0, 0, 0, 0).getTime();
+    const endTimestamp = new Date(anioF, mesF - 1, diaF, 23, 59, 59, 999).getTime();
 
     // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
     const movementsSnapshot = await firestore()

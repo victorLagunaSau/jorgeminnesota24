@@ -1,6 +1,6 @@
-import React, {useState, useRef} from "react";
+import React, {useState, useRef, useEffect} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
-import { COLLECTIONS } from "../../../constants";
+import { COLLECTIONS, USER_TYPES } from "../../../constants";
 import ReactToPrint from "react-to-print";
 import TablaVehiculos from "./TablaVehiculos";
 import TablaEntradas from "./TablaEntradas";
@@ -42,47 +42,6 @@ const ReporteMovimientos = React.forwardRef(({
             totalPendientes={totalPendientes}
             totalCredito={totalCredito}
         />
-
-        {/* Tabla de Abonos recibidos (cobros de fiados) */}
-        {abonosData && abonosData.length > 0 && (
-            <div className="mt-4">
-                <h3 className="text-lg font-semibold">Abonos de Fiados recibidos</h3>
-                <table className="min-w-full bg-white border text-xs">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="px-2 py-1 border">Fecha</th>
-                            <th className="px-2 py-1 border">Cliente / Vehículo</th>
-                            <th className="px-2 py-1 border text-right">Efectivo</th>
-                            <th className="px-2 py-1 border text-right">CC</th>
-                            <th className="px-2 py-1 border text-right">Saldo después</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {abonosData.map((a) => (
-                            <tr key={a.id}>
-                                <td className="px-2 py-1 border">
-                                    {a.timestamp?.seconds
-                                        ? new Date(a.timestamp.seconds * 1000).toLocaleDateString()
-                                        : "-"}
-                                </td>
-                                <td className="px-2 py-1 border">
-                                    {a.cliente} — {a.marca} {a.modelo} (Bin: {a.binNip})
-                                </td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaRecibo) || 0).toFixed(2)}</td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaCC) || 0).toFixed(2)}</td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.saldoFiadoDespues) || 0).toFixed(2)}</td>
-                            </tr>
-                        ))}
-                        <tr className="bg-gray-100 font-semibold">
-                            <td colSpan="2" className="px-2 py-1 border text-right">Subtotal abonos:</td>
-                            <td className="px-2 py-1 border text-right">${totalAbonosEfectivo.toFixed(2)}</td>
-                            <td className="px-2 py-1 border text-right">${totalAbonosCC.toFixed(2)}</td>
-                            <td className="px-2 py-1 border"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        )}
 
         {/* Tabla de Anticipos (Pagos Adelantados) */}
         {anticiposData && anticiposData.length > 0 && (
@@ -140,18 +99,6 @@ const ReporteMovimientos = React.forwardRef(({
                 </td>
             </tr>
             <tr>
-                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (efectivo):</td>
-                <td className="border px-4 py-2 font-semibold text-right">
-                    ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
-                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (CC):</td>
-                <td className="border px-4 py-2 font-semibold text-right">
-                    ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
                 <td className="border px-4 py-2 font-semibold text-green-700">Anticipos (Pagos Adelantados):</td>
                 <td className="border px-4 py-2 font-semibold text-right text-green-700">
                     ${totalAnticipos.toFixed(2).toLocaleString('en-US')}
@@ -173,14 +120,8 @@ const ReporteMovimientos = React.forwardRef(({
                 <td className="border px-4 py-2 font-bold">Total General:</td>
                 <td className="border px-4 py-2 font-bold text-right">
                     ${(
-                        totalCaja + totalAbonosEfectivo + totalAbonosCC + totalAnticipos + totalRecibido - totalSalidas
+                        totalCaja + totalAnticipos + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
-                <td className="border px-4 py-2 font-semibold text-orange-700">Crédito otorgado hoy (informativo):</td>
-                <td className="border px-4 py-2 font-semibold text-right text-orange-700">
-                    ${totalCredito.toFixed(2).toLocaleString('en-US')}
                 </td>
             </tr>
         </tbody>
@@ -191,6 +132,7 @@ const ReporteMovimientos = React.forwardRef(({
 
 // Componente principal de Corte del Día
 const CorteDia = ({user}) => {
+    const isAdminMaster = user?.adminMaster === true;
     const [endDate, setEndDate] = useState("");
     const [vehiculosData, setVehiculosData] = useState([]);
     const [entradasData, setEntradasData] = useState([]);
@@ -200,18 +142,54 @@ const CorteDia = ({user}) => {
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
+    // Admin Master: lista de usuarios con caja
+    const [usuariosCaja, setUsuariosCaja] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState("");
+    const [selectedUserObj, setSelectedUserObj] = useState(null);
+
+    useEffect(() => {
+        if (!isAdminMaster) return;
+        const unsub = firestore()
+            .collection(COLLECTIONS.USERS)
+            .where("tipo", "==", USER_TYPES.ADMIN)
+            .onSnapshot((snap) => {
+                const todos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const conCaja = todos.filter(u => u.caja === true);
+                conCaja.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+                setUsuariosCaja(conCaja);
+            });
+        return () => unsub();
+    }, [isAdminMaster]);
+
+    // Cuando cambia el usuario seleccionado
+    useEffect(() => {
+        if (!isAdminMaster) {
+            setSelectedUserObj(user);
+            return;
+        }
+        if (selectedUserId) {
+            const found = usuariosCaja.find(u => u.id === selectedUserId);
+            setSelectedUserObj(found || null);
+        } else {
+            setSelectedUserObj(null);
+        }
+    }, [selectedUserId, usuariosCaja, isAdminMaster, user]);
+
     const handleButtonClick = async () => {
         if (!endDate) {
             setErrorMessage("Por favor, selecciona una fecha.");
             return;
         }
+        const targetUser = isAdminMaster ? selectedUserObj : user;
+        if (!targetUser) {
+            setErrorMessage("Por favor, selecciona un usuario.");
+            return;
+        }
         setErrorMessage("");
 
-        const siguienteDia = new Date(endDate);
-        siguienteDia.setDate(siguienteDia.getDate() + 1);
-
-        const startTimestamp = new Date(siguienteDia).setHours(0, 0, 0, 0);
-        const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
+        const [anio, mes, dia] = endDate.split('-').map(Number);
+        const startTimestamp = new Date(anio, mes - 1, dia, 0, 0, 0, 0).getTime();
+        const endTimestamp = new Date(anio, mes - 1, dia, 23, 59, 59, 999).getTime();
 
         // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
         const movementsSnapshot = await firestore()
@@ -225,7 +203,7 @@ const CorteDia = ({user}) => {
             ...doc.data(),
         }));
 
-        const filteredUserID = movements.filter((movement) => movement.idUsuario === user.id);
+        const filteredUserID = movements.filter((movement) => movement.idUsuario === targetUser.id);
         const filteredVehiculos = filteredUserID.filter((movement) => movement.estatus === "EN" && movement.tipo !== "Pago" && movement.tipo !== "Abono");
         const filteredEntradas = filteredUserID.filter((movement) => movement.estatus === "EE" && movement.tipo === "Entrada");
         const filteredSalidas = filteredUserID.filter((movement) => movement.estatus === "SE" && movement.tipo === "Pago");
@@ -274,25 +252,48 @@ const CorteDia = ({user}) => {
 
     const totalSalidas = salidasData.reduce((total, movement) => total + (parseFloat(movement.salidaCaja) || 0), 0);
 
+    const reportUser = isAdminMaster && selectedUserObj ? selectedUserObj : user;
+
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="home">
             <h3 className="justify-center text-3xl lg:text-3xl font-medium text-black-500">
                 Reporte de <strong>Movimientos</strong>.
             </h3>
 
-            <div className="mb-4 md:mb-0">
-                <label className="block text-black-500">Fecha Final: {endDate}</label>
-                <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg"
-                    required
-                />
+            <div className="flex flex-col md:flex-row md:items-end gap-4 mt-4">
+                {/* Selector de usuario - Solo Admin Master */}
+                {isAdminMaster && (
+                    <div className="mb-4 md:mb-0">
+                        <label className="block text-black-500 font-semibold">Usuario:</label>
+                        <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="w-full px-4 py-2 border rounded-lg min-w-[200px]"
+                        >
+                            <option value="">-- Seleccionar usuario --</option>
+                            {usuariosCaja.map(u => (
+                                <option key={u.id} value={u.id}>
+                                    {u.nombre} {u.adminMaster ? '(Master)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
+                <div className="mb-4 md:mb-0">
+                    <label className="block text-black-500">Fecha Final: {endDate}</label>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full px-4 py-2 border rounded-lg"
+                        required
+                    />
+                </div>
             </div>
 
             {errorMessage && (
-                <div className="text-red-500 mb-2">{errorMessage}</div>
+                <div className="text-red-500 mb-2 mt-2">{errorMessage}</div>
             )}
 
             <button
@@ -313,7 +314,7 @@ const CorteDia = ({user}) => {
 
             {/* Reporte Movimientos */}
             <ReporteMovimientos
-                user={user}
+                user={reportUser}
                 ref={componentRef}
                 endDate={endDate}
                 vehiculosData={vehiculosData}
