@@ -1,25 +1,19 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer';
 
 async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
   let browser;
 
   try {
-    const isDev = process.env.NODE_ENV === 'development';
-
     browser = await puppeteer.launch({
-      args: isDev
-        ? ['--no-sandbox', '--disable-setuid-sandbox']
-        : chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: isDev
-        ? (process.platform === 'darwin'
-          ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          : process.platform === 'win32'
-            ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-            : '/usr/bin/google-chrome')
-        : await chromium.executablePath(),
-      headless: isDev ? 'shell' : chromium.headless,
+      headless: 'shell',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-features=IsolateOrigins,site-per-process',
+        '--window-size=1920,1080'
+      ]
     });
 
     const page = await browser.newPage();
@@ -181,10 +175,6 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
     return null;
   }
 }
-
-export const config = {
-  maxDuration: 60,
-};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
