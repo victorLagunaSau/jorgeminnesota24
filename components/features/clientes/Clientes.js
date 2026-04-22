@@ -109,7 +109,12 @@ const Clientes = ({ user }) => {
                 ...c,
                 ...getDeudaCliente(c.cliente),
             }))
-            .sort((a, b) => b.deuda - a.deuda);
+            .sort((a, b) => {
+                // Primero los que tienen vehículos/deuda, luego por monto
+                if (a.vehiculos > 0 && b.vehiculos === 0) return -1;
+                if (a.vehiculos === 0 && b.vehiculos > 0) return 1;
+                return b.deuda - a.deuda;
+            });
     }, [clientesRaw, todosVehiculos, vehiculosFiados, vehiculosLegacy]);
 
     // Mantener clienteSeleccionado sincronizado con datos en tiempo real

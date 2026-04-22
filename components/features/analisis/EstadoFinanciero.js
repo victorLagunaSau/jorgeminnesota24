@@ -148,7 +148,7 @@ const EstadoFinanciero = () => {
         const vehiculos = movimientos.filter(m => m.estatus === "EN" && m.tipo !== "Pago" && m.tipo !== "Abono");
         const anticipos = movimientos.filter(m => m.tipo === "Anticipo");
         const abonos = movimientos.filter(m => m.tipo === "Abono");
-        const entradas = movimientos.filter(m => m.estatus === "EE" && m.tipo === "Entrada");
+        const entradas = movimientos.filter(m => m.estatus === "EE" && m.tipo === "Entrada" && m.entradaCajaTipo !== "ECI");
 
         // Vehiculos con crédito
         const vehiculosCredito = vehiculos.filter(m => (parseFloat(m.creditoOtorgado) || 0) > 0);
@@ -247,7 +247,15 @@ const EstadoFinanciero = () => {
         { key: 'cajaCC', label: 'Tarjeta', align: 'right', fmt: true, color: 'text-blue-600' },
     ];
 
+    const tipoEntradaLabel = (tipo) => {
+        if (tipo === 'ECI') return 'Capital Inicial';
+        if (tipo === 'ERC') return 'Recibo Capital';
+        if (tipo === 'EP') return 'Pago';
+        return tipo || '-';
+    };
+
     const colEntrada = [
+        { key: 'entradaCajaTipo', label: 'Tipo', render: (m) => tipoEntradaLabel(m.entradaCajaTipo), bold: true },
         { key: 'entradaCajaReceptor', label: 'Receptor' },
         { key: 'entradaCajaConceptoPago', label: 'Concepto' },
         { key: 'fecha', label: 'Fecha', render: (m) => formatTs(m.timestamp) },

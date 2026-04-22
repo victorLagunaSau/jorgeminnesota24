@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { FaSearch, FaTruck } from 'react-icons/fa';
-import * as XLSX from "xlsx";
-import PagosPendientes from "./PagosPendientes";
 
-const Cobranza = ({ user }) => {
+const FletesFlados = () => {
     const [vehiculos, setVehiculos] = useState([]);
     const [loading, setLoading] = useState(true);
     const [busqueda, setBusqueda] = useState("");
-    const [modalOpen, setModalOpen] = useState(false);
-    const [selectedVehiculoId, setSelectedVehiculoId] = useState(null);
 
     useEffect(() => {
         let datosFiados = [];
@@ -21,6 +17,7 @@ const Cobranza = ({ user }) => {
             const porId = new Map();
             [...datosFiados, ...datosLegacy].forEach(v => porId.set(v.id, v));
             const todos = Array.from(porId.values());
+            // Ordenar por fecha de entrega (timestamp) más reciente primero
             todos.sort((a, b) => {
                 const ta = a.timestamp?.seconds || 0;
                 const tb = b.timestamp?.seconds || 0;
@@ -81,23 +78,6 @@ const Cobranza = ({ user }) => {
         return d ? d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
     };
 
-    const exportToExcel = () => {
-        const data = filtrados.map(v => ({
-            Fecha: formatFecha(v.timestamp),
-            Cliente: v.cliente,
-            Lote: v.binNip,
-            Vehiculo: `${v.marca} ${v.modelo}`,
-            Origen: `${v.ciudad}, ${v.estado}`,
-            Precio: (parseFloat(v.price) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sobrePeso) || 0) + (parseFloat(v.gastosExtra) || 0),
-            Cobrado: (parseFloat(v.cajaRecibo) || 0) - (parseFloat(v.cajaCambio) || 0) + (parseFloat(v.cajaCC) || 0),
-            Pendiente: parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0,
-        }));
-        const worksheet = XLSX.utils.json_to_sheet(data);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Cobranza");
-        XLSX.writeFile(workbook, "cobranza.xlsx");
-    };
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -111,15 +91,9 @@ const Cobranza = ({ user }) => {
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
-                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Cobranza</h2>
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Fletes Fiados</h2>
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{vehiculos.length} vehículos con saldo pendiente</p>
                 </div>
-                <button
-                    onClick={exportToExcel}
-                    className="btn btn-sm bg-green-500 hover:bg-green-600 text-white border-none font-bold rounded-xl"
-                >
-                    Exportar a Excel
-                </button>
             </div>
 
             {/* Cards resumen */}
@@ -150,7 +124,7 @@ const Cobranza = ({ user }) => {
                 />
             </div>
 
-            {/* Tabla */}
+            {/* Lista */}
             <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="table table-sm w-full">
@@ -165,15 +139,14 @@ const Cobranza = ({ user }) => {
                                 <th className="py-3 text-right">Precio</th>
                                 <th className="py-3 text-right">Cobrado</th>
                                 <th className="py-3 text-right">Pendiente</th>
-                                <th className="py-3 text-center">Acción</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm">
                             {filtrados.length === 0 ? (
                                 <tr>
-                                    <td colSpan="10" className="text-center py-16 text-gray-300">
+                                    <td colSpan="9" className="text-center py-16 text-gray-300">
                                         <FaTruck className="mx-auto text-4xl mb-2" />
-                                        <p className="font-bold">Sin fletes pendientes</p>
+                                        <p className="font-bold">Sin fletes fiados</p>
                                     </td>
                                 </tr>
                             ) : (
@@ -195,14 +168,6 @@ const Cobranza = ({ user }) => {
                                             <td className="text-right">{fmt(precio)}</td>
                                             <td className="text-right text-green-600">{fmt(cobrado)}</td>
                                             <td className="text-right font-bold text-orange-600">{fmt(saldo)}</td>
-                                            <td className="text-center">
-                                                <button
-                                                    className="btn btn-xs bg-blue-500 hover:bg-blue-600 text-white border-none font-bold rounded-lg"
-                                                    onClick={() => { setSelectedVehiculoId(v.id); setModalOpen(true); }}
-                                                >
-                                                    Pagar
-                                                </button>
-                                            </td>
                                         </tr>
                                     );
                                 })
@@ -214,7 +179,7 @@ const Cobranza = ({ user }) => {
                 {/* Footer total */}
                 {filtrados.length > 0 && (
                     <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                        <p className="text-sm font-black text-gray-500 uppercase">{filtrados.length} pendientes</p>
+                        <p className="text-sm font-black text-gray-500 uppercase">{filtrados.length} fletes fiados</p>
                         <div className="flex gap-8">
                             <div className="text-right">
                                 <p className="text-[10px] text-gray-400 uppercase font-bold">Cobrado</p>
@@ -228,17 +193,8 @@ const Cobranza = ({ user }) => {
                     </div>
                 )}
             </div>
-
-            {/* Modal de pago */}
-            {modalOpen && selectedVehiculoId && (
-                <PagosPendientes
-                    vehiculoId={selectedVehiculoId}
-                    onClose={() => { setSelectedVehiculoId(null); setModalOpen(false); }}
-                    user={user}
-                />
-            )}
         </div>
     );
 };
 
-export default Cobranza;
+export default FletesFlados;
