@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS, VEHICLE_STATUS, VEHICLE_STATUS_CODES } from "../../../constants";
 
 const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
     const [binNip, setBinNip] = useState("");
@@ -12,7 +13,7 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
         try {
             setCargando(true);
             setMensajeError("");
-            const vehiculoSnapshot = await firestore().collection("vehiculos").doc(binNip).get();
+            const vehiculoSnapshot = await firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).get();
 
             if (!vehiculoSnapshot.exists) {
                 setMensajeError("Vehículo no encontrado");
@@ -21,7 +22,7 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
             } else {
                 const vehiculo = vehiculoSnapshot.data();
                 const estatusVehiculo = vehiculo.estatus || "";
-                onVehiculoEncontrado(vehiculo, estatusVehiculo);
+                onVehiculoEncontrado(vehiculo, estatusVehiculo, binNip);
                 setEstatus(estatusVehiculo); // Actualizar estatus en el estado local
             }
         } catch (error) {
@@ -79,22 +80,17 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
             {/* Mostrar estatus del vehículo si existe */}
             {estatus && estatus !== "PA" && (
                 <ul className="steps steps-gray-500 mt-4 w-full max-w-3xl mx-auto mt-2">
-                    {["PR", "IN", "TR", "EB", "DS", "EN"].map((step, index) => (
+                    {VEHICLE_STATUS_CODES.map((step, index) => (
                         <li
                             key={index}
                             className={`step ${
                                 estatus === step ||
-                                index < ["PR", "IN", "TR", "EB", "DS", "EN"].indexOf(estatus)
+                                index < VEHICLE_STATUS_CODES.indexOf(estatus)
                                     ? "step-info text-black-500 text-xs"
                                     : "text-xs"
                             }`}
                         >
-                            {step === "PR" && "Registrado"}
-                            {step === "IN" && "Cargando"}
-                            {step === "TR" && "En Viaje"}
-                            {step === "EB" && "En Brownsville"}
-                            {step === "DS" && "Descargado"}
-                            {step === "EN" && "Entregado"}
+                            {VEHICLE_STATUS[step]?.label}
                         </li>
                     ))}
                 </ul>

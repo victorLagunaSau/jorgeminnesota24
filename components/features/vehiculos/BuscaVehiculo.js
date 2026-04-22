@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {firestore} from "../../../firebase/firebaseIni";
+import StatusSteps from "../../ui/StatusSteps";
 
 const SearchInput = () => {
     const [binNip, setBinNip] = useState("");
@@ -13,15 +14,13 @@ const SearchInput = () => {
 
     const buscarVehiculo = async () => {
         try {
-            setCargando(true); await new Promise(resolve => setTimeout(resolve, 2000));
+            setCargando(true);
             const vehiculoSnapshot = await firestore().collection("vehiculos").doc(binNip).get();
             if (!vehiculoSnapshot.exists) {
                 setEstatus("");
                 setMensajeError("Vehículo no encontrado");
             } else {
-
                 const vehiculo = vehiculoSnapshot.data();
-                                console.log(vehiculo)
                 setEstatus(vehiculo.estatus);
                 setMarca(vehiculo.marca);
                 setModelo(vehiculo.modelo);
@@ -82,74 +81,11 @@ const SearchInput = () => {
                 {mensajeError && <div className="text-red-500">{mensajeError}</div>}
 
                 {estatus && (
-                    <ul className="steps steps-gray-500 mt-4">
-                        {["PR", "IN", "TR", "EB", "DS", "EN"].map((step, index) => (
-                            <li key={index}
-                                className={`step ${estatus === step || index < ["PR", "IN", "TR", "EB", "DS", "EN"].indexOf(estatus) ? "step-info text-black-500 text-xs" : "text-xs"}`}>
-                                {step === "PR" && "Registrado"}
-                                {step === "IN" && "Cargando"}
-                                {step === "TR" && "En Viaje"}
-                                {step === "EB" && "En Brownsville"}
-                                {step === "DS" && "Descargado"}
-                                {step === "EN" && "Entregado"}
-                            </li>
-                        ))}
-                    </ul>
+                    <StatusSteps estatus={estatus} />
                 )}
                 {estatus && (
                     <div className="w-full max-w-3xl mx-auto mt-2">
-
                         <div className="bg-gray-100 shadow-md p-6 rounded-md">
-                            {estatus === "PR" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        Registrado
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo está asignado y en espera de ser
-                                        recogido.</p>
-                                </div>
-                            )}
-                            {estatus === "IN" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        Cargando
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo está siendo cargado en nuestra unidad de
-                                        transporte.</p>
-                                </div>
-                            )}
-                            {estatus === "TR" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        En Viaje
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo está en camino a Brownsville.</p>
-                                </div>
-                            )}
-                            {estatus === "EB" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        En Brownsville
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo ha llegado a la ciudad de Brownsville.</p>
-                                </div>
-                            )}
-                            {estatus === "DS" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        Descargado
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo está esperando que lo recojas.</p>
-                                </div>
-                            )}
-                            {estatus === "EN" && (
-                                <div>
-                                    <p className="text-2xl lg:text-3xl xl:text-3xl font-medium text-blue-700 leading-normal">
-                                        Entregado
-                                    </p>
-                                    <p className="text-black-500">Tu vehículo fue entregado</p>
-                                </div>
-                            )}
                             <p>Modelo: <strong>{modelo}</strong></p>
                             <p>Marca: <strong>{marca}</strong></p>
                             <p>Viaja desde</p>

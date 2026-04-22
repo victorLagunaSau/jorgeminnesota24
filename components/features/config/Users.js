@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS, USER_TYPES } from "../../../constants";
 import { useAuthContext } from "../../../context/auth";
+import Alert from "../../ui/Alert";
+import LoadingSpinner from "../../ui/LoadingSpinner";
+import SearchBar from "../../ui/SearchBar";
 import {
-    FaUserShield, FaUserCog, FaCrown, FaSearch, FaCheck, FaTimes,
-    FaCashRegister, FaTruck, FaChartBar, FaUsers, FaCog, FaExclamationTriangle,
-    FaSave, FaLock, FaTrashAlt, FaKey, FaCopy, FaClock, FaTrash
+    FaUserShield, FaUserCog, FaCrown, FaCheck, FaTimes,
+    FaCashRegister, FaTruck, FaChartBar, FaUsers, FaCog,
+    FaLock, FaTrashAlt, FaKey, FaCopy, FaClock, FaTrash
 } from "react-icons/fa";
 
 const Users = () => {
@@ -31,8 +35,8 @@ const Users = () => {
         }
 
         const unsub = firestore()
-            .collection("users")
-            .where("tipo", "==", "admin")
+            .collection(COLLECTIONS.USERS)
+            .where("tipo", "==", USER_TYPES.ADMIN)
             .onSnapshot(snap => {
                 const data = snap.docs.map(doc => ({
                     id: doc.id,
@@ -56,7 +60,7 @@ const Users = () => {
         if (!isAdminMaster) return;
 
         const unsub = firestore()
-            .collection("tokensChofer")
+            .collection(COLLECTIONS.TOKENS_CHOFER)
             .orderBy("fechaCreacion", "desc")
             .onSnapshot(snap => {
                 const ahora = new Date();
@@ -87,7 +91,7 @@ const Users = () => {
             const ahora = new Date();
             const expiracion = new Date(ahora.getTime() + 30 * 60 * 1000); // 30 minutos
 
-            await firestore().collection("tokensChofer").doc(codigo).set({
+            await firestore().collection(COLLECTIONS.TOKENS_CHOFER).doc(codigo).set({
                 codigo,
                 fechaCreacion: ahora,
                 fechaExpiracion: expiracion,
@@ -112,7 +116,7 @@ const Users = () => {
     // Eliminar token
     const eliminarToken = async (tokenId) => {
         try {
-            await firestore().collection("tokensChofer").doc(tokenId).delete();
+            await firestore().collection(COLLECTIONS.TOKENS_CHOFER).doc(tokenId).delete();
             setAlertMessage({ msg: "Token eliminado", tipo: 'success' });
             setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 2000);
         } catch (error) {
@@ -149,7 +153,7 @@ const Users = () => {
 
         setGuardando(userId);
         try {
-            await firestore().collection("users").doc(userId).update({
+            await firestore().collection(COLLECTIONS.USERS).doc(userId).update({
                 [campo]: valor
             });
             setAlertMessage({ msg: "Permiso actualizado correctamente", tipo: 'success' });
@@ -184,11 +188,7 @@ const Users = () => {
     }
 
     if (loading) {
-        return (
-            <div className="flex justify-center items-center min-h-[400px]">
-                <span className="loading loading-spinner loading-lg text-red-600"></span>
-            </div>
-        );
+        return <LoadingSpinner texto="Cargando usuarios..." />;
     }
 
     return (
@@ -290,12 +290,11 @@ const Users = () => {
             </div>
 
             {/* ALERTA */}
-            {alertMessage.msg && (
-                <div className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 font-bold text-white`}>
-                    {alertMessage.tipo === 'success' ? <FaCheck /> : <FaExclamationTriangle />}
-                    <span>{alertMessage.msg}</span>
-                </div>
-            )}
+            <Alert
+                mostrar={!!alertMessage.msg}
+                mensaje={alertMessage.msg}
+                tipo={alertMessage.tipo === 'success' ? 'success' : 'error'}
+            />
 
             {/* LEYENDA DE PERMISOS */}
             <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
@@ -351,16 +350,11 @@ const Users = () => {
 
             {/* BUSCADOR */}
             <div className="bg-white rounded-xl p-4 mb-4 border border-gray-200">
-                <div className="relative">
-                    <FaSearch className="absolute left-4 top-3 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o email..."
-                        className="input input-bordered w-full pl-12 bg-gray-50 font-medium"
-                        value={busqueda}
-                        onChange={(e) => setBusqueda(e.target.value)}
-                    />
-                </div>
+                <SearchBar
+                    value={busqueda}
+                    onChange={setBusqueda}
+                    placeholder="Buscar por nombre o email..."
+                />
             </div>
 
             {/* TABLA DE USUARIOS */}

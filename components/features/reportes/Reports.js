@@ -1,5 +1,6 @@
 import React, {useState} from "react";
 import {firestore} from '../../../firebase/firebaseIni';
+import { COLLECTIONS } from "../../../constants";
 import * as XLSX from 'xlsx'; // Importar la librería para exportar a Excel
 
 const Report = () => {
@@ -18,7 +19,7 @@ const Report = () => {
             const endTimestamp = new Date(endDate).getTime();
 
             const movementsSnapshot = await firestore()
-                .collection("movimientos")
+                .collection(COLLECTIONS.MOVIMIENTOS)
                 .where("timestamp", ">=", new Date(startTimestamp))
                 .where("timestamp", "<=", new Date(endTimestamp))
                 .get();

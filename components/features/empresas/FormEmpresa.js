@@ -4,6 +4,8 @@ import 'react-phone-input-2/lib/style.css';
 import { firestore, storage } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import { FaCloudUploadAlt, FaUserLock, FaExclamationTriangle } from "react-icons/fa";
+import { PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS } from "../../../constants";
+import Alert from "../../ui/Alert";
 
 const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
     const [loading, setLoading] = useState(false);
@@ -19,7 +21,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
         taxClassification: "Individual",
         ciudadEmpresa: "",
         estadoEmpresa: "",
-        paisEmpresa: "United States",
+        paisEmpresa: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
         representante: "",
         telefonoEmpresa: "",
         emailAcceso: "",
@@ -39,7 +41,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
                 taxClassification: "Individual",
                 ciudadEmpresa: "",
                 estadoEmpresa: "",
-                paisEmpresa: "United States",
+                paisEmpresa: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
                 representante: "",
                 telefonoEmpresa: "",
                 emailAcceso: "",
@@ -63,7 +65,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            if (file.size > 5 * 1024 * 1024) {
+            if (file.size > FIELD_LIMITS.MAX_FILE_SIZE) {
                 mostrarAviso("El archivo es muy pesado (máx 5MB)", "error");
                 return;
             }
@@ -101,7 +103,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
                     empresaId = empresaAEditar.id;
 
                     // Obtener credenciales actuales de Firestore
-                    const empresaDoc = await firestore().collection("empresas").doc(empresaAEditar.id).get();
+                    const empresaDoc = await firestore().collection(COLLECTIONS.EMPRESAS).doc(empresaAEditar.id).get();
                     const datosActuales = empresaDoc.data();
                     const emailActual = datosActuales.emailAcceso;
                     const passwordActual = datosActuales.passwordAcceso;
@@ -171,14 +173,14 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
             };
 
             const batch = firestore().batch();
-            const userRef = firestore().collection("users").doc(empresaId);
-            const empresaRef = firestore().collection("empresas").doc(empresaId);
+            const userRef = firestore().collection(COLLECTIONS.USERS).doc(empresaId);
+            const empresaRef = firestore().collection(COLLECTIONS.EMPRESAS).doc(empresaId);
 
             batch.set(userRef, usuarioData, { merge: true });
             batch.set(empresaRef, empresaFinal, { merge: true });
 
             if (!empresaAEditar) {
-                const conRef = firestore().collection("config").doc("consecutivos");
+                const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
                 const docCon = await conRef.get();
                 const nuevoFolio = (docCon.data().empresas || 0) + 1;
                 batch.update(conRef, { empresas: nuevoFolio });
@@ -201,13 +203,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
 
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative font-sans">
-            {alerta.mostrar && (
-                <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
-                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 px-6`}>
-                        <span>{alerta.mensaje}</span>
-                    </div>
-                </div>
-            )}
+            <Alert mostrar={alerta.mostrar} mensaje={alerta.mensaje} tipo={alerta.tipo === 'success' ? 'success' : 'error'} />
 
             {/* SECCIÓN 1: DATOS FISCALES */}
             <div className="flex flex-row flex-nowrap gap-2 items-end w-full mb-3">
@@ -226,7 +222,7 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
                         placeholder="00-0000000"
                         value={datos.taxId}
                         onChange={handleTaxIdChange}
-                        maxLength={10}
+                        maxLength={FIELD_LIMITS.TAX_ID}
                         className="input input-bordered w-full input-sm bg-white text-black font-mono border-red-200 focus:border-red-600"
                     />
                 </div>
@@ -241,12 +237,12 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
                 </div>
                 <div className="w-24 p-1">
                     <label className="block text-[11px] font-bold text-red-600 uppercase italic">Zip Code: *</label>
-                    <input type="text" maxLength={5} value={datos.zipCode} onChange={(e) => setDatos({ ...datos, zipCode: e.target.value.replace(/\D/g, "") })}
+                    <input type="text" maxLength={FIELD_LIMITS.ZIP_CODE} value={datos.zipCode} onChange={(e) => setDatos({ ...datos, zipCode: e.target.value.replace(/\D/g, "") })}
                            className="input input-bordered w-full input-sm bg-white text-black text-center" />
                 </div>
                 <div className="w-56 p-1">
                     <label className="block text-[11px] font-bold text-gray-600 uppercase italic">Phone: *</label>
-                    <PhoneInput onlyCountries={['us', 'mx']} country={'us'} value={datos.telefonoEmpresa}
+                    <PhoneInput onlyCountries={PHONE_CONFIG.COUNTRIES} country={PHONE_CONFIG.DEFAULT_COUNTRY} value={datos.telefonoEmpresa}
                                 onChange={(val) => setDatos({ ...datos, telefonoEmpresa: val })}
                                 inputStyle={{ paddingLeft: '45px', width: '100%', height: '32px' }}
                                 inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white font-bold' }} />

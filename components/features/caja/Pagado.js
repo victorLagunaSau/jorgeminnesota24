@@ -2,8 +2,13 @@ import React, {useState} from 'react';
 import ImprimeSalida from './ImprimeSalida';
 import ImprimeSalidaSinPendientes from './ImprimeSalidaSinPendientes';
 import moment from 'moment';
+import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
+import { registrarAuditLog } from "../../../utils/auditLog";
+import { FaTrash } from "react-icons/fa";
 
-const Pagado = ({vehiculo}) => {
+const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
+    const isAdminMaster = user?.adminMaster === true;
     const vehiculoData = vehiculo[0] || {};
 
     const {
@@ -32,13 +37,12 @@ const Pagado = ({vehiculo}) => {
         saldoFiado = 0,
         cajaRecibo = 0,
         cajaCC = 0,
-        pagoTardioFlete = 0, // Nuevo campo
-        estacionamiento = 0, // Nuevo campo
         registro = {seconds: 0, nanoseconds: 0},
         folioVenta = "pendiente"
     } = vehiculoData;
 
     const [showModal, setShowModal] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
 
     const handleImprimeSalida = () => {
         setShowModal(true);
@@ -46,6 +50,124 @@ const Pagado = ({vehiculo}) => {
 
     const closeModal = () => {
         setShowModal(false);
+    };
+
+    const handleEliminarVehiculo = async () => {
+        if (!binNip) return;
+
+        const confirmar = window.confirm(
+            `¿Eliminar el vehículo ${binNip} y TODOS sus registros?\n\n` +
+            `Se eliminará:\n` +
+            `- Vehículo de /vehiculos/\n` +
+            `- Todos sus movimientos\n` +
+            `- Su referencia en viajes pagados\n` +
+            `- Lotes en tránsito\n\n` +
+            `Se descargará un respaldo JSON antes de borrar.\n` +
+            `Esta acción es IRREVERSIBLE.`
+        );
+        if (!confirmar) return;
+
+        try {
+            setEliminando(true);
+
+            // 1. Buscar movimientos
+            const movSnap = await firestore()
+                .collection(COLLECTIONS.MOVIMIENTOS)
+                .where("lote", "==", binNip)
+                .get();
+
+            // 2. Buscar viajes pagados que contengan este lote
+            const viajesSnap = await firestore()
+                .collection(COLLECTIONS.VIAJES_PAGADOS)
+                .get();
+            const viajesRelacionados = [];
+            viajesSnap.docs.forEach(doc => {
+                const data = doc.data();
+                if (Array.isArray(data.vehiculos) && data.vehiculos.some(v => v.lote === binNip)) {
+                    viajesRelacionados.push({ docId: doc.id, totalVehiculos: data.vehiculos.length, data });
+                }
+            });
+
+            // 3. Buscar en lotesEnTransito
+            const loteDoc = await firestore()
+                .collection(COLLECTIONS.LOTES_EN_TRANSITO)
+                .doc(binNip)
+                .get();
+
+            // 4. Respaldo JSON
+            const respaldo = {
+                binNip,
+                vehiculo: vehiculoData,
+                movimientos: movSnap.docs.map(d => ({ docId: d.id, ...d.data() })),
+                viajesRelacionados,
+                loteEnTransito: loteDoc.exists ? loteDoc.data() : null
+            };
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const jsonStr = JSON.stringify(respaldo, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `respaldo_${binNip}_${timestamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // 5. Audit log
+            await registrarAuditLog("eliminacion", user, {
+                binNip,
+                cliente: vehiculoData.cliente,
+                marca: vehiculoData.marca,
+                modelo: vehiculoData.modelo,
+            });
+
+            // 6. Batch delete
+            const batch = firestore().batch();
+
+            // Movimientos
+            movSnap.docs.forEach(doc => {
+                batch.delete(firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(doc.id));
+            });
+
+            // Vehículo
+            batch.delete(firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip));
+
+            // Lote en tránsito
+            if (loteDoc.exists) {
+                batch.delete(firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(binNip));
+            }
+
+            // Viajes pagados
+            for (const viaje of viajesRelacionados) {
+                if (viaje.totalVehiculos <= 1) {
+                    batch.delete(firestore().collection(COLLECTIONS.VIAJES_PAGADOS).doc(viaje.docId));
+                } else {
+                    const vehiculosActualizados = viaje.data.vehiculos.filter(v => v.lote !== binNip);
+                    batch.update(firestore().collection(COLLECTIONS.VIAJES_PAGADOS).doc(viaje.docId), {
+                        vehiculos: vehiculosActualizados
+                    });
+                }
+            }
+
+            await batch.commit();
+
+            alert(
+                `Vehículo ${binNip} eliminado exitosamente.\n\n` +
+                `- ${movSnap.size} movimiento(s)\n` +
+                `- ${viajesRelacionados.length} viaje(s) limpiados\n` +
+                `- ${loteDoc.exists ? 1 : 0} lote(s) en tránsito\n\n` +
+                `Respaldo descargado.`
+            );
+
+            if (onVehiculoEliminado) onVehiculoEliminado();
+
+        } catch (error) {
+            console.error("Error al eliminar vehículo:", error);
+            alert("Error al eliminar el vehículo. Revisa la consola.");
+        } finally {
+            setEliminando(false);
+        }
     };
 
     return (
@@ -87,8 +209,6 @@ const Pagado = ({vehiculo}) => {
                     <p>Pago Extras por Storage: <strong>{storage}</strong></p>
                     <p>Pago Sobre Peso: <strong>{sobrePeso}</strong></p>
                     <p>Pago Extras: <strong>{gastosExtra}</strong></p>
-                    {pagoTardioFlete && <p>Pago Tardío Flete: <strong>{pagoTardioFlete}</strong></p>}
-                    {estacionamiento && <p>Estacionamiento: <strong>{estacionamiento}</strong></p>}
                     <p className="mt-4 text-xl">Total: <strong>$ {totalPago} DLL</strong></p>
                 </div>
 
@@ -118,9 +238,21 @@ const Pagado = ({vehiculo}) => {
                     </div>
                 )}
 
-                <button className="btn btn-outline btn-error m-4" onClick={handleImprimeSalida}>
-                    Imprimir
-                </button>
+                <div className="flex items-center gap-2 mt-4">
+                    <button className="btn btn-outline btn-error" onClick={handleImprimeSalida}>
+                        Imprimir
+                    </button>
+                    {isAdminMaster && binNip && (
+                        <button
+                            className="btn btn-error text-white gap-2"
+                            onClick={handleEliminarVehiculo}
+                            disabled={eliminando}
+                        >
+                            <FaTrash />
+                            {eliminando ? "Eliminando..." : "Eliminar Vehículo"}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {showModal && (

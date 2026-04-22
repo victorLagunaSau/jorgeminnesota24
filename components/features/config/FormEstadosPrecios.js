@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
+import Alert from "../../ui/Alert";
 import { FaMapMarkerAlt, FaSave } from "react-icons/fa";
 
 const FormEstadosPrecios = ({ user, onSuccess }) => {
@@ -31,7 +33,7 @@ const FormEstadosPrecios = ({ user, onSuccess }) => {
                 }
             };
 
-            await firestore().collection("province").add(nuevoEstado);
+            await firestore().collection(COLLECTIONS.PROVINCE).add(nuevoEstado);
 
             mostrarAviso(`${nombreEstado.toUpperCase()} registrado. Configura los precios en la tabla.`, "success");
             setNombreEstado("");
@@ -46,13 +48,11 @@ const FormEstadosPrecios = ({ user, onSuccess }) => {
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative font-sans">
             {/* ALERTAS DINÁMICAS */}
-            {alerta.mostrar && (
-                <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
-                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 px-6 uppercase text-[11px]`}>
-                        <span>{alerta.mensaje}</span>
-                    </div>
-                </div>
-            )}
+            <Alert
+                mostrar={alerta.mostrar}
+                mensaje={alerta.mensaje}
+                tipo={alerta.tipo}
+            />
 
             <div className="flex flex-row flex-nowrap gap-4 items-end w-full">
                 {/* CAMPO ÚNICO DE REGISTRO */}

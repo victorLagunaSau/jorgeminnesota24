@@ -2,9 +2,13 @@ import React, { useState } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import { useAdminData } from "../../../context/adminData";
 import {
-    FaSearch, FaChevronLeft, FaChevronRight, FaCopy,
+    FaCopy,
     FaCheck, FaIdCard, FaEdit, FaTimes, FaSave, FaFilter, FaExclamationTriangle, FaTruck, FaUserTie
 } from "react-icons/fa";
+import { COLLECTIONS } from "../../../constants";
+import SearchBar from "../../ui/SearchBar";
+import Pagination from "../../ui/Pagination";
+import EmptyState from "../../ui/EmptyState";
 
 const TablaChoferes = ({ onEditarChofer }) => {
     // Usar datos del contexto compartido (ya no hace queries propias)
@@ -31,7 +35,7 @@ const TablaChoferes = ({ onEditarChofer }) => {
         }
         setLoadingEdit(true);
         try {
-            await firestore().collection("choferes").doc(choferId).update({
+            await firestore().collection(COLLECTIONS.CHOFERES).doc(choferId).update({
                 // Empresa 1: Fiscal (Dueño)
                 empresaId: nuevaEmpresaFiscal.id,
                 empresaNombre: nuevaEmpresaFiscal.nombre,
@@ -64,12 +68,11 @@ const TablaChoferes = ({ onEditarChofer }) => {
 
             {/* Filtros */}
             <div className="p-4 bg-gray-50 border-b flex flex-wrap items-center gap-4">
-                <div className="relative flex-1 min-w-[300px]">
-                    <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                    <input type="text" placeholder="Buscar por nombre o apodo..."
-                        className="input input-bordered input-sm w-full pl-10 bg-white text-black font-bold uppercase text-[11px]"
-                        onChange={(e) => {setBusqueda(e.target.value); setPagina(1);}} />
-                </div>
+                <SearchBar
+                    value={busqueda}
+                    onChange={(val) => {setBusqueda(val); setPagina(1);}}
+                    placeholder="Buscar por nombre o apodo..."
+                />
 
                 <div className="flex items-center gap-2">
                     <FaFilter className="text-gray-400" />
@@ -85,11 +88,15 @@ const TablaChoferes = ({ onEditarChofer }) => {
                     </select>
                 </div>
 
-                <div className="flex items-center gap-1 ml-auto">
-                    <button className="btn btn-xs btn-outline" disabled={pagina === 1} onClick={() => setPagina(p => p - 1)}><FaChevronLeft /></button>
-                    <span className="text-[10px] font-black uppercase text-gray-500">Pág {pagina} / {totalPags || 1}</span>
-                    <button className="btn btn-xs btn-outline" disabled={pagina === totalPags || totalPags === 0} onClick={() => setPagina(p => p + 1)}><FaChevronRight /></button>
-                </div>
+                <Pagination
+                    pagina={pagina}
+                    totalPags={totalPags}
+                    onAnterior={() => setPagina(p => p - 1)}
+                    onSiguiente={() => setPagina(p => p + 1)}
+                    esPrimera={pagina === 1}
+                    esUltima={pagina === totalPags || totalPags === 0}
+                    totalItems={filtrados.length}
+                />
             </div>
 
             <table className="table w-full border-collapse">
@@ -236,12 +243,10 @@ const TablaChoferes = ({ onEditarChofer }) => {
                     })}
                 </tbody>
             </table>
+            {paginados.length === 0 && <EmptyState mensaje="No se encontraron choferes" />}
 
             <div className="p-3 bg-gray-50 flex justify-between items-center border-t border-gray-100">
                 <span className="text-[10px] text-gray-400 font-black uppercase italic">Base de Datos: {filtrados.length} Registros</span>
-                <span className="text-[9px] text-blue-600 font-black uppercase tracking-widest italic animate-pulse">
-                    Mantenimiento Carrier Pro v2.6
-                </span>
             </div>
         </div>
     );

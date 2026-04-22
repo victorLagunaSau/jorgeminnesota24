@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
+import Alert from "../../ui/Alert";
 import ReciboPP from "./ReciboPP";
 import ReactToPrint from "react-to-print";
 
@@ -32,7 +34,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
     useEffect(() => {
         const fetchVehiculo = async () => {
             try {
-                const doc = await firestore().collection("vehiculos").doc(vehiculoId).get();
+                const doc = await firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculoId).get();
                 if (doc.exists) {
                     setVehiculo(doc.data());
                 } else {
@@ -114,9 +116,9 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                 updateData.pagoTotalPendiente = nuevoSaldo;
             }
 
-            await firestore().collection("vehiculos").doc(vehiculoId).update(updateData);
+            await firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculoId).update(updateData);
 
-            await firestore().collection("movimientos").add({
+            await firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
                 tipo: "Abono",
                 estatus: "AB",
                 binNip: vehiculo.binNip,
@@ -165,15 +167,12 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
         <div className="modal modal-open">
             <div className="modal-box">
                 <h2 className="text-2xl font-bold mb-4">Registrar Abono</h2>
-                {alertMessage && (
-                    <div
-                        className={`alert ${
-                            alertMessage.type === "success" ? "alert-success" : "alert-error"
-                        } shadow-lg mb-4`}
-                    >
-                        {alertMessage.message}
-                    </div>
-                )}
+                <Alert
+                    mostrar={!!alertMessage}
+                    mensaje={alertMessage?.message}
+                    tipo={alertMessage?.type}
+                    onClose={() => setAlertMessage(null)}
+                />
                 {vehiculo ? (
                     <>
                         <div>

@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import * as XLSX from "xlsx";
 import PagosPendientes from "./PagosPendientes";
 
@@ -25,7 +26,7 @@ const Cobranza = ({user}) => {
         };
 
         const unsubNuevo = firestore()
-            .collection("vehiculos")
+            .collection(COLLECTIONS.VEHICULOS)
             .where("estadoPago", "==", "fiado")
             .onSnapshot((snap) => {
                 datosNuevo = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -33,7 +34,7 @@ const Cobranza = ({user}) => {
             });
 
         const unsubLegacy = firestore()
-            .collection("vehiculos")
+            .collection(COLLECTIONS.VEHICULOS)
             .where("pagosPendientes", "==", true)
             .onSnapshot((snap) => {
                 datosLegacy = snap.docs

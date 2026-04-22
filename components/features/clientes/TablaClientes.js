@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { useAdminData } from "../../../context/adminData";
-import { FaCopy, FaCheck, FaSearch, FaChevronLeft, FaChevronRight, FaPencilAlt } from "react-icons/fa";
+import { FaCopy, FaCheck, FaPencilAlt } from "react-icons/fa";
+import SearchBar from "../../ui/SearchBar";
+import Pagination from "../../ui/Pagination";
+import EmptyState from "../../ui/EmptyState";
+import LoadingSpinner from "../../ui/LoadingSpinner";
 
 const TablaClientes = ({ onEditar }) => {
     // Usar datos del contexto compartido
@@ -32,25 +36,26 @@ const TablaClientes = ({ onEditar }) => {
         setTimeout(() => setCopiadoId(null), 2000);
     };
 
-    if (loading) return <div className="text-center p-10"><span className="loading loading-spinner text-info"></span></div>;
+    if (loading) return <LoadingSpinner texto="Cargando clientes..." />;
 
     return (
         <div className="w-full bg-white rounded-lg shadow-md border border-gray-200 mt-6 overflow-hidden">
             {/* Buscador igual al anterior */}
             <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-100 font-sans">
-                <div className="relative w-full md:w-96">
-                    <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                    <input
-                        type="text" placeholder="Buscar cliente..."
-                        className="input input-bordered input-md w-full pl-10 bg-white text-black text-[13px]"
-                        value={busqueda} onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
-                    />
-                </div>
-                <div className="flex items-center gap-2">
-                    <button className="btn btn-xs btn-outline" disabled={pagina === 1} onClick={() => setPagina(p => p - 1)}><FaChevronLeft /></button>
-                    <span className="text-[11px] font-bold text-black uppercase">Pág {pagina} / {totalPags || 1}</span>
-                    <button className="btn btn-xs btn-outline" disabled={pagina === totalPags} onClick={() => setPagina(p => p + 1)}><FaChevronRight /></button>
-                </div>
+                <SearchBar
+                    value={busqueda}
+                    onChange={(val) => {setBusqueda(val); setPagina(1);}}
+                    placeholder="Buscar cliente..."
+                />
+                <Pagination
+                    pagina={pagina}
+                    totalPags={totalPags}
+                    onAnterior={() => setPagina(p => p - 1)}
+                    onSiguiente={() => setPagina(p => p + 1)}
+                    esPrimera={pagina === 1}
+                    esUltima={pagina === totalPags || totalPags === 0}
+                    totalItems={filtrados.length}
+                />
             </div>
 
             <table className="table w-full">
@@ -92,6 +97,7 @@ const TablaClientes = ({ onEditar }) => {
                     ))}
                 </tbody>
             </table>
+            {paginados.length === 0 && <EmptyState mensaje="No se encontraron clientes" />}
         </div>
     );
 };

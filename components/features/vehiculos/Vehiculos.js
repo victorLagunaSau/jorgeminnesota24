@@ -1,9 +1,15 @@
 import React, {useEffect, useState} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
+import { registrarAuditLog } from "../../../utils/auditLog";
 import * as XLSX from "xlsx";
 import FormDatosVehiculo from "./FormDatosVehiculo";
 import FormEditarVehiculo from "./FormEditarVehiculo";
 import EntregadoVehiculo from './EntregadoVehiculo';
+import { VEHICLE_STATUS, VEHICLE_STATUS_LIST, COLLECTIONS, PAGINATION } from "../../../constants";
+import StatusBadge from "../../ui/StatusBadge";
+import Pagination from "../../ui/Pagination";
+import SearchBar from "../../ui/SearchBar";
+import Alert from "../../ui/Alert";
 
 const Vehiculos = ({user}) => {
     const [vehiculosNoAsignados, setVehiculosNoAsignados] = useState([]);
@@ -33,6 +39,8 @@ const Vehiculos = ({user}) => {
     const [nuevoLote, setNuevoLote] = useState("");
     const [loteError, setLoteError] = useState("");
     const [cambiandoLote, setCambiandoLote] = useState(false);
+    const [alertMsg, setAlertMsg] = useState({ mostrar: false, mensaje: "", tipo: "" });
+    const [isDeleting, setIsDeleting] = useState(false);
 
 
     const handleSortByDate = () => {
@@ -53,7 +61,7 @@ const Vehiculos = ({user}) => {
         const obtenerVehiculos = () => {
             try {
                 const unsubscribe = firestore()
-                    .collection("vehiculos")
+                    .collection(COLLECTIONS.VEHICULOS)
                     .where("estatus", "!=", "EN")
                     .onSnapshot((vehiculosSnapshot) => {
                         const vehiculosNoAsignados = vehiculosSnapshot.docs.map((doc) => ({
@@ -164,13 +172,13 @@ const Vehiculos = ({user}) => {
         try {
             const db = firestore();
 
-            const existeNuevo = await db.collection("vehiculos").doc(loteNuevo).get();
+            const existeNuevo = await db.collection(COLLECTIONS.VEHICULOS).doc(loteNuevo).get();
             if (existeNuevo.exists) {
                 setLoteError(`El lote ${loteNuevo} ya existe en vehículos`);
                 setCambiandoLote(false);
                 return;
             }
-            const existeTransito = await db.collection("lotesEnTransito").doc(loteNuevo).get();
+            const existeTransito = await db.collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteNuevo).get();
             if (existeTransito.exists) {
                 setLoteError(`El lote ${loteNuevo} está en tránsito`);
                 setCambiandoLote(false);
@@ -182,19 +190,19 @@ const Vehiculos = ({user}) => {
 
             const batch = db.batch();
 
-            batch.set(db.collection("vehiculos").doc(loteNuevo), vehiculoData);
-            batch.delete(db.collection("vehiculos").doc(loteAnterior));
+            batch.set(db.collection(COLLECTIONS.VEHICULOS).doc(loteNuevo), vehiculoData);
+            batch.delete(db.collection(COLLECTIONS.VEHICULOS).doc(loteAnterior));
 
-            const movSnap = await db.collection("movimientos").where("binNip", "==", loteAnterior).get();
+            const movSnap = await db.collection(COLLECTIONS.MOVIMIENTOS).where("binNip", "==", loteAnterior).get();
             movSnap.forEach(doc => batch.update(doc.ref, { binNip: loteNuevo }));
 
-            const transitoDoc = await db.collection("lotesEnTransito").doc(loteAnterior).get();
+            const transitoDoc = await db.collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteAnterior).get();
             if (transitoDoc.exists) {
-                batch.set(db.collection("lotesEnTransito").doc(loteNuevo), transitoDoc.data());
-                batch.delete(db.collection("lotesEnTransito").doc(loteAnterior));
+                batch.set(db.collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteNuevo), transitoDoc.data());
+                batch.delete(db.collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteAnterior));
             }
 
-            for (const col of ["viajesPendientes", "viajesPagados"]) {
+            for (const col of [COLLECTIONS.VIAJES_PENDIENTES, COLLECTIONS.VIAJES_PAGADOS]) {
                 const snap = await db.collection(col).get();
                 snap.forEach(doc => {
                     const data = doc.data();
@@ -207,7 +215,14 @@ const Vehiculos = ({user}) => {
 
             await batch.commit();
 
-            alert(`Lote cambiado de ${loteAnterior} a ${loteNuevo} correctamente.`);
+            await registrarAuditLog("cambioLote", user, {
+                binNip: loteAnterior,
+                cliente: loteTargetVehiculo.cliente,
+                marca: loteTargetVehiculo.marca,
+                modelo: loteTargetVehiculo.modelo,
+            }, { lote: { antes: loteAnterior, despues: loteNuevo } });
+
+            setAlertMsg({ mostrar: true, mensaje: `Lote cambiado de ${loteAnterior} a ${loteNuevo} correctamente`, tipo: "success" }); setTimeout(() => setAlertMsg({mostrar:false,mensaje:"",tipo:""}), 3500);
             setIsLoteModalOpen(false);
             setLoteTargetVehiculo(null);
             setNuevoLote("");
@@ -221,17 +236,25 @@ const Vehiculos = ({user}) => {
 
     const handleConfirmDelete = async () => {
         if (pinInput !== CORRECT_PIN) {
-            alert("PIN incorrecto");
+            setAlertMsg({ mostrar: true, mensaje: "PIN incorrecto", tipo: "error" }); setTimeout(() => setAlertMsg({mostrar:false,mensaje:"",tipo:""}), 3500);
             return;
         }
 
+        setIsDeleting(true);
         try {
             const firestoreInstance = firestore();
 
-            await firestoreInstance.collection("vehiculos").doc(deleteTargetVehiculo.id).delete();
+            await registrarAuditLog("eliminacion", user, {
+                binNip: deleteTargetVehiculo.id,
+                cliente: deleteTargetVehiculo.cliente,
+                marca: deleteTargetVehiculo.marca,
+                modelo: deleteTargetVehiculo.modelo,
+            });
+
+            await firestoreInstance.collection(COLLECTIONS.VEHICULOS).doc(deleteTargetVehiculo.id).delete();
 
             const movimientosSnapshot = await firestoreInstance
-                .collection("movimientos")
+                .collection(COLLECTIONS.MOVIMIENTOS)
                 .where("binNip", "==", deleteTargetVehiculo.id)
                 .get();
 
@@ -242,7 +265,7 @@ const Vehiculos = ({user}) => {
 
             // Liberar lote en tránsito si aún existe, para permitir reutilización
             const transitoDoc = await firestoreInstance
-                .collection("lotesEnTransito")
+                .collection(COLLECTIONS.LOTES_EN_TRANSITO)
                 .doc(deleteTargetVehiculo.id)
                 .get();
             if (transitoDoc.exists) {
@@ -251,11 +274,12 @@ const Vehiculos = ({user}) => {
 
             await batch.commit();
 
-            alert("Vehículo y movimientos eliminados con éxito.");
+            setAlertMsg({ mostrar: true, mensaje: "Vehículo y movimientos eliminados con éxito", tipo: "success" }); setTimeout(() => setAlertMsg({mostrar:false,mensaje:"",tipo:""}), 3500);
         } catch (error) {
             console.error("Error al eliminar:", error);
-            alert("Error al eliminar el vehículo.");
+            setAlertMsg({ mostrar: true, mensaje: "Error al eliminar el vehículo", tipo: "error" }); setTimeout(() => setAlertMsg({mostrar:false,mensaje:"",tipo:""}), 3500);
         } finally {
+            setIsDeleting(false);
             setIsDeleteModalOpen(false);
             setDeleteTargetVehiculo(null);
         }
@@ -263,6 +287,7 @@ const Vehiculos = ({user}) => {
 
     return (
         <div className="max-w-screen-xl mt-5 xl:px-16 mx-auto" id="clientes">
+            <Alert mostrar={alertMsg.mostrar} mensaje={alertMsg.mensaje} tipo={alertMsg.tipo} />
             {/* HEADER MODERNIZADO */}
             <div className="mb-6">
                 <h2 className="text-3xl font-black text-black uppercase italic tracking-tighter">
@@ -311,7 +336,7 @@ const Vehiculos = ({user}) => {
                 <dialog open={isEditModalOpen} className="modal">
                     <div className="modal-box w-11/12 max-w-5xl bg-white">
                         {selectedVehiculo && (
-                            <FormEditarVehiculo vehiculo={selectedVehiculo} onClose={() => {
+                            <FormEditarVehiculo vehiculo={selectedVehiculo} user={user} onClose={() => {
                                 setSelectedVehiculo(null);
                                 setIsEditModalOpen(false);
                             }}/>
@@ -353,12 +378,9 @@ const Vehiculos = ({user}) => {
                                     onChange={(e) => setStatusFilter(e.target.value)}
                                 >
                                     <option value="">Todos</option>
-                                    <option value="PR">Registrado</option>
-                                    <option value="IN">Cargando</option>
-                                    <option value="TR">En Viaje</option>
-                                    <option value="EB">En Brownsville</option>
-                                    <option value="DS">Descargado</option>
-                                    <option value="EN">Entregado</option>
+                                    {VEHICLE_STATUS_LIST.map(s => (
+                                        <option key={s.code} value={s.code}>{s.label}</option>
+                                    ))}
                                 </select>
                                 <button
                                     className="btn btn-xs btn-outline border-black text-black font-bold"
@@ -393,14 +415,7 @@ const Vehiculos = ({user}) => {
                                             new Date(vehiculo.registro.timestamp.seconds * 1000 + vehiculo.registro.timestamp.nanoseconds / 1000000).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
                                             : '-'}
                                     </div>
-                                    <div className="text-[10px] font-bold text-black mt-1">
-                                        {vehiculo.estatus === "PR" && "Registrado"}
-                                        {vehiculo.estatus === "IN" && "Cargando"}
-                                        {vehiculo.estatus === "TR" && "En Viaje"}
-                                        {vehiculo.estatus === "EB" && "En Brownsville"}
-                                        {vehiculo.estatus === "DS" && "Descargado"}
-                                        {vehiculo.estatus === "EN" && "Entregado"}
-                                    </div>
+                                    <StatusBadge status={vehiculo.estatus} />
                                 </td>
 
                                 <td className="px-4 py-3">
@@ -484,26 +499,16 @@ const Vehiculos = ({user}) => {
                 </table>
             </div>
 
-            {/* PAGINACIÓN MODERNIZADA */}
-            <div className="flex justify-between items-center my-6 pt-4">
-                <button
-                    className="btn btn-sm btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
-                >
-                    ← Anterior
-                </button>
-                <span className="text-sm font-bold text-black">
-                    Página {currentPage} de {Math.ceil(filteredVehiculos.length / itemsPerPage) || 1}
-                </span>
-                <button
-                    className="btn btn-sm btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage * itemsPerPage >= filteredVehiculos.length}
-                >
-                    Siguiente →
-                </button>
-            </div>
+            {/* PAGINACIÓN */}
+            <Pagination
+                pagina={currentPage}
+                totalPags={Math.ceil(filteredVehiculos.length / itemsPerPage) || 1}
+                onAnterior={() => handlePageChange(currentPage - 1)}
+                onSiguiente={() => handlePageChange(currentPage + 1)}
+                esPrimera={currentPage === 1}
+                esUltima={currentPage * itemsPerPage >= filteredVehiculos.length}
+                totalItems={sortedVehiculos.length}
+            />
 
             {/* MODAL CAMBIAR LOTE */}
             <dialog className="modal" open={isLoteModalOpen}>
@@ -576,8 +581,8 @@ const Vehiculos = ({user}) => {
                         >
                             Cancelar
                         </button>
-                        <button className="btn bg-black text-white hover:bg-white hover:text-black border border-black font-black" onClick={handleConfirmDelete}>
-                            Confirmar Borrado
+                        <button className="btn bg-black text-white hover:bg-white hover:text-black border border-black font-black" onClick={handleConfirmDelete} disabled={isDeleting}>
+                            {isDeleting ? "Eliminando..." : "Confirmar Borrado"}
                         </button>
                     </div>
                 </div>

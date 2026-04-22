@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import Recibo from './Recibo';
 
 const OperacionEntrada = ({ user }) => {
@@ -38,7 +39,7 @@ const OperacionEntrada = ({ user }) => {
             const cajaRecibo = esEntrada ? -parseFloat(monto) : parseFloat(monto);
             const entradaCaja = esEntrada ? parseFloat(monto) : 0;
 
-            await firestore().collection("movimientos").add({
+            await firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
                 tipo: "Entrada",
                 estatus: "EE",
                 usuario: user.nombre,

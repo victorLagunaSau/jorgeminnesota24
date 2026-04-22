@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
-import { FaPlus, FaTrash, FaSave, FaExclamationCircle, FaUserClock, FaDollarSign } from "react-icons/fa";
+import { COLLECTIONS } from "../../../constants";
+import Alert from "../../ui/Alert";
+import { FaPlus, FaTrash, FaSave, FaUserClock, FaDollarSign } from "react-icons/fa";
 
 const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
     const [updatedRegions, setUpdatedRegions] = useState([]);
@@ -75,7 +77,7 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
 
         try {
             // Se guarda el arreglo con el campo 'profit' incluido en cada región
-            await firestore().collection("province").doc(currentRegions.id).update({
+            await firestore().collection(COLLECTIONS.PROVINCE).doc(currentRegions.id).update({
                 regions: updatedRegions,
                 ultimaEdicion: {
                     usuario: user?.nombre || "Admin",
@@ -96,12 +98,11 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
 
     return (
         <div className="bg-white font-sans p-2">
-            {alertMessage.msg && (
-                <div className={`alert ${alertMessage.tipo === 'success' ? 'alert-success' : 'alert-error'} mb-4 shadow-md text-white font-bold text-[12px] uppercase`}>
-                    <FaExclamationCircle />
-                    <span>{alertMessage.msg}</span>
-                </div>
-            )}
+            <Alert
+                mostrar={!!alertMessage.msg}
+                mensaje={alertMessage.msg}
+                tipo={alertMessage.tipo}
+            />
 
             <div className="flex justify-between items-center mb-4 border-b-2 border-gray-100 pb-3">
                 <div className="flex flex-col">

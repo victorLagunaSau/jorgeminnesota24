@@ -1,5 +1,6 @@
 import React, {useState, useRef} from "react";
 import {firestore} from '../../../firebase/firebaseIni';
+import { COLLECTIONS, VEHICLE_STATUS } from "../../../constants";
 import ReactToPrint from "react-to-print";
 
 // Componente que renderiza el reporte imprimible
@@ -153,7 +154,7 @@ const ReportePendientesPago = () => {
 
         try {
             const snapshot = await firestore()
-                .collection("vehiculos")
+                .collection(COLLECTIONS.VEHICULOS)
                 .where("registro.timestamp", ">=", new Date(start))
                 .where("registro.timestamp", "<=", new Date(end))
                 .get();
@@ -161,7 +162,7 @@ const ReportePendientesPago = () => {
             const rawResults = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
 
 
-            const results = rawResults.filter(v => v.estatus === "PR");
+            const results = rawResults.filter(v => v.estatus === VEHICLE_STATUS.PR.code);
 
 
             setData(results);

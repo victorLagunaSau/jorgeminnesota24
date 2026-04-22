@@ -3,8 +3,11 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
+import { VEHICLE_TYPES, VEHICLE_WAREHOUSES, TITLE_OPTIONS, PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS, TIMEOUTS, VEHICLE_STATUS_LIST } from "../../../constants";
+import { registrarAuditLog } from "../../../utils/auditLog";
+import Alert from "../../ui/Alert";
 
-const FormEditVehiculo = ({vehiculo, onClose}) => {
+const FormEditVehiculo = ({vehiculo, onClose, user}) => {
     const [estado, setEstado] = useState(vehiculo.estado);
     const [ciudad, setCiudad] = useState(vehiculo.ciudad);
     const [price, setPrice] = useState(0);
@@ -27,13 +30,14 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
     const [titulo, setTitulo] = useState('NO');
 
     const [estatus, setEstatus] = useState('');
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         let timeoutId;
         if (error) {
             timeoutId = setTimeout(() => {
                 setError('');
-            }, 5000);
+            }, TIMEOUTS.ERROR);
         }
         return () => clearTimeout(timeoutId);
     }, [error]);
@@ -41,7 +45,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
     useEffect(() => {
         const fetchEstados = async () => {
             try {
-                const estadosSnapshot = await firebase.firestore().collection("province").get();
+                const estadosSnapshot = await firebase.firestore().collection(COLLECTIONS.PROVINCE).get();
                 const estadosData = estadosSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     state: doc.data().state,
@@ -92,31 +96,33 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
             return;
         }
 
-        await handleActualizarVehiculo();
-        setSuccess('Vehículo actualizado con éxito.');
-        onClose(); // Cerrar el formulario después de una actualización exitosa
+        setSaving(true);
+        try {
+            await handleActualizarVehiculo();
+            setSuccess('Vehículo actualizado con éxito.');
+            onClose(); // Cerrar el formulario después de una actualización exitosa
+        } finally {
+            setSaving(false);
+        }
     };
 
     const handleActualizarVehiculo = async () => {
         try {
-            await firebase.firestore().collection("vehiculos").doc(vehiculo.binNip).update({
-                gatePass: gatePass,
-                almacen: almacen,
-                tipoVehiculo: tipoVehiculo,
-                marca: marca,
-                modelo: modelo,
-                cliente: cliente,
-                telefonoCliente: telefonoCliente,
-                descripcion: descripcion,
-                estado: estado,
-                ciudad: ciudad,
-                price: price,
-                storage: storage,
-                sobrePeso: sobrePeso,
-                gastosExtra: gastosExtra,
-                titulo: titulo,
-                estatus: estatus,
+            const nuevos = { gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad, price, storage, sobrePeso, gastosExtra, titulo, estatus };
+            const cambios = {};
+            Object.keys(nuevos).forEach(campo => {
+                const antes = vehiculo[campo] !== undefined ? vehiculo[campo] : '';
+                const despues = nuevos[campo] !== undefined ? nuevos[campo] : '';
+                if (String(antes) !== String(despues)) {
+                    cambios[campo] = { antes, despues };
+                }
             });
+
+            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update(nuevos);
+
+            if (Object.keys(cambios).length > 0) {
+                await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
+            }
         } catch (error) {
             console.error("Error al actualizar vehículo:", error);
             setError('Error al actualizar el vehículo. Por favor, intente nuevamente. Error:');
@@ -124,7 +130,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
     };
     const handleDeleteVehiculo = async () => {
         try {
-            await firebase.firestore().collection("vehiculos").doc(vehiculo.binNip).delete();
+            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).delete();
             setSuccess('Vehículo eliminado con éxito.');
             onClose(); // Cierra el modal después de la eliminación
         } catch (error) {
@@ -139,18 +145,8 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                 X
             </button>
             <h2 className="text-xl font-bold mt-6 mb-2">Editar Vehículo: {vehiculo.binNip}</h2>
-            {error && (
-                <div>
-                    <div role="alert" className="alert alert-warning">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none"
-                             viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <span>{error}</span>
-                    </div>
-                </div>
-            )}
+            <Alert mostrar={!!error} mensaje={error} tipo="warning" />
+            <Alert mostrar={!!success} mensaje={success} tipo="success" />
             <div className="w-1/8 p-1">
                 <label htmlFor="titulo" className="block text-black-500">Estatus:</label>
                 <select
@@ -159,11 +155,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     onChange={(e) => setEstatus(e.target.value)}
                 >
                     <option value="">Todos</option>
-                    <option value="PR">Registrado</option>
-                    <option value="IN">Cargando</option>
-                    <option value="TR">En Viaje</option>
-                    <option value="EB">En Brownsville</option>
-                    <option value="DS">Descargado</option>
+                    {VEHICLE_STATUS_LIST.filter(s => s.code !== "EN").map(s => <option key={s.code} value={s.code}>{s.label}</option>)}
                 </select>
 
             </div>
@@ -217,7 +209,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                         type="text"
                         id="gatePass"
                         value={gatePass}
-                        maxLength={12}
+                        maxLength={FIELD_LIMITS.GATE_PASS}
                         onChange={(e) => setGatePass(e.target.value)}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     />
@@ -231,11 +223,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option key="S" value="">Seleciona</option>
-                        <option key="Copart" value="Copart">Copart</option>
-                        <option key="Adesa" value="Adesa">Adesa</option>
-                        <option key="Manheim" value="Manheim">Manheim</option>
-                        <option key="Insurance Auto Auctions" value="Insurance Auto Auctions">Insurance Auto Auctions
-                        </option>
+                        {VEHICLE_WAREHOUSES.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
                     </select>
                 </div>
             </div>
@@ -249,9 +237,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option key="S" value="">Seleciona</option>
-                        <option key="A" value="A">A Ligero</option>
-                        <option key="B" value="B">B Mediano</option>
-                        <option key="C" value="C">C Pesado</option>
+                        {VEHICLE_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                 </div>
                 <div className="w-1/4 p-1">
@@ -289,7 +275,8 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                 <div className="w-1/2 p-1">
                     <label htmlFor="telefonoCliente" className="block text-black-500">Teléfono del Cliente:</label>
                     <PhoneInput
-                        country={'us'}
+                        onlyCountries={PHONE_CONFIG.COUNTRIES}
+                        country={PHONE_CONFIG.DEFAULT_COUNTRY}
                         value={telefonoCliente}
                         onChange={setTelefonoCliente}
                         inputStyle={{width: '100%'}}
@@ -349,9 +336,7 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     >
                         <option value="">Seleccionar Título</option>
-                        <option value="NO">NO</option>
-                        <option value="SI">SI</option>
-                        {/* Agregar más opciones según sea necesario */}
+                        {TITLE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                     </select>
                 </div>
             </div>
@@ -367,11 +352,11 @@ const FormEditVehiculo = ({vehiculo, onClose}) => {
                     type="button"
                     onClick={handleSubmit}
                     className="btn btn-primary text-white-100 w-1/3"
+                    disabled={saving}
                 >
-                    Actualizar
+                    {saving ? 'Actualizando...' : 'Actualizar'}
                 </button>
             </div>
-            {success && <p className="text-green-600 mt-4">{success}</p>}
         </form>
     );
 };

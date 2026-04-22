@@ -4,6 +4,8 @@ import 'react-phone-input-2/lib/style.css';
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import { FaUserLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS } from "../../../constants";
+import Alert from "../../ui/Alert";
 
 const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
     const [loading, setLoading] = useState(false);
@@ -16,7 +18,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
         apodoCliente: "",
         ciudadCliente: "",
         estadoCliente: "",
-        paisCliente: "United States",
+        paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
         rfcCliente: "",
         emailCliente: "",
         // Nuevos campos para acceso
@@ -30,7 +32,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
         } else {
             setDatos({
                 cliente: "", telefonoCliente: "", apodoCliente: "",
-                ciudadCliente: "", estadoCliente: "", paisCliente: "United States",
+                ciudadCliente: "", estadoCliente: "", paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
                 rfcCliente: "", emailCliente: "",
                 emailAcceso: "", passwordAcceso: ""
             });
@@ -57,7 +59,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
             return;
         }
 
-        if (tieneCredenciales && datos.passwordAcceso.length < 6) {
+        if (tieneCredenciales && datos.passwordAcceso.length < FIELD_LIMITS.MIN_PASSWORD) {
             mostrarAviso("La contraseña debe tener al menos 6 caracteres", "error");
             return;
         }
@@ -99,7 +101,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                             await secondaryApp.auth().signOut();
 
                             // Actualizar users
-                            await firestore().collection("users").doc(clienteId).update({
+                            await firestore().collection(COLLECTIONS.USERS).doc(clienteId).update({
                                 email: datos.emailAcceso.toLowerCase(),
                                 username: datos.cliente,
                                 telefono: datos.telefonoCliente
@@ -121,7 +123,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                             await secondaryApp.auth().signOut();
 
                             // Crear documento en users con el nuevo UID
-                            await firestore().collection("users").doc(nuevoUid).set({
+                            await firestore().collection(COLLECTIONS.USERS).doc(nuevoUid).set({
                                 email: datos.emailAcceso.toLowerCase(),
                                 username: datos.cliente,
                                 telefono: datos.telefonoCliente,
@@ -148,7 +150,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                 }
 
                 // Actualizar cliente en Firestore
-                await firestore().collection("clientes").doc(clienteId).update({
+                await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteId).update({
                     ...datos,
                     editado: {
                         usuario: user?.nombre || "Admin",
@@ -162,7 +164,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
 
             } else {
                 // === REGISTRO NUEVO ===
-                const conRef = firestore().collection("config").doc("consecutivos");
+                const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
                 const docCon = await conRef.get();
                 const nuevoFolio = (docCon.data().clientes || 0) + 1;
 
@@ -185,9 +187,9 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                     clienteId = userCredential.user.uid;
                     await secondaryApp.auth().signOut();
 
-                    await firestore().collection("clientes").doc(clienteId).set(clienteFinal);
+                    await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteId).set(clienteFinal);
 
-                    await firestore().collection("users").doc(clienteId).set({
+                    await firestore().collection(COLLECTIONS.USERS).doc(clienteId).set({
                         email: datos.emailAcceso.toLowerCase(),
                         username: datos.cliente,
                         telefono: datos.telefonoCliente,
@@ -199,7 +201,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                     mostrarAviso(`Cliente #${nuevoFolio} creado con acceso al portal`, "success");
                 } else {
                     // Crear sin credenciales (como antes)
-                    await firestore().collection("clientes").add(clienteFinal);
+                    await firestore().collection(COLLECTIONS.CLIENTES).add(clienteFinal);
                     mostrarAviso(`Cliente #${nuevoFolio} guardado (sin acceso al portal)`, "success");
                 }
 
@@ -234,13 +236,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
 
     return (
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative">
-            {alerta.mostrar && (
-                <div className="absolute top-[-50px] left-0 w-full z-50 flex justify-center">
-                    <div className={`alert ${alerta.tipo === 'success' ? 'alert-success' : 'alert-error'} shadow-lg text-white font-bold py-2 px-6`}>
-                        <span>{alerta.mensaje}</span>
-                    </div>
-                </div>
-            )}
+            <Alert mostrar={alerta.mostrar} mensaje={alerta.mensaje} tipo={alerta.tipo === 'success' ? 'success' : 'error'} />
 
             {/* Fila 1: Datos básicos */}
             <div className="flex flex-row flex-wrap gap-2 items-end w-full mb-4">
@@ -255,8 +251,8 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                 <div className="w-64 p-1">
                     <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono: *</label>
                     <PhoneInput
-                        onlyCountries={['us', 'mx']}
-                        country={'us'}
+                        onlyCountries={PHONE_CONFIG.COUNTRIES}
+                        country={PHONE_CONFIG.DEFAULT_COUNTRY}
                         value={datos.telefonoCliente}
                         onChange={(val, country) => {
                             setDatos({

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import {
-    FaSearch, FaChevronLeft, FaChevronRight, FaGlobeAmericas,
     FaFilePdf, FaFileImage, FaMapMarkerAlt, FaPencilAlt, FaUserCircle
 } from "react-icons/fa";
+import { COLLECTIONS } from "../../../constants";
+import SearchBar from "../../ui/SearchBar";
+import Pagination from "../../ui/Pagination";
+import EmptyState from "../../ui/EmptyState";
+import LoadingSpinner from "../../ui/LoadingSpinner";
 
 const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por props
     const [lista, setLista] = useState([]);
@@ -14,7 +18,7 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
 
     useEffect(() => {
         const unsubscribe = firestore()
-            .collection("empresas")
+            .collection(COLLECTIONS.EMPRESAS)
             .orderBy("folio", "desc")
             .onSnapshot((snap) => {
                 const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -37,27 +41,26 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
     const totalPags = Math.ceil(filtrados.length / xPagina);
     const paginados = filtrados.slice((pagina - 1) * xPagina, pagina * xPagina);
 
-    if (loading) return <div className="text-center p-10"><span className="loading loading-spinner text-info"></span></div>;
+    if (loading) return <LoadingSpinner texto="Cargando empresas..." />;
 
     return (
         <div className="w-full bg-white rounded-lg shadow-md border border-gray-200 mt-6 overflow-hidden">
             {/* CABECERA DE BÚSQUEDA */}
             <div className="p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-100">
-                <div className="relative w-full md:w-96">
-                    <FaSearch className="absolute left-3 top-3 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por Empresa, EIN, Email..."
-                        className="input input-bordered input-sm w-full pl-10 bg-white text-black text-[11px] border-gray-300 focus:border-blue-700"
-                        value={busqueda}
-                        onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
-                    />
-                </div>
-                <div className="flex items-center gap-1 border-l pl-3 border-gray-300">
-                    <button className="btn btn-xs btn-outline border-gray-300" disabled={pagina === 1} onClick={() => setPagina(p => p - 1)}><FaChevronLeft /></button>
-                    <span className="text-[11px] font-bold text-black px-2">Pág {pagina} / {totalPags || 1}</span>
-                    <button className="btn btn-xs btn-outline border-gray-300" disabled={pagina === totalPags || totalPags === 0} onClick={() => setPagina(p => p + 1)}><FaChevronRight /></button>
-                </div>
+                <SearchBar
+                    value={busqueda}
+                    onChange={(val) => { setBusqueda(val); setPagina(1); }}
+                    placeholder="Buscar por Empresa, EIN, Email..."
+                />
+                <Pagination
+                    pagina={pagina}
+                    totalPags={totalPags}
+                    onAnterior={() => setPagina(p => p - 1)}
+                    onSiguiente={() => setPagina(p => p + 1)}
+                    esPrimera={pagina === 1}
+                    esUltima={pagina === totalPags || totalPags === 0}
+                    totalItems={filtrados.length}
+                />
             </div>
 
             <table className="table w-full">
@@ -71,6 +74,13 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
                     </tr>
                 </thead>
                 <tbody className="text-black text-[12px]">
+                    {paginados.length === 0 && (
+                        <tr>
+                            <td colSpan={onEditar ? 5 : 4}>
+                                <EmptyState mensaje="No se encontraron empresas" />
+                            </td>
+                        </tr>
+                    )}
                     {paginados.map((e) => (
                         <tr key={e.id} className="hover:bg-blue-50 border-b border-gray-100 transition-colors">
                             <td className="py-3">
@@ -124,7 +134,6 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
 
             <div className="p-3 bg-gray-50 flex justify-between items-center border-t border-gray-200">
                 <span className="text-[11px] text-gray-400 font-bold italic uppercase">Registros: {filtrados.length}</span>
-                <span className="text-[10px] text-blue-900 font-black uppercase tracking-widest opacity-60">Admin Mode</span>
             </div>
         </div>
     );

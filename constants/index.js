@@ -16,6 +16,8 @@ export const COLLECTIONS = {
   ENTRADAS_CAJA: "entradasCaja",
   SALIDAS_CAJA: "salidasCaja",
   SOLICITUDES_VEHICULOS: "solicitudesVehiculos",
+  TOKENS_CHOFER: "tokensChofer",
+  AUDIT_LOG: "auditLog",
 };
 
 // ===========================================
@@ -129,6 +131,79 @@ export const ADMIN_MODULES = {
 };
 
 // ===========================================
+// VEHICLE TYPES
+// ===========================================
+export const VEHICLE_TYPES = [
+  { value: "A", label: "A Ligero" },
+  { value: "B", label: "B Mediano" },
+  { value: "C", label: "C Pesado" },
+];
+
+// ===========================================
+// VEHICLE WAREHOUSES (for registration)
+// ===========================================
+export const VEHICLE_WAREHOUSES = [
+  { value: "Copart", label: "Copart" },
+  { value: "Adesa", label: "Adesa" },
+  { value: "Manheim", label: "Manheim" },
+  { value: "Insurance Auto Auctions", label: "Insurance Auto Auctions" },
+];
+
+// ===========================================
+// TITLE OPTIONS
+// ===========================================
+export const TITLE_OPTIONS = [
+  { value: "NO", label: "NO" },
+  { value: "SI", label: "SI" },
+];
+
+// ===========================================
+// VEHICLE STATUS DESCRIPTIONS (for tracking)
+// ===========================================
+export const VEHICLE_STATUS_DESCRIPTIONS = {
+  PR: "Tu vehiculo esta asignado y en espera de ser recogido.",
+  IN: "Tu vehiculo esta siendo cargado en nuestra unidad de transporte.",
+  TR: "Tu vehiculo esta en camino a Brownsville.",
+  EB: "Tu vehiculo ha llegado a la ciudad de Brownsville.",
+  DS: "Tu vehiculo esta esperando que lo recojas.",
+  EN: "Tu vehiculo fue entregado.",
+};
+
+export const VEHICLE_STATUS_CODES = Object.keys(VEHICLE_STATUS);
+
+// ===========================================
+// FIELD LIMITS
+// ===========================================
+export const FIELD_LIMITS = {
+  BIN_NIP: 16,
+  GATE_PASS: 12,
+  LICENSE: 13,
+  ZIP_CODE: 5,
+  TAX_ID: 10,
+  LOT: 8,
+  MIN_PASSWORD: 6,
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+};
+
+// ===========================================
+// PHONE CONFIG
+// ===========================================
+export const PHONE_CONFIG = {
+  COUNTRIES: ["us", "mx"],
+  DEFAULT_COUNTRY: "us",
+  DEFAULT_COUNTRY_NAME: "United States",
+};
+
+// ===========================================
+// TIMEOUTS (ms)
+// ===========================================
+export const TIMEOUTS = {
+  ALERT: 3500,
+  COPY_FEEDBACK: 2000,
+  ERROR: 5000,
+};
+
+// ===========================================
 // COMPANY INFO (for receipts)
 // ===========================================
 export const COMPANY_INFO = {
@@ -138,4 +213,18 @@ export const COMPANY_INFO = {
   PHONE: "+1 (956) 371-8314",
   LOGO_PATH: "/assets/Logo.png",
   LOGO_PRINT_PATH: "/assets/Logoprint.png",
+};
+
+// ===========================================
+// HELPERS
+// ===========================================
+export const getStatusLabel = (code) => VEHICLE_STATUS[code]?.label || code;
+
+export const getStatusIndex = (code) => VEHICLE_STATUS_CODES.indexOf(code);
+
+export const formatFirestoreTimestamp = (timestamp) => {
+  if (!timestamp) return new Date(0);
+  return timestamp.seconds
+    ? new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000)
+    : new Date(timestamp);
 };
