@@ -140,18 +140,6 @@ const ReporteMovimientos = React.forwardRef(({
                 </td>
             </tr>
             <tr>
-                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (efectivo):</td>
-                <td className="border px-4 py-2 font-semibold text-right">
-                    ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
-                <td className="border px-4 py-2 font-semibold">Abonos de Fiados (CC):</td>
-                <td className="border px-4 py-2 font-semibold text-right">
-                    ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
                 <td className="border px-4 py-2 font-semibold text-green-700">Anticipos (Pagos Adelantados):</td>
                 <td className="border px-4 py-2 font-semibold text-right text-green-700">
                     ${totalAnticipos.toFixed(2).toLocaleString('en-US')}
@@ -173,14 +161,8 @@ const ReporteMovimientos = React.forwardRef(({
                 <td className="border px-4 py-2 font-bold">Total General:</td>
                 <td className="border px-4 py-2 font-bold text-right">
                     ${(
-                        totalCaja + totalAbonosEfectivo + totalAbonosCC + totalAnticipos + totalRecibido - totalSalidas
+                        totalCaja + totalAnticipos + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
-                </td>
-            </tr>
-            <tr>
-                <td className="border px-4 py-2 font-semibold text-orange-700">Crédito otorgado hoy (informativo):</td>
-                <td className="border px-4 py-2 font-semibold text-right text-orange-700">
-                    ${totalCredito.toFixed(2).toLocaleString('en-US')}
                 </td>
             </tr>
         </tbody>
@@ -246,11 +228,9 @@ const CorteDia = ({user}) => {
         }
         setErrorMessage("");
 
-        const siguienteDia = new Date(endDate);
-        siguienteDia.setDate(siguienteDia.getDate() + 1);
-
-        const startTimestamp = new Date(siguienteDia).setHours(0, 0, 0, 0);
-        const endTimestamp = new Date(siguienteDia).setHours(23, 59, 59, 999);
+        const [anio, mes, dia] = endDate.split('-').map(Number);
+        const startTimestamp = new Date(anio, mes - 1, dia, 0, 0, 0, 0).getTime();
+        const endTimestamp = new Date(anio, mes - 1, dia, 23, 59, 59, 999).getTime();
 
         // Consulta a Firestore para obtener todos los movimientos en el rango de fechas
         const movementsSnapshot = await firestore()

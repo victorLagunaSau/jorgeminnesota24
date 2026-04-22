@@ -15,8 +15,10 @@ const Report = () => {
     const fetchMovements = async () => {
         setLoading(true);
         try {
-            const startTimestamp = new Date(startDate).getTime();
-            const endTimestamp = new Date(endDate).getTime();
+            const [anioI, mesI, diaI] = startDate.split('-').map(Number);
+            const [anioF, mesF, diaF] = endDate.split('-').map(Number);
+            const startTimestamp = new Date(anioI, mesI - 1, diaI, 0, 0, 0, 0).getTime();
+            const endTimestamp = new Date(anioF, mesF - 1, diaF, 23, 59, 59, 999).getTime();
 
             const movementsSnapshot = await firestore()
                 .collection(COLLECTIONS.MOVIMIENTOS)

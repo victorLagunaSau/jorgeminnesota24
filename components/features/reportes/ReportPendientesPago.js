@@ -149,8 +149,10 @@ const ReportePendientesPago = () => {
         }
 
         setErrorMessage("");
-        const start = new Date(iniDate).setHours(0, 0, 0, 0);
-        const end = new Date(endDate).setHours(23, 59, 59, 999);
+        const [anioI, mesI, diaI] = iniDate.split('-').map(Number);
+        const [anioF, mesF, diaF] = endDate.split('-').map(Number);
+        const start = new Date(anioI, mesI - 1, diaI, 0, 0, 0, 0).getTime();
+        const end = new Date(anioF, mesF - 1, diaF, 23, 59, 59, 999).getTime();
 
         try {
             const snapshot = await firestore()
