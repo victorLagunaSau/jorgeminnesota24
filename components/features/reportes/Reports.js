@@ -38,12 +38,14 @@ const Report = () => {
 
     // Filtrar movimientos según el término de búsqueda
     const filteredMovements = movements.filter(movement => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
         return (
-            movement.cliente.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            movement.ciudad.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            movement.estado.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            movement.modelo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            movement.binNip.toLowerCase().includes(searchTerm.toLowerCase())
+            (movement.cliente || '').toLowerCase().includes(term) ||
+            (movement.ciudad || '').toLowerCase().includes(term) ||
+            (movement.estado || '').toLowerCase().includes(term) ||
+            (movement.modelo || '').toLowerCase().includes(term) ||
+            (movement.binNip || '').toLowerCase().includes(term)
         );
     });
 
