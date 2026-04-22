@@ -43,47 +43,6 @@ const ReporteMovimientos = React.forwardRef(({
             totalCredito={totalCredito}
         />
 
-        {/* Tabla de Abonos recibidos (cobros de fiados) */}
-        {abonosData && abonosData.length > 0 && (
-            <div className="mt-4">
-                <h3 className="text-lg font-semibold">Abonos de Fiados recibidos</h3>
-                <table className="min-w-full bg-white border text-xs">
-                    <thead>
-                        <tr className="bg-gray-100">
-                            <th className="px-2 py-1 border">Fecha</th>
-                            <th className="px-2 py-1 border">Cliente / Vehículo</th>
-                            <th className="px-2 py-1 border text-right">Efectivo</th>
-                            <th className="px-2 py-1 border text-right">CC</th>
-                            <th className="px-2 py-1 border text-right">Saldo después</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {abonosData.map((a) => (
-                            <tr key={a.id}>
-                                <td className="px-2 py-1 border">
-                                    {a.timestamp?.seconds
-                                        ? new Date(a.timestamp.seconds * 1000).toLocaleDateString()
-                                        : "-"}
-                                </td>
-                                <td className="px-2 py-1 border">
-                                    {a.cliente} — {a.marca} {a.modelo} (Bin: {a.binNip})
-                                </td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaRecibo) || 0).toFixed(2)}</td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.cajaCC) || 0).toFixed(2)}</td>
-                                <td className="px-2 py-1 border text-right">${(parseFloat(a.saldoFiadoDespues) || 0).toFixed(2)}</td>
-                            </tr>
-                        ))}
-                        <tr className="bg-gray-100 font-semibold">
-                            <td colSpan="2" className="px-2 py-1 border text-right">Subtotal abonos:</td>
-                            <td className="px-2 py-1 border text-right">${totalAbonosEfectivo.toFixed(2)}</td>
-                            <td className="px-2 py-1 border text-right">${totalAbonosCC.toFixed(2)}</td>
-                            <td className="px-2 py-1 border"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        )}
-
         {/* Tabla de Anticipos (Pagos Adelantados) */}
         {anticiposData && anticiposData.length > 0 && (
             <div className="mt-4">

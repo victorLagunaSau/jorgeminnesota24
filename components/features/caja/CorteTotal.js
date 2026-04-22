@@ -107,18 +107,6 @@ const ReporteMovimientos = React.forwardRef(({
                     </td>
                 </tr>
                 <tr>
-                    <td className="border px-4 py-2 font-semibold">Abonos Fiados (efectivo):</td>
-                    <td className="border px-4 py-2 font-semibold text-right">
-                        ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
-                    </td>
-                </tr>
-                <tr>
-                    <td className="border px-4 py-2 font-semibold">Abonos Fiados (CC):</td>
-                    <td className="border px-4 py-2 font-semibold text-right">
-                        ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
-                    </td>
-                </tr>
-                <tr>
                     <td className="border px-4 py-2 font-semibold text-green-700">Anticipos (Pagos Adelantados):</td>
                     <td className="border px-4 py-2 font-semibold text-right text-green-700">
                         ${totalAnticipos.toFixed(2).toLocaleString('en-US')}
@@ -134,7 +122,7 @@ const ReporteMovimientos = React.forwardRef(({
                     <td className="border px-4 py-2 font-bold">Total Ingresos:</td>
                     <td className="border px-4 py-2 font-bold text-right">
                         ${(
-                        totalCaja + totalCC + totalAbonosEfectivo + totalAbonosCC + totalAnticipos + totalRecibido
+                        totalCaja + totalCC + totalAnticipos + totalRecibido
                     ).toFixed(2).toLocaleString('en-US')}
                     </td>
                 </tr>
@@ -148,14 +136,8 @@ const ReporteMovimientos = React.forwardRef(({
                     <td className="border px-4 py-2 font-bold">Total General:</td>
                     <td className="border px-4 py-2 font-bold text-right">
                         ${(
-                        totalCaja + totalCC + totalAbonosEfectivo + totalAbonosCC + totalAnticipos + totalRecibido - totalSalidas
+                        totalCaja + totalCC + totalAnticipos + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
-                    </td>
-                </tr>
-                <tr>
-                    <td className="border px-4 py-2 font-semibold text-orange-700">Crédito otorgado (informativo):</td>
-                    <td className="border px-4 py-2 font-semibold text-right text-orange-700">
-                        ${totalCredito.toFixed(2).toLocaleString('en-US')}
                     </td>
                 </tr>
                 </tbody>
