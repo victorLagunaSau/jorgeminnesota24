@@ -198,8 +198,12 @@ const FormViaje = ({user, onViajeCreado}) => {
             almacen: "Copart",
             estado: "", ciudad: "",
             flete: "0",        // Se usará para el COST (chofer) - Editable
-            precioVenta: 0,    // Se usará para el PRICE (cliente) - OCULTO
-            storage: "0", sPeso: "0", gExtra: "0", titulo: "NO",
+            precioVenta: 0,    // Se usará para el PRICE (cliente)
+            storage: "0", sPeso: "0", gExtra: "0",
+            // Campos cliente (cobro al cliente, independientes del chofer)
+            preciosClienteEditados: false,
+            storageCliente: "0", sPesoCliente: "0", gExtraCliente: "0",
+            titulo: "NO",
             comentarioRegistro: "",
             yaPagado: false    // Indica si el lote ya existe en vehiculos (pagado)
         }]);
@@ -214,6 +218,13 @@ const FormViaje = ({user, onViajeCreado}) => {
                 }
 
                 let actualizacion = {...v, [field]: valorFinal};
+
+                // Auto-sync: campos cliente siguen al chofer cuando no estan editados manualmente
+                if (!v.preciosClienteEditados) {
+                    if (field === 'storage') actualizacion.storageCliente = valorFinal;
+                    if (field === 'sPeso') actualizacion.sPesoCliente = valorFinal;
+                    if (field === 'gExtra') actualizacion.gExtraCliente = valorFinal;
+                }
 
                 if (field === 'estado') {
                     const estadoData = provincias.find(p => p.state === value);
