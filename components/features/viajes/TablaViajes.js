@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash, FaPlus, FaMinus, FaUserEdit} from "react-icons/fa";
+import {FaFilter, FaPrint, FaCheckCircle, FaTimes, FaCommentDots, FaRegCommentDots, FaTrash, FaPlus, FaMinus, FaUserEdit, FaPen, FaCar} from "react-icons/fa";
 import ReactToPrint from "react-to-print";
 import HojaVerificacion from "./HojaVerificacion";
 import {useAdminData} from "../../../context/adminData";
@@ -9,7 +9,7 @@ import { COLLECTIONS, VEHICLE_STATUS, WAREHOUSES, TITLE_OPTIONS } from "../../..
 import Alert from "../../ui/Alert";
 import StatusBadge from "../../ui/StatusBadge";
 
-const TablaViajes = ({user}) => {
+const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) => {
     const { choferes: choferesAdmin } = useAdminData();
     const [viajes, setViajes] = useState([]);
     const [clientes, setClientes] = useState([]);
@@ -1446,6 +1446,76 @@ const TablaViajes = ({user}) => {
                                 )}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                ))}
+
+                {/* TARJETAS DE BORRADORES */}
+                {borradores && borradores.map((borrador) => (
+                    <div key={borrador.id} className="rounded-xl shadow-lg overflow-hidden border-2 border-amber-400 bg-white">
+                        <div className="bg-amber-50 p-3 flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <div className="px-3 py-1.5 italic font-black text-lg skew-x-[-10deg] rounded-lg border bg-amber-100 text-amber-700 border-amber-300">
+                                    VIAJE - BORRADOR
+                                </div>
+                                <div>
+                                    <p className="text-[9px] uppercase font-bold text-amber-500 leading-none">Transportista</p>
+                                    <p className="text-sm font-black uppercase italic leading-none text-gray-800">
+                                        {borrador.choferNombre || borrador.encabezado?.choferManual || borrador.choferManual || "Sin asignar"}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-black uppercase px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 border border-amber-300">
+                                    SIN GUARDAR
+                                </span>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="table w-full border-collapse">
+                                <thead>
+                                    <tr className="text-[10px] uppercase text-gray-500 bg-gray-50 border-b-2 border-gray-200 italic font-black">
+                                        <th className="p-3">Lote</th>
+                                        <th className="p-3">Vehículo</th>
+                                        <th className="p-3">Ciudad</th>
+                                        <th className="p-3 text-center">Flete</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {borrador.vehiculos.map((v, i) => (
+                                        <tr key={i} className="border-b border-gray-100">
+                                            <td className="p-3">
+                                                <span className="font-mono text-xs font-black text-blue-700">{v.lote || "—"}</span>
+                                            </td>
+                                            <td className="p-3">
+                                                <span className="text-[10px] font-bold text-gray-600 uppercase">{v.marca} {v.modelo}</span>
+                                            </td>
+                                            <td className="p-3">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase">{v.ciudad || v.estado || "—"}</span>
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <span className="text-xs font-black text-gray-800">${parseFloat(v.flete || 0).toLocaleString()}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                            <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold">
+                                <FaCar size={12}/>
+                                {borrador.vehiculos.length} vehículo{borrador.vehiculos.length !== 1 ? "s" : ""}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => onDescartarBorrador(borrador.id)}
+                                        className="btn btn-sm btn-ghost text-red-500 hover:bg-red-50 font-black uppercase text-[10px] gap-1">
+                                    <FaTrash size={10}/> Descartar
+                                </button>
+                                <button onClick={() => onEditarBorrador(borrador.id)}
+                                        className="btn btn-sm bg-amber-500 hover:bg-amber-600 text-white border-none font-black uppercase text-[10px] shadow-lg gap-1">
+                                    <FaPen size={10}/> Seguir Editando
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ))}
