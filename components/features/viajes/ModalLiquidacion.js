@@ -24,6 +24,13 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
     const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
     const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
 
+    // Totales lado cliente
+    const totalPrecioVenta = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.precioVenta) || parseFloat(v.flete) || 0), 0);
+    const totalStorageCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.storageCliente) || 0) : (parseFloat(v.storage) || 0)), 0);
+    const totalSobrepesoCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.sPesoCliente) || 0) : (parseFloat(v.sPeso) || 0)), 0);
+    const totalGastosExtraCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.gExtraCliente) || 0) : (parseFloat(v.gExtra) || 0)), 0);
+    const granTotalCliente = totalPrecioVenta + totalStorageCliente + totalSobrepesoCliente + totalGastosExtraCliente;
+
     const ejecutarPago = async () => {
         setProcesando(true);
         // Definimos el momento exacto de la operación
@@ -71,13 +78,18 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     const yaPagado = lotesExistentes.includes(v.lote);
 
                     if (yaPagado) {
-                        // LOTE YA PAGADO - Solo actualizar precios
+                        // LOTE YA PAGADO - Actualizar precios (cliente y chofer)
                         transaction.update(vehiculoRef, {
-                            storage: parseFloat(v.storage || 0),
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            // Valores cliente (lo que cobra caja)
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
+                            // Valores chofer (referencia)
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
+                            preciosClienteEditados: v.preciosClienteEditados || false,
                             comentarioRecepcion: v.comentarioRecepcion || "",
-                            // Agregar nota de actualización
                             ultimaActualizacionPrecios: {
                                 fecha: fechaOperacionActual,
                                 usuario: user?.nombre || "Admin",
@@ -91,9 +103,12 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                             timestamp: fechaOperacionActual,
                             tipo: "ACTUALIZACIÓN",
                             tipoRegistro: "ACTUALIZACIÓN PRECIOS",
-                            storage: parseFloat(v.storage || 0),
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
                             numViaje: viaje.numViaje,
                             usuario: user?.nombre || "Admin",
                             nota: "Actualización de precios - Lote ya pagado previamente"
@@ -121,28 +136,33 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                             descripcion: "",
                             estado: v.estado || "",
                             estatus: "EB",
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            // Valores cliente (lo que cobra caja)
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
                             gatePass: "X",
                             marca: v.marca || "",
                             modelo: v.modelo || "",
                             price: String(v.precioVenta || v.flete || "0"),
                             flete: parseFloat(v.flete || 0),
+                            // Valores chofer (referencia/auditoria)
+                            fleteChofer: parseFloat(v.flete || 0),
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
+                            preciosClienteEditados: v.preciosClienteEditados || false,
 
-                            // --- AJUSTE DE FECHAS Y TRAZABILIDAD ---
                             registro: {
                                 idUsuario: user?.id || "Admin_ID",
                                 usuario: user?.nombre || "Admin",
-                                timestamp: fechaOperacionActual // FECHA DE HOY (Liquidación)
+                                timestamp: fechaOperacionActual
                             },
                             datosOrigen: {
                                 idUsuario: viaje.creadoPor?.id,
                                 usuario: viaje.creadoPor?.nombre,
-                                fechaRegistro: viaje.fechaCreacion // Mantenemos la fecha de febrero para auditoría
+                                fechaRegistro: viaje.fechaCreacion
                             },
-                            // ---------------------------------------
 
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
                             titulo: v.titulo || "NO"
@@ -173,11 +193,18 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                     estatus: "PAGADO",
                     resumenFinanciero: {
                         ...viaje.resumenFinanciero,
+                        // Lado chofer
                         totalFletes,
                         totalStorage,
                         totalSobrepeso,
                         totalGastosExtra,
-                        granTotal: granTotalReal
+                        granTotal: granTotalReal,
+                        // Lado cliente
+                        totalPrecioVenta,
+                        totalStorageCliente,
+                        totalSobrepesoCliente,
+                        totalGastosExtraCliente,
+                        granTotalCliente
                     }
                 };
 

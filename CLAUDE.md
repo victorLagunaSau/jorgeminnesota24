@@ -8,7 +8,7 @@ Sistema web completo de logistica vehicular para **Jorge Minnesota Logistic LLC*
 - **Backend/DB:** Firebase (Auth, Firestore, Storage)
 - **Scraping:** Puppeteer (subastas IAA y Copart)
 - **Extras:** Framer Motion, XLSX, React to Print, Moment.js
-- **Sanitizacion:** App Electron independiente para importar datos historicos de Excel a Firebase
+- **Importacion Historial:** Componente web integrado para importar datos historicos de Excel a Firebase
 
 ## Estructura del Proyecto
 
@@ -35,13 +35,13 @@ Sistema web completo de logistica vehicular para **Jorge Minnesota Logistic LLC*
 │   │   ├── Admin.js      # Componente maestro del panel admin
 │   │   ├── caja/         # SalidaVehiculo, EntradaCaja, SalidaCaja, CorteDia, CorteTotal, Recibo, PagoAdelantado
 │   │   ├── vehiculos/    # CRUD vehiculos, registro masivo, rastreo, entrega
-│   │   ├── viajes/       # CRUD viajes, tabla, hoja chofer, hoja verificacion, reporte pagados
+│   │   ├── viajes/       # CRUD viajes, tabla, hoja chofer, hoja verificacion, reporte pagados, viajes anteriores, importar historial
 │   │   ├── choferes/     # CRUD choferes
 │   │   ├── clientes/     # CRUD clientes
 │   │   ├── empresas/     # CRUD empresas/carriers
 │   │   ├── reportes/     # Ingresos, movimientos, pendientes de pago
 │   │   ├── cobranza/     # Modulo de cobranza
-│   │   ├── analisis/     # Estado financiero, historial anticipos/autorizaciones
+│   │   ├── analisis/     # Estado financiero, historial anticipos/autorizaciones, fletes fiados
 │   │   ├── config/       # Estados/precios, usuarios, movimientos, solicitudes
 │   │   └── solicitudes/  # Solicitudes de vehiculos desde clientes
 │   ├── marketing/        # Hero, Feature, Catalogo, SEO
@@ -57,19 +57,6 @@ Sistema web completo de logistica vehicular para **Jorge Minnesota Logistic LLC*
 ├── services/             # firebaseService.js (CRUD generico Firestore)
 ├── utils/                # Utilidades numeros/strings/fechas, auditLog, constants
 ├── constants/            # Constantes globales (colecciones, estatus, etc)
-│
-├── sanitizacion/         # <<< SUBDIRECTORIO INDEPENDIENTE >>>
-│   ├── electron_main.js      # App Electron para importar historial
-│   ├── electron_app.html     # UI de la app Electron
-│   ├── ui.html               # UI alternativa
-│   ├── sanitizar.js          # Limpieza masiva de Excel → JSON
-│   ├── descargar_firebase.js # Descarga datos Firebase → JSON local
-│   ├── importar_a_firebase.js# Importa JSON → Firebase
-│   ├── analizar_cruce.js     # Analisis de cruce vehiculos Excel vs Firebase
-│   ├── servidor.js           # Servidor local para la UI
-│   ├── corregir_excel.js     # Correcciones al Excel
-│   ├── exportar_choferes.js  # Exporta choferes
-│   └── [archivos .json/.xlsx]# Datos exportados y de trabajo
 │
 └── .env.local            # Config Firebase (NUNCA commitear)
 ```
@@ -127,7 +114,7 @@ PR (Registrado) → IN (Cargando) → TR (En Viaje) → EB (En Brownsville) → 
 - **Reportes:** Ingresos, movimientos, pendientes de pago
 - **Gestion:** CRUD de clientes, choferes, empresas, vehiculos, viajes
 - **Config:** Estados y precios por ruta, usuarios (solo adminMaster), movimientos, solicitudes
-- **Analisis:** Estado financiero, historial de anticipos, historial de autorizaciones
+- **Analisis:** Estado financiero, historial de anticipos, historial de autorizaciones, fletes fiados
 - **Cobranza:** Seguimiento de cobros y deudas pendientes
 
 ## State Management
@@ -140,13 +127,10 @@ PR (Registrado) → IN (Cargando) → TR (En Viaje) → EB (En Brownsville) → 
 ## Metodos de Pago Soportados
 Efectivo, cheque, Zelle, tarjeta (sin integracion con procesador, se registra manualmente)
 
-## Sanitizacion (subdirectorio)
-Herramientas independientes para migrar datos historicos de un Excel (JML.xlsx) a Firebase:
-- **App Electron** (`npm start`): UI visual para cruzar viajes del Excel con vehiculos en Firebase, asignar choferes, y exportar viajes listos para importar
-- **sanitizar.js**: Limpieza automatica del Excel crudo, genera JSON limpio y reporte de errores
-- **descargar_firebase.js** (`npm run descargar`): Descarga datos actuales de Firebase para trabajar offline
-- **importar_a_firebase.js**: Sube los viajes procesados a Firebase
-- **analizar_cruce.js**: Analisis de coincidencias entre Excel y Firebase
+## Importacion de Historial
+La funcionalidad de importar datos historicos de Excel ahora esta integrada directamente en la app web:
+- **ImportarHistorial.js** (`components/features/viajes/`): Componente que permite cargar un Excel, cruzar viajes con vehiculos existentes en Firebase, asignar choferes, y subir viajes pagados directamente desde el panel admin
+- Reemplaza la antigua app Electron de sanitizacion (subdirectorio `sanitizacion/` fue removido)
 
 ## Convenciones de Codigo
 - Idioma del codigo: mezcla espanol/ingles (variables y UI en espanol, framework en ingles)
@@ -163,4 +147,47 @@ Herramientas independientes para migrar datos historicos de un Excel (JML.xlsx) 
 - Creacion de este archivo de resumen
 - Estado actual: branch `nova`
 - La app esta funcional con todos los modulos operativos
-- Subdirectorio `sanitizacion/` contiene herramientas de migracion de datos historicos
+
+### 2026-04-24
+- Removido subdirectorio `sanitizacion/` (app Electron de migracion) — funcionalidad reemplazada por `ImportarHistorial.js` integrado en la web
+- Nuevo componente `FletesFlados.js` en analisis: muestra vehiculos con flete fiado (pendientes de cobro de flete)
+- Nuevo componente `ImportarHistorial.js` en viajes: importacion de historial de viajes desde Excel a Firebase directamente en el panel admin
+- Nuevo modulo `viajesAnteriores` en Admin.js: consulta de viajes pagados historicos
+- Actualizaciones en: cobranza, clientes (fechas y fiados), abonos/anticipos, control de viajes, modulos clickeables en sidebar
+
+---
+
+## Mejoras Pendientes (analisis 2026-04-24)
+
+### CRITICO — Seguridad y Estabilidad
+1. **Remover/proteger `setup-master.js` y `clonar-usuario.js`** — accesibles sin auth, credenciales hardcodeadas
+2. **Autenticar API `/api/scrape-vehicle`** — sin verificacion de tokens ni rate limiting
+3. **Crear Firestore Security Rules** — no existe `firestore.rules`, la BD esta abierta
+4. **Hacer escrituras atomicas en pagos** — `PagoVehiculo.js:91-164` y `PagosPendientes.js:59-142` escriben vehiculo y movimiento por separado
+5. **Agregar Error Boundaries** — un error en cualquier modulo tumba todo el panel admin
+6. **Fix memory leak en `Header.js:25-46`** — `removeEventListener` recibe funcion nueva
+
+### ALTO — Mantenibilidad
+7. **Quitar UID hardcodeado** `"BdRfEmYfd7ZLjWQHB06uuT6w2112"` de `PagoVehiculo.js:66` y `Vehiculos.js:27`
+8. **Race condition en lotes** — `FormViaje.js:251-295` usa check-then-write, necesita transaccion
+9. **Dividir componentes gigantes** — `TablaViajes.js` (1345 lineas), `ReporteViajesPagados.js` (1221), `FormViaje.js` (970)
+10. **Refactorizar `Admin.js` switch (28 cases)** — usar moduleMap
+11. **Actualizar dependencias** — firebase@7→9, react@17→18, next@12→14, quitar moment.js
+12. **Mover `puppeteer` a devDependencies** — agrega ~150MB al bundle
+
+### MEDIO — Logica de Negocio
+13. **Aritmetica en centavos** — `PagoVehiculo.js:43-62`, `CorteDia.js:220-253` acumulan errores de punto flotante
+14. **Migrar campos legacy** — unificar `saldoFiado` vs `pagoTotalPendiente`
+15. **Validar transiciones de estatus** — vehiculo puede saltar estados sin restriccion
+16. **Estandarizar `useFirestoreCollection`** — 27 componentes reimplementan suscripciones
+17. **SSG en marketing** — agregar `getStaticProps` en `pages/index.js`
+18. **Dynamic imports** — usar `next/dynamic` para modulos del admin
+19. **Audit log no debe fallar silenciosamente** — `utils/auditLog.js:11-27`
+20. **Headers de seguridad** — agregar CSP, HSTS, X-Frame-Options en `next.config.js`
+
+### BAJO — Deuda Tecnica
+21. Crear hook `useModal()` (patron duplicado en 39 componentes)
+22. `generateId()` usa `Date.now()` — cambiar a `crypto.randomUUID()`
+23. Memoizar Sidebar con `React.memo` y `useCallback`
+24. Agregar accesibilidad (ARIA labels, navegacion por teclado)
+25. Subir requisito de contraseña a 12+ caracteres

@@ -63,6 +63,16 @@ li.check:before {
   @apply bg-primary rounded-l-full rounded-r-full w-12;
 }
 
+/* Glow suave para inputs vista cliente */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 3px rgba(56,189,248,0.3); }
+  50% { box-shadow: 0 0 6px rgba(56,189,248,0.5); }
+}
+.input-neon {
+  border: 1.5px solid #38bdf8 !important;
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
 /* purgecss end ignore */
 
 /* purgecss start ignore */

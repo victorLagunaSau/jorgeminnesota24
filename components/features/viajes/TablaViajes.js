@@ -34,6 +34,9 @@ const TablaViajes = ({user}) => {
     // Estado para el Modal de Comentarios
     const [modalComentario, setModalComentario] = useState({show: false, v: null, viajeId: null, idx: null});
 
+    // Vista de precios por viaje: {viajeId: "chofer" | "cliente"}
+    const [vistaPrecios, setVistaPrecios] = useState({});
+
     useEffect(() => {
         if (!user) return;
         let q = firestore().collection(COLLECTIONS.VIAJES_PENDIENTES);
@@ -94,7 +97,7 @@ const TablaViajes = ({user}) => {
             if (viaje.id === viajeId) {
                 const nuevosVehiculos = [...viaje.vehiculos];
                 let valorFinal = value;
-                if (['flete', 'storage', 'sPeso', 'gExtra'].includes(field)) {
+                if (['flete', 'storage', 'sPeso', 'gExtra', 'storageCliente', 'sPesoCliente', 'gExtraCliente'].includes(field)) {
                     valorFinal = value === "" ? "0" : parseFloat(value).toString();
                 }
                 if (field === 'clienteId') {
@@ -125,8 +128,18 @@ const TablaViajes = ({user}) => {
                         nuevosVehiculos[vehiculoIdx].flete = "0";
                         nuevosVehiculos[vehiculoIdx].precioVenta = 0;
                     }
+                } else if (['storageCliente', 'sPesoCliente', 'gExtraCliente'].includes(field)) {
+                    // Al editar campo cliente, marcar como editado automaticamente
+                    nuevosVehiculos[vehiculoIdx][field] = valorFinal;
+                    nuevosVehiculos[vehiculoIdx].preciosClienteEditados = true;
                 } else {
                     nuevosVehiculos[vehiculoIdx][field] = valorFinal;
+                    // Auto-sync: campos cliente siguen al chofer cuando no estan editados
+                    if (!nuevosVehiculos[vehiculoIdx].preciosClienteEditados) {
+                        if (field === 'storage') nuevosVehiculos[vehiculoIdx].storageCliente = valorFinal;
+                        if (field === 'sPeso') nuevosVehiculos[vehiculoIdx].sPesoCliente = valorFinal;
+                        if (field === 'gExtra') nuevosVehiculos[vehiculoIdx].gExtraCliente = valorFinal;
+                    }
                 }
                 return {...viaje, vehiculos: nuevosVehiculos};
             }
@@ -266,6 +279,10 @@ const TablaViajes = ({user}) => {
             storage: "0",
             sPeso: "0",
             gExtra: "0",
+            preciosClienteEditados: false,
+            storageCliente: "0",
+            sPesoCliente: "0",
+            gExtraCliente: "0",
             titulo: "NO",
             comentarioRegistro: "",
             comentarioRecepcion: "",
@@ -329,6 +346,13 @@ const TablaViajes = ({user}) => {
         const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
         const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
 
+        // Totales lado cliente (cobro al cliente)
+        const totalPrecioVenta = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.precioVenta) || parseFloat(v.flete) || 0), 0);
+        const totalStorageCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.storageCliente) || 0) : (parseFloat(v.storage) || 0)), 0);
+        const totalSobrepesoCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.sPesoCliente) || 0) : (parseFloat(v.sPeso) || 0)), 0);
+        const totalGastosExtraCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.gExtraCliente) || 0) : (parseFloat(v.gExtra) || 0)), 0);
+        const granTotalCliente = totalPrecioVenta + totalStorageCliente + totalSobrepesoCliente + totalGastosExtraCliente;
+
         try {
             const consecutivoRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
 
@@ -371,11 +395,17 @@ const TablaViajes = ({user}) => {
                     const yaPagado = lotesExistentes.includes(v.lote);
 
                     if (yaPagado) {
-                        // LOTE YA PAGADO - Actualizar precios, preservar anticipoPago existente
+                        // LOTE YA PAGADO - Actualizar precios (cliente y chofer), preservar anticipoPago existente
                         transaction.update(vehiculoRef, {
-                            storage: parseFloat(v.storage || 0),
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            // Valores cliente (lo que cobra caja)
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
+                            // Valores chofer (referencia)
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
+                            preciosClienteEditados: v.preciosClienteEditados || false,
                             comentarioRecepcion: v.comentarioRecepcion || "",
                             ultimaActualizacionPrecios: {
                                 fecha: fechaOperacionActual,
@@ -390,9 +420,12 @@ const TablaViajes = ({user}) => {
                             timestamp: fechaOperacionActual,
                             tipo: "ACTUALIZACIÓN",
                             tipoRegistro: "ACTUALIZACIÓN PRECIOS",
-                            storage: parseFloat(v.storage || 0),
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
                             numViaje: numViajeFinal,
                             usuario: user?.nombre || "Admin",
                             nota: "Actualización de precios - Lote ya pagado previamente"
@@ -420,12 +453,19 @@ const TablaViajes = ({user}) => {
                             descripcion: "",
                             estado: v.estado || "",
                             estatus: "EB",
-                            gastosExtra: parseFloat(v.gExtra || 0),
+                            // Valores cliente (lo que cobra caja)
+                            gastosExtra: v.preciosClienteEditados ? parseFloat(v.gExtraCliente || 0) : parseFloat(v.gExtra || 0),
                             gatePass: "X",
                             marca: v.marca || "",
                             modelo: v.modelo || "",
                             price: String(v.precioVenta || v.flete || "0"),
                             flete: parseFloat(v.flete || 0),
+                            // Valores chofer (referencia/auditoria)
+                            fleteChofer: parseFloat(v.flete || 0),
+                            storageChofer: parseFloat(v.storage || 0),
+                            sobrePesoChofer: parseFloat(v.sPeso || 0),
+                            gastosExtraChofer: parseFloat(v.gExtra || 0),
+                            preciosClienteEditados: v.preciosClienteEditados || false,
 
                             registro: {
                                 idUsuario: user?.id || "Admin_ID",
@@ -438,8 +478,8 @@ const TablaViajes = ({user}) => {
                                 fechaRegistro: viaje.fechaCreacion
                             },
 
-                            sobrePeso: parseFloat(v.sPeso || 0),
-                            storage: parseFloat(v.storage || 0),
+                            sobrePeso: v.preciosClienteEditados ? parseFloat(v.sPesoCliente || 0) : parseFloat(v.sPeso || 0),
+                            storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
                             titulo: v.titulo || "NO",
@@ -472,11 +512,18 @@ const TablaViajes = ({user}) => {
                     estatus: "PAGADO",
                     resumenFinanciero: {
                         ...viaje.resumenFinanciero,
+                        // Lado chofer
                         totalFletes,
                         totalStorage,
                         totalSobrepeso,
                         totalGastosExtra,
-                        granTotal: granTotalReal
+                        granTotal: granTotalReal,
+                        // Lado cliente
+                        totalPrecioVenta,
+                        totalStorageCliente,
+                        totalSobrepesoCliente,
+                        totalGastosExtraCliente,
+                        granTotalCliente
                     }
                 };
 
@@ -969,15 +1016,15 @@ const TablaViajes = ({user}) => {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                                 {user.admin && viaje.vehiculos.some(v => v.yaPagado) && (
-                                    <span className="text-[9px] font-black uppercase px-3 py-1 rounded-full bg-yellow-500 text-black flex items-center gap-1">
+                                    <span className="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-300 flex items-center gap-1">
                                         ⚠️ CONTIENE LOTES PAGADOS
                                     </span>
                                 )}
-                                <span className={`text-[10px] font-black uppercase px-4 py-1 rounded-full ${
-                                    viaje.estatus === 'PENDIENTE' ? 'bg-yellow-500 text-black' :
-                                        viaje.estatus === 'VERIFICADO' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+                                <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-lg border ${
+                                    viaje.estatus === 'PENDIENTE' ? 'bg-emerald-50 text-emerald-600 border-emerald-300' :
+                                        viaje.estatus === 'VERIFICADO' ? 'bg-emerald-100 text-emerald-700 border-emerald-400' : 'bg-emerald-50 text-emerald-600 border-emerald-300'
                                 }`}>
                                     {viaje.estatus}
                                 </span>
@@ -994,13 +1041,28 @@ const TablaViajes = ({user}) => {
                                     <th className="p-3">Ciudad / Almacén</th>
                                     {user.admin ? <th className="p-3 w-64">Cliente Oficial</th> :
                                         <th className="p-3">Referencia</th>}
-                                    <th className="p-3 text-center text-blue-800">Flete</th>
-                                    <th className="p-3 text-center">Storage</th>
-                                    <th className="p-3 text-center text-gray-400">S. Peso</th>
-                                    <th className="p-3 text-center text-gray-400">G. Extra</th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-blue-800'}`}>
+                                        {vistaPrecios[viaje.id] === 'cliente' ? 'Precio' : 'Flete'}
+                                    </th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : ''}`}>Storage</th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-gray-400'}`}>
+                                        {user.admin && (
+                                            <button
+                                                onClick={() => setVistaPrecios(prev => ({...prev, [viaje.id]: prev[viaje.id] === 'cliente' ? 'chofer' : 'cliente'}))}
+                                                className={`font-black uppercase px-4 py-1.5 rounded-lg mb-1 transition-all block mx-auto text-[10px] tracking-tight shadow-lg ${
+                                                    vistaPrecios[viaje.id] === 'cliente'
+                                                        ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'
+                                                        : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-200'
+                                                }`}
+                                            >
+                                                {vistaPrecios[viaje.id] === 'cliente' ? 'Pago Chofer' : 'Pago Cliente'}
+                                            </button>
+                                        )}
+                                        S. Peso
+                                    </th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-gray-400'}`}>G. Extra</th>
                                     <th className="p-3 text-center">Título</th>
                                     <th className="p-3 text-center bg-gray-100">Notas</th>
-                                    {/* COLUMNA DE NOTAS */}
                                     <th className="p-3 text-center bg-gray-100">Acción</th>
                                 </tr>
                                 </thead>
@@ -1199,17 +1261,56 @@ const TablaViajes = ({user}) => {
                                                 )}
                                             </td>
 
-                                            {['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
-                                                <td key={field} className="p-1 text-center">
-                                                    {puedeEditar ? (
-                                                        <input type="number" value={v[field]}
-                                                               onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
-                                                               className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
-                                                    ) : (
-                                                        <span className="text-[11px] font-bold">${v[field]}</span>
-                                                    )}
-                                                </td>
-                                            ))}
+                                            {/* Celdas de precio - cambian segun vista chofer/cliente */}
+                                            {vistaPrecios[viaje.id] !== 'cliente' ? (
+                                                // VISTA CHOFER: flete, storage, sPeso, gExtra
+                                                ['flete', 'storage', 'sPeso', 'gExtra'].map(field => (
+                                                    <td key={field} className="p-1 text-center">
+                                                        {puedeEditar ? (
+                                                            <input type="number" value={v[field]}
+                                                                   onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
+                                                                   className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold">${v[field]}</span>
+                                                        )}
+                                                    </td>
+                                                ))
+                                            ) : (
+                                                // VISTA CLIENTE: misma estructura, inputs con glow azul neon
+                                                <>
+                                                    <td className="p-1 text-center">
+                                                        {puedeEditar ? (
+                                                            <input type="number" value={v.precioVenta || 0}
+                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, 'precioVenta', e.target.value)}
+                                                                className="w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 focus:border-sky-400 input-neon"/>
+                                                        ) : (
+                                                            <span className="text-[11px] font-bold">${v.precioVenta || 0}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="p-1 text-center">
+                                                        <span className="text-[11px] font-bold text-gray-400">${v.storage || "0"}</span>
+                                                    </td>
+                                                    {[
+                                                        {field: 'sPesoCliente', driver: 'sPeso'},
+                                                        {field: 'gExtraCliente', driver: 'gExtra'}
+                                                    ].map(({field, driver}) => {
+                                                        const val = v.preciosClienteEditados ? (v[field] || "0") : (v[driver] || "0");
+                                                        const isDiff = v.preciosClienteEditados && String(v[field]) !== String(v[driver]);
+                                                        return (
+                                                            <td key={field} className="p-1 text-center">
+                                                                {puedeEditar ? (
+                                                                    <input type="number" value={val}
+                                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
+                                                                        className={`w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 input-neon ${isDiff ? 'bg-yellow-50' : ''}`}
+                                                                        style={isDiff ? {borderColor: '#eab308', boxShadow: '0 0 4px rgba(234,179,8,0.4)'} : {}}/>
+                                                                ) : (
+                                                                    <span className="text-[11px] font-bold">${val}</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
 
                                             <td className="p-1 text-center">
                                                 {puedeEditar ? (
