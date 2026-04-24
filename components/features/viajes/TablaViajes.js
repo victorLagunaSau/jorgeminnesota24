@@ -891,18 +891,18 @@ const TablaViajes = ({user}) => {
             <div className="p-4 space-y-6">
                 {filtrados.map((viaje, vIndex) => (
                     <div key={viaje.id}
-                         className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden transform transition-all">
+                         className={`rounded-xl shadow-lg overflow-hidden transform transition-all duration-300 ${vistaPrecios[viaje.id] === "cliente" ? "border-[3px] border-emerald-500 ring-4 ring-emerald-100 bg-emerald-50/40 shadow-emerald-200/50" : "border-2 border-gray-200 bg-white"}`}>
 
-                        <div className="bg-gray-100 p-3 flex justify-between items-center text-white">
+                        <div className={`p-3 flex justify-between items-center text-white transition-all duration-300 ${vistaPrecios[viaje.id] === "cliente" ? "bg-gradient-to-r from-emerald-500 to-teal-500" : "bg-gray-100"}`}>
                             <div className="flex items-center gap-4">
-                                <div className="bg-red-600 px-3 py-1 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2 text-white">
+                                <div className={`px-3 py-1.5 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2 transition-colors duration-300 rounded-lg border ${vistaPrecios[viaje.id] === 'cliente' ? 'bg-white/20 text-white border-white/40' : 'bg-red-50 text-red-600 border-red-300'}`}>
                                     {viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"}
                                 </div>
                                 <div className="relative">
-                                    <p className="text-[9px] uppercase font-bold text-gray-500 leading-none">Transportista</p>
+                                    <p className={`text-[9px] uppercase font-bold leading-none ${vistaPrecios[viaje.id] === 'cliente' ? 'text-emerald-100' : 'text-gray-500'}`}>Transportista</p>
                                     {user.admin ? (
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm font-black uppercase italic leading-none">
+                                            <p className={`text-sm font-black uppercase italic leading-none ${vistaPrecios[viaje.id] === 'cliente' ? 'text-white' : ''}`}>
                                                 {viaje.chofer?.nombre}
                                             </p>
                                             <button
@@ -913,7 +913,7 @@ const TablaViajes = ({user}) => {
                                                             : { [viaje.id]: "" }
                                                     )
                                                 }
-                                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                                                className={`p-1 rounded transition-colors ${vistaPrecios[viaje.id] === 'cliente' ? 'text-white/80 hover:text-white hover:bg-white/20' : 'text-blue-500 hover:text-blue-700 hover:bg-blue-50'}`}
                                                 title="Cambiar chofer"
                                             >
                                                 <FaUserEdit size={14} />
@@ -1010,21 +1010,28 @@ const TablaViajes = ({user}) => {
                                             })()}
                                         </div>
                                     ) : (
-                                        <p className="text-sm font-black uppercase italic leading-none">
+                                        <p className={`text-sm font-black uppercase italic leading-none ${vistaPrecios[viaje.id] === 'cliente' ? 'text-white' : ''}`}>
                                             {viaje.chofer?.nombre}
                                         </p>
                                     )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
+                                {vistaPrecios[viaje.id] === 'cliente' && (
+                                    <span className="text-[10px] font-black uppercase px-3 py-1.5 rounded-lg bg-white/20 text-white border border-white/40 flex items-center gap-1 tracking-wider">
+                                        MODO CLIENTE
+                                    </span>
+                                )}
                                 {user.admin && viaje.vehiculos.some(v => v.yaPagado) && (
-                                    <span className="text-[9px] font-black uppercase px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-300 flex items-center gap-1">
+                                    <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg flex items-center gap-1 border ${vistaPrecios[viaje.id] === 'cliente' ? 'bg-white/20 text-white border-white/40' : 'bg-emerald-50 text-emerald-600 border-emerald-300'}`}>
                                         ⚠️ CONTIENE LOTES PAGADOS
                                     </span>
                                 )}
                                 <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-lg border ${
-                                    viaje.estatus === 'PENDIENTE' ? 'bg-emerald-50 text-emerald-600 border-emerald-300' :
-                                        viaje.estatus === 'VERIFICADO' ? 'bg-emerald-100 text-emerald-700 border-emerald-400' : 'bg-emerald-50 text-emerald-600 border-emerald-300'
+                                    vistaPrecios[viaje.id] === 'cliente'
+                                        ? 'bg-white/20 text-white border-white/40'
+                                        : viaje.estatus === 'PENDIENTE' ? 'bg-emerald-50 text-emerald-600 border-emerald-300' :
+                                            viaje.estatus === 'VERIFICADO' ? 'bg-emerald-100 text-emerald-700 border-emerald-400' : 'bg-emerald-50 text-emerald-600 border-emerald-300'
                                 }`}>
                                     {viaje.estatus}
                                 </span>
@@ -1034,36 +1041,36 @@ const TablaViajes = ({user}) => {
                         <div className="overflow-x-auto">
                             <table className="table w-full border-collapse">
                                 <thead>
-                                <tr className="text-[10px] uppercase text-gray-500 bg-gray-50 border-b-2 border-gray-200 italic font-black">
+                                <tr className={`text-[10px] uppercase italic font-black transition-colors duration-300 ${vistaPrecios[viaje.id] === 'cliente' ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-200' : 'text-gray-500 bg-gray-50 border-b-2 border-gray-200'}`}>
                                     <th className="p-1 w-8"></th>
                                     <th className="p-3">Lote</th>
                                     <th className="p-3">Vehículo</th>
                                     <th className="p-3">Ciudad / Almacén</th>
                                     {user.admin ? <th className="p-3 w-64">Cliente Oficial</th> :
                                         <th className="p-3">Referencia</th>}
-                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-blue-800'}`}>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-emerald-800' : 'text-blue-800'}`}>
                                         {vistaPrecios[viaje.id] === 'cliente' ? 'Precio' : 'Flete'}
                                     </th>
-                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : ''}`}>Storage</th>
-                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-gray-400'}`}>
+                                    <th className="p-3 text-center">Storage</th>
+                                    <th className="p-3 text-center">
                                         {user.admin && (
                                             <button
                                                 onClick={() => setVistaPrecios(prev => ({...prev, [viaje.id]: prev[viaje.id] === 'cliente' ? 'chofer' : 'cliente'}))}
-                                                className={`font-black uppercase px-4 py-1.5 rounded-lg mb-1 transition-all block mx-auto text-[10px] tracking-tight shadow-lg ${
+                                                className={`font-black uppercase px-5 py-2 rounded-lg mb-1 transition-all block mx-auto text-xs tracking-wide shadow-lg ${
                                                     vistaPrecios[viaje.id] === 'cliente'
                                                         ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-orange-200'
                                                         : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-200'
                                                 }`}
                                             >
-                                                {vistaPrecios[viaje.id] === 'cliente' ? 'Pago Chofer' : 'Pago Cliente'}
+                                                {vistaPrecios[viaje.id] === 'cliente' ? 'CHOFER' : 'CLIENTE'}
                                             </button>
                                         )}
                                         S. Peso
                                     </th>
-                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'text-green-700' : 'text-gray-400'}`}>G. Extra</th>
+                                    <th className="p-3 text-center">G. Extra</th>
                                     <th className="p-3 text-center">Título</th>
-                                    <th className="p-3 text-center bg-gray-100">Notas</th>
-                                    <th className="p-3 text-center bg-gray-100">Acción</th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'bg-emerald-50' : 'bg-gray-100'}`}>Notas</th>
+                                    <th className={`p-3 text-center ${vistaPrecios[viaje.id] === 'cliente' ? 'bg-emerald-50' : 'bg-gray-100'}`}>Acción</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -1269,6 +1276,7 @@ const TablaViajes = ({user}) => {
                                                         {puedeEditar ? (
                                                             <input type="number" value={v[field]}
                                                                    onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
+                                                                   onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                                                                    className="w-16 text-center bg-gray-50 rounded border border-gray-200 outline-none text-[11px] font-black py-1 focus:border-blue-500"/>
                                                         ) : (
                                                             <span className="text-[11px] font-bold">${v[field]}</span>
@@ -1282,6 +1290,7 @@ const TablaViajes = ({user}) => {
                                                         {puedeEditar ? (
                                                             <input type="number" value={v.precioVenta || 0}
                                                                 onChange={(e) => handleLocalEdit(viaje.id, idx, 'precioVenta', e.target.value)}
+                                                                onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                                                                 className="w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 focus:border-sky-400 input-neon"/>
                                                         ) : (
                                                             <span className="text-[11px] font-bold">${v.precioVenta || 0}</span>
@@ -1301,6 +1310,7 @@ const TablaViajes = ({user}) => {
                                                                 {puedeEditar ? (
                                                                     <input type="number" value={val}
                                                                         onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
+                                                                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                                                                         className={`w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 input-neon ${isDiff ? 'bg-yellow-50' : ''}`}
                                                                         style={isDiff ? {borderColor: '#eab308', boxShadow: '0 0 4px rgba(234,179,8,0.4)'} : {}}/>
                                                                 ) : (
