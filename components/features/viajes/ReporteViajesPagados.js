@@ -37,7 +37,7 @@ const ReporteViajesPagados = ({ user }) => {
     const [nuevoNumViaje, setNuevoNumViaje] = useState("");
 
     // Modal para ver nota del vehículo en el historial
-    const [modalNota, setModalNota] = useState({ show: false, lote: "", notaRegistro: "", notaRecepcion: "" });
+    const [modalNota, setModalNota] = useState({ show: false, lote: "", notaRegistro: "", notaRecepcion: "", notaImportada: "" });
 
     // Modal para confirmar cambio de número de viaje
     const [modalCambioNum, setModalCambioNum] = useState({ show: false, viaje: null, nuevoNum: "", resultado: "" });
@@ -45,6 +45,10 @@ const ReporteViajesPagados = ({ user }) => {
     // Lotes que ya fueron cobrados en Caja (estatus "EN")
     const [lotesPagados, setLotesPagados] = useState({});
     const [modalEliminar, setModalEliminar] = useState({ show: false, viaje: null });
+
+    // Asignar chofer a viajes importados (H-*)
+    const [dropdownChoferViaje, setDropdownChoferViaje] = useState(null);
+    const [busquedaChoferHistorial, setBusquedaChoferHistorial] = useState("");
 
     // Cargar datos para agregar viajes
     useEffect(() => {
@@ -110,6 +114,38 @@ const ReporteViajesPagados = ({ user }) => {
             setModalCambioNum(prev => ({ ...prev, resultado: `Error: ${error.message}` }));
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Asignar chofer a viaje importado
+    const asignarChoferAViaje = async (viaje, chofer) => {
+        setDropdownChoferViaje(null);
+        setBusquedaChoferHistorial("");
+        try {
+            const docId = viaje.docId || viaje.numViaje;
+            await firestore().collection("viajesPagados").doc(docId).update({
+                chofer: {
+                    id: chofer.id,
+                    nombre: chofer.nombreChofer,
+                    empresa: chofer.empresaNombre || "",
+                },
+                choferPendiente: false,
+                empresaLiquidada: chofer.empresaNombre || "",
+            });
+            // Actualizar local
+            setViajes(prev => prev.map(v =>
+                (v.docId || v.numViaje) === docId
+                    ? {
+                        ...v,
+                        chofer: { id: chofer.id, nombre: chofer.nombreChofer, empresa: chofer.empresaNombre || "" },
+                        choferPendiente: false,
+                        empresaLiquidada: chofer.empresaNombre || "",
+                    }
+                    : v
+            ));
+        } catch (e) {
+            console.error(e);
+            alert("Error al asignar chofer: " + e.message);
         }
     };
 
@@ -497,6 +533,14 @@ const ReporteViajesPagados = ({ user }) => {
                                         </p>
                                     </div>
                                 )}
+                                {modalNota.notaImportada && (
+                                    <div className="p-3 bg-amber-50 rounded-lg border-l-4 border-amber-500">
+                                        <p className="text-[9px] font-black text-amber-500 uppercase mb-1">Nota (Historial)</p>
+                                        <p className="text-sm font-bold text-amber-700 italic">
+                                            {modalNota.notaImportada}
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex mt-6">
@@ -674,7 +718,8 @@ const ReporteViajesPagados = ({ user }) => {
                                         const total = parseFloat(v.flete || 0) + parseFloat(v.storage || 0) + parseFloat(v.sPeso || 0) + parseFloat(v.gExtra || 0);
                                         const notaRegistro = (v.comentarioRegistro || "").trim();
                                         const notaRecepcion = (v.comentarioRecepcion || "").trim();
-                                        const tieneNota = notaRegistro !== "" || notaRecepcion !== "";
+                                        const notaImportada = (v.notas || "").trim();
+                                        const tieneNota = notaRegistro !== "" || notaRecepcion !== "" || notaImportada !== "";
                                         const lotePagado = lotesPagados[v.lote] === true;
                                         const bgFila = lotePagado ? "bg-green-300" : "bg-white";
                                         return (
@@ -721,7 +766,48 @@ const ReporteViajesPagados = ({ user }) => {
                                                         )
                                                     ) : ""}
                                                 </td>
-                                                <td className="border border-gray-200 px-2 py-1 font-bold uppercase text-gray-700 whitespace-nowrap">{idx === 0 ? viaje.chofer?.nombre : ""}</td>
+                                                <td className="border border-gray-200 px-2 py-1 uppercase text-gray-700" style={{ minWidth: "170px" }}>
+                                                    {idx === 0 ? (
+                                                        viaje.chofer?.nombre ? (
+                                                            <div>
+                                                                <div className="font-black text-blue-800 text-[11px] truncate">{viaje.chofer.nombre}</div>
+                                                                {viaje.chofer.empresa && <div className="text-[8px] text-gray-400 italic truncate">{viaje.chofer.empresa}</div>}
+                                                                {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic">Ref: {viaje.choferExcel}</div>}
+                                                            </div>
+                                                        ) : viaje.choferPendiente ? (
+                                                            <div className="relative">
+                                                                {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic font-bold mb-1">Ref: {viaje.choferExcel}</div>}
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Asignar chofer..."
+                                                                    className="input input-xs w-full font-bold uppercase text-[10px] bg-yellow-50 border-yellow-300"
+                                                                    value={dropdownChoferViaje === viaje.docId ? busquedaChoferHistorial : ""}
+                                                                    onChange={(e) => { setBusquedaChoferHistorial(e.target.value); setDropdownChoferViaje(viaje.docId); }}
+                                                                    onFocus={() => setDropdownChoferViaje(viaje.docId)}
+                                                                />
+                                                                {dropdownChoferViaje === viaje.docId && (
+                                                                    <div className="absolute z-[200] w-72 bg-white border-2 border-black shadow-2xl rounded-md max-h-48 overflow-y-auto mt-1 left-0">
+                                                                        {choferes
+                                                                            .filter(c => {
+                                                                                const t = busquedaChoferHistorial.toUpperCase();
+                                                                                return !t || c.nombreChofer?.toUpperCase().includes(t) || c.empresaNombre?.toUpperCase().includes(t);
+                                                                            })
+                                                                            .slice(0, 15)
+                                                                            .map(c => (
+                                                                                <div key={c.id} className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between" onClick={() => asignarChoferAViaje(viaje, c)}>
+                                                                                    <span>{c.nombreChofer}</span>
+                                                                                    <span className="text-[8px] opacity-60">{c.empresaNombre}</span>
+                                                                                </div>
+                                                                            ))
+                                                                        }
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-400 italic text-[10px]">Sin chofer</span>
+                                                        )
+                                                    ) : ""}
+                                                </td>
                                                 <td className="border border-gray-200 px-2 py-1 uppercase text-gray-600">{v.marca}</td>
                                                 <td className="border border-gray-200 px-2 py-1 uppercase text-gray-600">{v.modelo}</td>
                                                 <td className="border border-gray-200 px-2 py-1 font-mono font-black text-blue-700">{v.lote}</td>
@@ -738,7 +824,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                     {tieneNota ? (
                                                         <button
                                                             type="button"
-                                                            onClick={() => setModalNota({ show: true, lote: v.lote, notaRegistro, notaRecepcion })}
+                                                            onClick={() => setModalNota({ show: true, lote: v.lote, notaRegistro, notaRecepcion, notaImportada })}
                                                             className="text-blue-600 hover:text-blue-800"
                                                         >
                                                             <FaCommentDots size={14} />
@@ -1125,6 +1211,9 @@ const ReporteViajesPagados = ({ user }) => {
                     </div>
                 </div>
             )}
+
+            {/* Overlay para cerrar dropdown chofer */}
+            {dropdownChoferViaje && <div className="fixed inset-0 z-[150]" onClick={() => { setDropdownChoferViaje(null); setBusquedaChoferHistorial(""); }} />}
         </div>
     );
 };
