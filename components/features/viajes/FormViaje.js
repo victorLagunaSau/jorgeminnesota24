@@ -11,7 +11,9 @@ import HojaVerificacion from "./HojaVerificacion";
 import { COLLECTIONS, FIELD_LIMITS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
 import Alert from "../../ui/Alert";
 
-const FormViaje = ({user, onViajeCreado}) => {
+const DRAFTS_KEY = "formViaje_borradores";
+
+const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
@@ -61,6 +63,15 @@ const FormViaje = ({user, onViajeCreado}) => {
 
     const [vehiculos, setVehiculos] = useState([]);
 
+    // --- BORRADOR / AUTO-GUARDADO ---
+    const borradorCargado = useRef(false);
+    const draftIdRef = useRef(draftIdProp || null);
+    const desmontado = useRef(false);
+
+    useEffect(() => {
+        return () => { desmontado.current = true; };
+    }, []);
+
 // --- FILTRADO DE CHOFERES DESDE CONTEXTO ---
     const choferes = useMemo(() => {
         if (!user || !choferesRaw.length) return [];
@@ -109,10 +120,84 @@ const FormViaje = ({user, onViajeCreado}) => {
         return () => unsubProvincias();
     }, [user]);
 
+    // --- RESTAURAR BORRADOR SOLO SI SE PIDIÓ ---
+    useEffect(() => {
+        if (!restaurarDraft || !draftIdRef.current) return;
+        try {
+            const all = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "[]");
+            const draft = all.find(d => d.id === draftIdRef.current);
+            if (draft && draft.vehiculos && draft.vehiculos.length > 0) {
+                setEncabezado(draft.encabezado || {numViaje: "", choferId: "", choferManual: "", fecha: new Date().toLocaleDateString()});
+                setVehiculos(draft.vehiculos || []);
+                setViajeIniciado(draft.viajeIniciado || false);
+                setChoferManual(draft.choferManual || "");
+                setTokenUsado(draft.tokenUsado || null);
+                setTokenValido(draft.tokenValido || false);
+                if (draft.choferNombre) {
+                    setBusquedaChofer(draft.choferNombre);
+                } else if (draft.encabezado?.choferManual) {
+                    setBusquedaChofer(draft.encabezado.choferManual);
+                }
+                borradorCargado.current = true;
+            }
+        } catch (_) {}
+    }, [restaurarDraft]);
+
+    // --- AUTO-GUARDADO CON DEBOUNCE ---
+    const autoSaveTimer = useRef(null);
+    useEffect(() => {
+        if (desmontado.current) return;
+        if (!borradorCargado.current && !viajeIniciado) return;
+        if (vehiculos.length === 0 && !viajeIniciado) return;
+
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+        autoSaveTimer.current = setTimeout(() => {
+            if (desmontado.current) return;
+            if (!draftIdRef.current) {
+                draftIdRef.current = "draft_" + Date.now();
+            }
+            try {
+                const all = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "[]");
+                const draftData = {
+                    id: draftIdRef.current,
+                    encabezado,
+                    vehiculos,
+                    viajeIniciado,
+                    choferManual,
+                    choferNombre: busquedaChofer,
+                    tokenUsado,
+                    tokenValido,
+                    guardadoEn: new Date().toISOString()
+                };
+                const idx = all.findIndex(d => d.id === draftIdRef.current);
+                if (idx >= 0) {
+                    all[idx] = draftData;
+                } else {
+                    all.push(draftData);
+                }
+                localStorage.setItem(DRAFTS_KEY, JSON.stringify(all));
+            } catch (_) {}
+        }, 800);
+
+        return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+    }, [encabezado, vehiculos, viajeIniciado, choferManual, busquedaChofer, tokenUsado, tokenValido]);
+
+    const limpiarBorrador = () => {
+        if (draftIdRef.current) {
+            try {
+                const all = JSON.parse(localStorage.getItem(DRAFTS_KEY) || "[]");
+                localStorage.setItem(DRAFTS_KEY, JSON.stringify(all.filter(d => d.id !== draftIdRef.current)));
+            } catch (_) {}
+        }
+        draftIdRef.current = null;
+        borradorCargado.current = false;
+    };
+
     // --- FUNCIÓN PARA INICIAR VIAJE (número se asigna al pagar) ---
     const iniciarViajeConFolio = async () => {
         setLoading(true);
         try {
+            borradorCargado.current = true;
             setViajeIniciado(true);
         } catch (e) {
             setAlertMessage({msg: "Error al iniciar viaje", tipo: 'error'});
@@ -394,8 +479,12 @@ const FormViaje = ({user, onViajeCreado}) => {
                 });
             });
 
-            await batch.commit();
+            await Promise.race([
+                batch.commit(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Sin conexión. Verifica tu internet e intenta de nuevo.")), 15000))
+            ]);
             setViajeReciente(viajeData);
+            limpiarBorrador();
 
             // Si hay callback de redirección (modo administrativo), redirigir automáticamente
             if (onViajeCreado) {
@@ -463,12 +552,12 @@ const FormViaje = ({user, onViajeCreado}) => {
                         />
 
                         <button onClick={() => {
+                            limpiarBorrador();
                             setVehiculos([]);
                             setEncabezado({numViaje: "", choferId: "", choferManual: "", fecha: new Date().toLocaleDateString()});
                             setViajeIniciado(false);
                             setMostrarModalExito(false);
                             setBusquedaChofer("");
-                            // Resetear estados del token
                             setTokenValido(false);
                             setTokenUsado(null);
                             setChoferManual("");
@@ -767,7 +856,7 @@ const FormViaje = ({user, onViajeCreado}) => {
                 <div className="flex justify-between items-center mb-4">
                     <span
                         className="text-[11px] font-black uppercase text-gray-400 italic">Unidades: {vehiculos.length} / 13</span>
-                    <button onClick={agregarFila} disabled={vehiculos.length >= 13}
+                    <button onMouseDown={(e) => { e.preventDefault(); agregarFila(); }} disabled={vehiculos.length >= 13}
                             className="btn btn-sm btn-info text-white font-black px-8">+ Agregar
                     </button>
                 </div>

@@ -1,4 +1,4 @@
-import React, {useState} from "react";
+import React, {useState, useEffect} from "react";
 import Head from "next/head";
 import { useAuthContext } from "../context/auth";
 import { AdminDataProvider } from "../context/adminData";
@@ -9,10 +9,20 @@ import {FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt} from "react-icons/fa";
 const CarriersPage = () => {
     const { user, loading, isEmpresa, signIn, signOut } = useAuthContext();
     const [view, setView] = useState("tabla");
+    const [usarBorrador, setUsarBorrador] = useState(false);
 
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
     const [error, setError] = useState("");
+    const [borradores, setBorradores] = useState([]);
+    const [editandoDraftId, setEditandoDraftId] = useState(null);
+
+    useEffect(() => {
+        try {
+            const all = JSON.parse(localStorage.getItem("formViaje_borradores") || "[]");
+            setBorradores(all.filter(d => d.vehiculos && d.vehiculos.length > 0));
+        } catch (_) { setBorradores([]); }
+    }, [view]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -103,7 +113,7 @@ const CarriersPage = () => {
 
                     {/* BOTÓN SUPERIOR PEQUEÑO: SOLO MUESTRA LA SECCIÓN DONDE NO ESTÁS */}
                     <button
-                        onClick={() => setView(view === 'tabla' ? 'nuevo' : 'tabla')}
+                        onClick={() => { setUsarBorrador(false); setView(view === 'tabla' ? 'nuevo' : 'tabla'); }}
                         className="btn btn-xs h-8 bg-gray-800 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
                     >
                         {view === 'tabla' ? <><FaPlus className="mr-1"/> Nuevo</> : <><FaListUl className="mr-1"/> Lista</>}
@@ -113,16 +123,16 @@ const CarriersPage = () => {
                 {/* CONTENIDO PRINCIPAL */}
                 <main className="p-4">
                     {view === "nuevo" ? (
-                        <FormViaje user={user} isCarrierMode={true} onSuccess={() => setView("tabla")}/>
+                        <FormViaje user={user} isCarrierMode={true} restaurarDraft={usarBorrador} draftId={editandoDraftId} onSuccess={() => { setUsarBorrador(false); setEditandoDraftId(null); setView("tabla"); }}/>
                     ) : (
-                        <TablaViajes user={user} isCarrierMode={true}/>
+                        <TablaViajes user={user} isCarrierMode={true} borradores={borradores} onEditarBorrador={(draftId) => { setEditandoDraftId(draftId); setUsarBorrador(true); setView("nuevo"); }} onDescartarBorrador={(draftId) => { try { const all = JSON.parse(localStorage.getItem("formViaje_borradores") || "[]"); localStorage.setItem("formViaje_borradores", JSON.stringify(all.filter(d => d.id !== draftId))); } catch(_){} setBorradores(prev => prev.filter(d => d.id !== draftId)); }}/>
                     )}
                 </main>
 
                 {/* NAVEGACIÓN INFERIOR: CUADRADA, DE LADO A LADO */}
                 <nav className="fixed bottom-0 left-0 w-full flex h-20 z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]">
                     <button
-                        onClick={() => setView("tabla")}
+                        onClick={() => { setUsarBorrador(false); setView("tabla"); }}
                         className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors border-r border-gray-100 ${view === 'tabla' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                     >
                         <FaListUl size={22}/>
@@ -130,7 +140,7 @@ const CarriersPage = () => {
                     </button>
 
                     <button
-                        onClick={() => setView("nuevo")}
+                        onClick={() => { setUsarBorrador(false); setView("nuevo"); }}
                         className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === 'nuevo' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                     >
                         <FaPlus size={22}/>
