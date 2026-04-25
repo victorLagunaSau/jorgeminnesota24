@@ -302,6 +302,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                         id="storage"
                         value={storage}
                         onChange={(e) => setStorage(Math.max(0, e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                         min="0"
                     />
@@ -313,6 +314,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                         id="sobrePeso"
                         value={sobrePeso}
                         onChange={(e) => setSobrePeso(Math.max(0, e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                         min="0"
                     />
@@ -324,6 +326,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                         id="gastosExtra"
                         value={gastosExtra}
                         onChange={(e) => setGastosExtra(Math.max(0, e.target.value))}
+                        onFocus={(e) => e.target.select()}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                         min="0"
                     />

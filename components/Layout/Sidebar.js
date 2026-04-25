@@ -205,11 +205,11 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Corregir Precios - Solo Admin Master, temporal */}
+                        {/* Auditoría de Cobros - Solo Admin Master */}
                         {isAdminMaster && (
                             <li>
                                 <button className={getButtonClass('migrarPrecios')} onClick={() => handleSelectModule('migrarPrecios')}>
-                                    <FaCog className="mr-3 text-orange-500" size={18} /> Corregir Precios
+                                    <FaCog className="mr-3 text-orange-500" size={18} /> Auditoría Cobros
                                 </button>
                             </li>
                         )}
