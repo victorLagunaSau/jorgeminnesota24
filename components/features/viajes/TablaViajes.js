@@ -111,7 +111,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     if (estadoData && estadoData.regions?.length > 0) {
                         nuevosVehiculos[vehiculoIdx].ciudad = estadoData.regions[0].city;
                         nuevosVehiculos[vehiculoIdx].flete = (estadoData.regions[0].cost || 0).toString();
-                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(estadoData.regions[0].price || 0);
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(estadoData.regions[0].precioPagina || estadoData.regions[0].price || 0);
                     } else {
                         nuevosVehiculos[vehiculoIdx].ciudad = "";
                         nuevosVehiculos[vehiculoIdx].flete = "0";
@@ -123,7 +123,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     const regionData = estadoData?.regions?.find(r => r.city === value);
                     if (regionData) {
                         nuevosVehiculos[vehiculoIdx].flete = (regionData.cost || 0).toString();
-                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(regionData.price || 0);
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(regionData.precioPagina || regionData.price || 0);
                     } else {
                         nuevosVehiculos[vehiculoIdx].flete = "0";
                         nuevosVehiculos[vehiculoIdx].precioVenta = 0;
@@ -1291,7 +1291,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                             <input type="number" value={v.precioVenta || 0}
                                                                 onChange={(e) => handleLocalEdit(viaje.id, idx, 'precioVenta', e.target.value)}
                                                                 onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
-                                                                className="w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 focus:border-sky-400 input-neon"/>
+                                                                className="w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 input-neon"/>
                                                         ) : (
                                                             <span className="text-[11px] font-bold">${v.precioVenta || 0}</span>
                                                         )}
@@ -1311,10 +1311,10 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                                     <input type="number" value={val}
                                                                         onChange={(e) => handleLocalEdit(viaje.id, idx, field, e.target.value)}
                                                                         onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
-                                                                        className={`w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 input-neon ${isDiff ? 'bg-yellow-50' : ''}`}
-                                                                        style={isDiff ? {borderColor: '#eab308', boxShadow: '0 0 4px rgba(234,179,8,0.4)'} : {}}/>
+                                                                        className={`w-16 text-center rounded outline-none text-[11px] font-black py-1 ${isDiff ? 'bg-blue-50 text-blue-800 border-[3px] border-sky-400' : 'bg-gray-50 input-neon'}`}
+                                                                        style={isDiff ? {boxShadow: '0 0 10px rgba(56,189,248,0.6), 0 0 3px rgba(56,189,248,0.3)'} : {}}/>
                                                                 ) : (
-                                                                    <span className="text-[11px] font-bold">${val}</span>
+                                                                    <span className={`text-[11px] font-bold ${isDiff ? 'text-blue-900' : ''}`}>${val}</span>
                                                                 )}
                                                             </td>
                                                         );

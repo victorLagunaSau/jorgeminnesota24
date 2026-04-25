@@ -12,12 +12,17 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
         if (currentRegions?.regions) {
             const esTexas = (currentRegions.state || "").toUpperCase().includes("TEXAS");
             const incremento = esTexas ? 50 : 100;
-            const data = currentRegions.regions.map(r => ({
-                ...r,
-                cost: r.cost || "0",
-                precioPagina: r.precioPagina || (parseFloat(r.price || 0) + incremento).toString(),
-                profit: r.profit || (parseFloat(r.price || 0) - parseFloat(r.cost || 0)).toString()
-            })).sort((a, b) => a.order - b.order);
+            const data = currentRegions.regions.map(r => {
+                // Sincronizar: usar precioPagina como fuente de verdad
+                const precio = r.precioPagina || r.price || "0";
+                return {
+                    ...r,
+                    cost: r.cost || "0",
+                    price: precio,
+                    precioPagina: precio,
+                    profit: (parseFloat(precio) - parseFloat(r.cost || 0)).toString()
+                };
+            }).sort((a, b) => a.order - b.order);
             setUpdatedRegions(data);
         }
     }, [currentRegions]);
@@ -26,10 +31,17 @@ const EditarEstadosPrecios = ({ currentRegions, closeModal, user }) => {
         const copy = [...updatedRegions];
         copy[index][field] = value;
 
+        // Sincronizar precioPagina y price (siempre el mismo valor)
+        if (field === 'precioPagina') {
+            copy[index].price = value;
+        } else if (field === 'price') {
+            copy[index].precioPagina = value;
+        }
+
         // CÁLCULO EN TIEMPO REAL: Si cambia precio o costo, actualizamos profit automáticamente
-        if (field === 'price' || field === 'cost') {
-            const p = field === 'price' ? parseFloat(value || 0) : parseFloat(copy[index].price || 0);
-            const c = field === 'cost' ? parseFloat(value || 0) : parseFloat(copy[index].cost || 0);
+        if (field === 'price' || field === 'precioPagina' || field === 'cost') {
+            const p = parseFloat(copy[index].price || 0);
+            const c = parseFloat(copy[index].cost || 0);
             copy[index].profit = (p - c).toString();
         }
 

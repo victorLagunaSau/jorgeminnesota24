@@ -24,7 +24,9 @@ const ReporteMovimientos = React.forwardRef(({
                                                  entradasData,
                                                  totalRecibido,
                                                  salidasData,
-                                                 totalSalidas
+                                                 totalSalidas,
+                                                 isAdminMaster,
+                                                 onDataChange
                                              }, ref) => (
     <div ref={ref} className="m-4" style={{maxWidth: "90%", marginLeft: "auto", marginRight: "auto"}}>
         <div className="encabezado-impresion w-full flex justify-between border-t border-gray-300 pt-1 hidden-print">
@@ -41,6 +43,8 @@ const ReporteMovimientos = React.forwardRef(({
             totalCC={totalCC}
             totalPendientes={totalPendientes}
             totalCredito={totalCredito}
+            isAdminMaster={isAdminMaster}
+            onDataChange={onDataChange}
         />
 
         {/* Tabla de Anticipos (Pagos Adelantados) */}
@@ -332,6 +336,8 @@ const CorteDia = ({user}) => {
                 totalRecibido={totalRecibido}
                 salidasData={salidasData}
                 totalSalidas={totalSalidas}
+                isAdminMaster={isAdminMaster}
+                onDataChange={handleButtonClick}
             />
         </div>
     );

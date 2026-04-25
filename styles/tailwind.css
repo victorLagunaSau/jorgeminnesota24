@@ -73,14 +73,14 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Glow suave para inputs vista cliente */
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 3px rgba(56,189,248,0.3); }
-  50% { box-shadow: 0 0 6px rgba(56,189,248,0.5); }
+/* Glow suave para inputs vista cliente (verde esmeralda) */
+@keyframes glowPulseGreen {
+  0%, 100% { box-shadow: 0 0 3px rgba(16,185,129,0.3); }
+  50% { box-shadow: 0 0 6px rgba(16,185,129,0.5); }
 }
 .input-neon {
-  border: 1.5px solid #38bdf8 !important;
-  animation: glowPulse 2s ease-in-out infinite;
+  border: 1.5px solid #10b981 !important;
+  animation: glowPulseGreen 2s ease-in-out infinite;
 }
 
 /* purgecss end ignore */
