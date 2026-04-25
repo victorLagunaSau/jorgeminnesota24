@@ -26,7 +26,7 @@ const Vehiculos = ({user}) => {
     const itemsPerPage = 20;
     const ID_USUARIO_PERMITIDO = "BdRfEmYfd7ZLjWQHB06uuT6w2112";
     const isAdminMaster = user?.adminMaster === true;
-    const edicionPermitida = isAdminMaster || user.id === ID_USUARIO_PERMITIDO;
+    const edicionPermitida = isAdminMaster || user.id === ID_USUARIO_PERMITIDO || user?.caja === true;
 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [deleteTargetVehiculo, setDeleteTargetVehiculo] = useState(null);
@@ -467,15 +467,16 @@ const Vehiculos = ({user}) => {
                                             Editar
                                         </button>
 
-                                        <button
-                                            className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
-                                            onClick={() => handleEntregadoClick(vehiculo)}
-                                            disabled={!edicionPermitida}
-                                        >
-                                            Entregado
-                                        </button>
+                                        {isAdminMaster && (
+                                            <button
+                                                className="btn btn-xs btn-outline border-black text-black hover:bg-black hover:text-white font-bold"
+                                                onClick={() => handleEntregadoClick(vehiculo)}
+                                            >
+                                                Entregado
+                                            </button>
+                                        )}
 
-                                        {edicionPermitida && (
+                                        {isAdminMaster && (
                                             <>
                                                 <button
                                                     className="btn btn-xs btn-outline border-blue-600 text-blue-700 hover:bg-blue-600 hover:text-white font-bold"
