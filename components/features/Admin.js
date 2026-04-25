@@ -12,6 +12,7 @@ import Sidebar from "../Layout/Sidebar";
 import EstadosPrecios from "./config/EstadosPrecios";
 import Users from "./config/Users";
 import EliminarMovimientosERC from "./config/EliminarMovimientosERC";
+import MigrarPrecios from "./config/MigrarPrecios";
 
 // Módulos - Viajes
 import Viajes from "./viajes/Viajes";
@@ -108,6 +109,8 @@ const Admin = () => {
                 return <Vehiculos user={user} />;
             case 'estadosPrecios':
                 return <EstadosPrecios user={user}/>;
+            case 'migrarPrecios':
+                return <MigrarPrecios user={user}/>;
             case 'reports':
                 return <Reports user={user} />;
             case 'reportsPendientesPago':

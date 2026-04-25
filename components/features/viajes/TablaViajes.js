@@ -111,7 +111,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     if (estadoData && estadoData.regions?.length > 0) {
                         nuevosVehiculos[vehiculoIdx].ciudad = estadoData.regions[0].city;
                         nuevosVehiculos[vehiculoIdx].flete = (estadoData.regions[0].cost || 0).toString();
-                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(estadoData.regions[0].price || 0);
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(estadoData.regions[0].precioPagina || estadoData.regions[0].price || 0);
                     } else {
                         nuevosVehiculos[vehiculoIdx].ciudad = "";
                         nuevosVehiculos[vehiculoIdx].flete = "0";
@@ -123,7 +123,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     const regionData = estadoData?.regions?.find(r => r.city === value);
                     if (regionData) {
                         nuevosVehiculos[vehiculoIdx].flete = (regionData.cost || 0).toString();
-                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(regionData.price || 0);
+                        nuevosVehiculos[vehiculoIdx].precioVenta = parseFloat(regionData.precioPagina || regionData.price || 0);
                     } else {
                         nuevosVehiculos[vehiculoIdx].flete = "0";
                         nuevosVehiculos[vehiculoIdx].precioVenta = 0;

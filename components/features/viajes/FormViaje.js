@@ -317,7 +317,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                         actualizacion.ciudad = estadoData.regions[0].city;
                         // LOGICA DE COSTO VS PRECIO
                         actualizacion.flete = (estadoData.regions[0].cost || 0).toString();
-                        actualizacion.precioVenta = parseFloat(estadoData.regions[0].price || 0);
+                        actualizacion.precioVenta = parseFloat(estadoData.regions[0].precioPagina || estadoData.regions[0].price || 0);
                     } else {
                         actualizacion.ciudad = "";
                         actualizacion.flete = "0";
@@ -331,7 +331,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     if (regionData) {
                         // LOGICA DE COSTO VS PRECIO
                         actualizacion.flete = (regionData.cost || 0).toString();
-                        actualizacion.precioVenta = parseFloat(regionData.price || 0);
+                        actualizacion.precioVenta = parseFloat(regionData.precioPagina || regionData.price || 0);
                     } else {
                         actualizacion.flete = "0";
                         actualizacion.precioVenta = 0;
