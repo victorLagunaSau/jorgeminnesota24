@@ -41,6 +41,7 @@ import ReportPendientesPago from "./reportes/ReportPendientesPago";
 import EstadoFinanciero from "./analisis/EstadoFinanciero";
 import HistorialAnticipos from "./analisis/HistorialAnticipos";
 import HistorialAutorizaciones from "./analisis/HistorialAutorizaciones";
+import Gastos from "./analisis/Gastos";
 
 // Módulos - Otros
 import Cobranza from "./cobranza/Cobranza";
@@ -120,6 +121,8 @@ const Admin = () => {
                 return <HistorialAnticipos />;
             case 'historialAutorizaciones':
                 return <HistorialAutorizaciones />;
+            case 'gastos':
+                return <Gastos />;
             case 'users':
                 return <Users />;
             case 'registroMasivoVehiculos':

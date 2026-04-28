@@ -186,6 +186,7 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                         <li><button className={getButtonClass('estadoFinanciero')} onClick={() => handleSelectModule('estadoFinanciero')}>Estado Financiero</button></li>
                                         <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
                                         <li><button className={getButtonClass('historialAutorizaciones')} onClick={() => handleSelectModule('historialAutorizaciones')}>Autorizaciones</button></li>
+                                        <li><button className={getButtonClass('gastos')} onClick={() => handleSelectModule('gastos')}>Gastos</button></li>
                                     </ul>
                                 </div>
                             </li>
