@@ -47,9 +47,9 @@ const Gastos = () => {
         setComprimiendo(true);
         let archivoFinal = file;
         try {
-            archivoFinal = await imageCompression(file, { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: true, fileType: "image/webp" });
+            archivoFinal = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true, fileType: "image/webp" });
         } catch {
-            try { archivoFinal = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1200, useWebWorker: true }); }
+            try { archivoFinal = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2000, useWebWorker: true }); }
             catch { alert("Error al comprimir."); setComprimiendo(false); return; }
         }
         setComprimiendo(false);
@@ -205,7 +205,8 @@ const Gastos = () => {
                                 <th className="pb-2 font-medium">Concepto</th>
                                 <th className="pb-2 font-medium">Fecha</th>
                                 <th className="pb-2 font-medium">Subido por</th>
-                                <th className="pb-2 text-right pr-1 font-medium">Monto</th>
+                                <th className="pb-2 text-right font-medium">Monto</th>
+                                {isAdminMaster && <th className="pb-2 w-8"></th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -228,7 +229,18 @@ const Gastos = () => {
                                     </td>
                                     <td className="py-2.5 text-gray-500 whitespace-nowrap">{formatFecha(g.fechaGasto)}</td>
                                     <td className="py-2.5 text-gray-500 truncate max-w-[120px]">{g.creadoPor?.nombre}</td>
-                                    <td className="py-2.5 text-right pr-1 font-bold text-gray-800 whitespace-nowrap">{formatMoneda(g.monto)}</td>
+                                    <td className="py-2.5 text-right font-bold text-gray-800 whitespace-nowrap">{formatMoneda(g.monto)}</td>
+                                    {isAdminMaster && (
+                                        <td className="py-2.5 pr-1 text-center">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleEliminar(g); }}
+                                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                                title="Eliminar"
+                                            >
+                                                <FaTimes size={10} />
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
