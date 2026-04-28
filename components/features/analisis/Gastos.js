@@ -71,6 +71,7 @@ const Gastos = () => {
     const [cropMode, setCropMode] = useState(false);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
+    const [cropAspect, setCropAspect] = useState(null);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
     const [guardandoCrop, setGuardandoCrop] = useState(false);
     const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
@@ -92,9 +93,9 @@ const Gastos = () => {
         setComprimiendo(true);
         let archivoFinal = file;
         try {
-            archivoFinal = await imageCompression(file, { maxSizeMB: 1.5, maxWidthOrHeight: 2500, useWebWorker: true, fileType: "image/webp" });
+            archivoFinal = await imageCompression(file, { maxSizeMB: 2.5, maxWidthOrHeight: 3000, useWebWorker: true, fileType: "image/webp" });
         } catch {
-            try { archivoFinal = await imageCompression(file, { maxSizeMB: 2, maxWidthOrHeight: 2500, useWebWorker: true }); }
+            try { archivoFinal = await imageCompression(file, { maxSizeMB: 3, maxWidthOrHeight: 3000, useWebWorker: true }); }
             catch { alert("Error al comprimir."); setComprimiendo(false); return; }
         }
         setComprimiendo(false);
@@ -231,6 +232,7 @@ const Gastos = () => {
         setCropMode(false);
         setCrop({ x: 0, y: 0 });
         setZoom(1);
+        setCropAspect(null);
     };
 
     if (loading) return <div className="flex justify-center py-20"><FaSpinner className="animate-spin text-gray-400 text-2xl" /></div>;
@@ -367,25 +369,44 @@ const Gastos = () => {
                     <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="relative">
                             {cropMode ? (
-                                <div className="relative w-full h-72 bg-gray-900 rounded-t-xl overflow-hidden">
-                                    <Cropper
-                                        image={gastoSeleccionado.imagenUrl}
-                                        crop={crop}
-                                        zoom={zoom}
-                                        aspect={undefined}
-                                        onCropChange={setCrop}
-                                        onZoomChange={setZoom}
-                                        onCropComplete={onCropComplete}
-                                    />
-                                    <div className="absolute bottom-2 left-2 right-2 flex justify-between z-10">
-                                        <button onClick={() => setCropMode(false)} className="bg-white/90 text-gray-700 px-3 py-1.5 rounded text-xs font-bold hover:bg-white">
-                                            Cancelar
-                                        </button>
-                                        <button onClick={handleCropSave} disabled={guardandoCrop}
-                                            className="bg-gray-800 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-700 disabled:bg-gray-400 flex items-center gap-1">
-                                            {guardandoCrop ? <FaSpinner className="animate-spin" size={10} /> : <FaCheck size={10} />}
-                                            Recortar
-                                        </button>
+                                <div className="bg-gray-900 rounded-t-xl overflow-hidden">
+                                    <div className="relative w-full h-80">
+                                        <Cropper
+                                            image={gastoSeleccionado.imagenUrl}
+                                            crop={crop}
+                                            zoom={zoom}
+                                            aspect={cropAspect || 4 / 3}
+                                            onCropChange={setCrop}
+                                            onZoomChange={setZoom}
+                                            onCropComplete={onCropComplete}
+                                            restrictPosition={false}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between px-3 py-2 bg-gray-800">
+                                        <div className="flex gap-1">
+                                            {[
+                                                { label: "Ancho", val: 16 / 9 },
+                                                { label: "Cuadro", val: 1 },
+                                                { label: "Alto", val: 3 / 4 },
+                                                { label: "Largo", val: 9 / 16 },
+                                            ].map((o) => (
+                                                <button key={o.label}
+                                                    onClick={() => { setCropAspect(o.val); setCrop({ x: 0, y: 0 }); }}
+                                                    className={`px-2 py-1 rounded text-[10px] font-bold ${cropAspect === o.val ? "bg-white text-gray-800" : "text-gray-300 hover:bg-gray-700"}`}>
+                                                    {o.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex gap-1.5">
+                                            <button onClick={() => setCropMode(false)} className="bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-500">
+                                                Cancelar
+                                            </button>
+                                            <button onClick={handleCropSave} disabled={guardandoCrop}
+                                                className="bg-white text-gray-800 px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-200 disabled:bg-gray-400 flex items-center gap-1">
+                                                {guardandoCrop ? <FaSpinner className="animate-spin" size={10} /> : <FaCheck size={10} />}
+                                                Recortar
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
