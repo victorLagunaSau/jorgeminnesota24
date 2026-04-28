@@ -179,10 +179,12 @@ const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
                     </p>
                 )}
                 <p className="text-black-500 text-2xl">
-                    <strong className="mr-3"> Fecha de Registro de Pago: </strong> {
-                    registro?.seconds
-                        ? moment(registro.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                        : moment().format('DD/MM/YYYY HH:mm:ss')
+                    <strong className="mr-3"> Alta de Vehículo: </strong> {
+                    vehiculoData?.registro?.timestamp?.seconds
+                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : registro?.seconds
+                            ? moment(registro.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                            : "Sin fecha"
                 }
                 </p>
 

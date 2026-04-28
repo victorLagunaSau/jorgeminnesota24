@@ -1287,14 +1287,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                 // VISTA CLIENTE: misma estructura, inputs con glow azul neon
                                                 <>
                                                     <td className="p-1 text-center">
-                                                        {puedeEditar ? (
-                                                            <input type="number" value={v.precioVenta || 0}
-                                                                onChange={(e) => handleLocalEdit(viaje.id, idx, 'precioVenta', e.target.value)}
-                                                                onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
-                                                                className="w-16 text-center bg-gray-50 rounded outline-none text-[11px] font-black py-1 input-neon"/>
-                                                        ) : (
-                                                            <span className="text-[11px] font-bold">${v.precioVenta || 0}</span>
-                                                        )}
+                                                        <span className="text-[11px] font-bold text-gray-400">${v.precioVenta || 0}</span>
                                                     </td>
                                                     <td className="p-1 text-center">
                                                         <span className="text-[11px] font-bold text-gray-400">${v.storage || "0"}</span>
@@ -1451,7 +1444,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                 ))}
 
                 {/* TARJETAS DE BORRADORES */}
-                {borradores && borradores.map((borrador) => (
+                {!loading && borradores && borradores.map((borrador) => (
                     <div key={borrador.id} className="rounded-xl shadow-lg overflow-hidden border-2 border-amber-400 bg-white">
                         <div className="bg-amber-50 p-3 flex justify-between items-center">
                             <div className="flex items-center gap-4">

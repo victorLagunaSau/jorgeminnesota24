@@ -4,7 +4,8 @@ import { useAuthContext } from "../context/auth";
 import { AdminDataProvider } from "../context/adminData";
 import FormViaje from "../components/features/viajes/FormViaje";
 import TablaViajes from "../components/features/viajes/TablaViajes";
-import {FaPlus, FaListUl, FaUser, FaLock, FaSignOutAlt} from "react-icons/fa";
+import HistorialViajesCarrier from "../components/features/viajes/HistorialViajesCarrier";
+import {FaPlus, FaListUl, FaHistory, FaUser, FaLock, FaSignOutAlt} from "react-icons/fa";
 
 const CarriersPage = () => {
     const { user, loading, isEmpresa, signIn, signOut } = useAuthContext();
@@ -111,19 +112,41 @@ const CarriersPage = () => {
                         </p>
                     </div>
 
-                    {/* BOTÓN SUPERIOR PEQUEÑO: SOLO MUESTRA LA SECCIÓN DONDE NO ESTÁS */}
-                    <button
-                        onClick={() => { setUsarBorrador(false); setView(view === 'tabla' ? 'nuevo' : 'tabla'); }}
-                        className="btn btn-xs h-8 bg-gray-800 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
-                    >
-                        {view === 'tabla' ? <><FaPlus className="mr-1"/> Nuevo</> : <><FaListUl className="mr-1"/> Lista</>}
-                    </button>
+                    {/* BOTONES SUPERIORES */}
+                    <div className="flex gap-2">
+                        {view !== 'nuevo' && (
+                            <button
+                                onClick={() => { setUsarBorrador(false); setView('nuevo'); }}
+                                className="btn btn-xs h-8 bg-gray-800 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
+                            >
+                                <FaPlus className="mr-1"/> Nuevo
+                            </button>
+                        )}
+                        {view !== 'historial' && (
+                            <button
+                                onClick={() => setView('historial')}
+                                className="btn btn-xs h-8 bg-amber-500 hover:bg-amber-600 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
+                            >
+                                <FaHistory className="mr-1"/> Historial
+                            </button>
+                        )}
+                        {view !== 'tabla' && (
+                            <button
+                                onClick={() => { setUsarBorrador(false); setView('tabla'); }}
+                                className="btn btn-xs h-8 bg-gray-800 text-white border-none rounded-md px-4 font-black uppercase text-[9px]"
+                            >
+                                <FaListUl className="mr-1"/> Lista
+                            </button>
+                        )}
+                    </div>
                 </section>
 
                 {/* CONTENIDO PRINCIPAL */}
                 <main className="p-4">
                     {view === "nuevo" ? (
                         <FormViaje user={user} isCarrierMode={true} restaurarDraft={usarBorrador} draftId={editandoDraftId} onSuccess={() => { setUsarBorrador(false); setEditandoDraftId(null); setView("tabla"); }}/>
+                    ) : view === "historial" ? (
+                        <HistorialViajesCarrier user={user} />
                     ) : (
                         <TablaViajes user={user} isCarrierMode={true} borradores={borradores} onEditarBorrador={(draftId) => { setEditandoDraftId(draftId); setUsarBorrador(true); setView("nuevo"); }} onDescartarBorrador={(draftId) => { try { const all = JSON.parse(localStorage.getItem("formViaje_borradores") || "[]"); localStorage.setItem("formViaje_borradores", JSON.stringify(all.filter(d => d.id !== draftId))); } catch(_){} setBorradores(prev => prev.filter(d => d.id !== draftId)); }}/>
                     )}
@@ -135,16 +158,24 @@ const CarriersPage = () => {
                         onClick={() => { setUsarBorrador(false); setView("tabla"); }}
                         className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors border-r border-gray-100 ${view === 'tabla' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                     >
-                        <FaListUl size={22}/>
+                        <FaListUl size={20}/>
                         <span className="text-[10px] font-black uppercase">Mis Viajes</span>
+                    </button>
+
+                    <button
+                        onClick={() => setView("historial")}
+                        className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors border-r border-gray-100 ${view === 'historial' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
+                    >
+                        <FaHistory size={20}/>
+                        <span className="text-[10px] font-black uppercase">Historial</span>
                     </button>
 
                     <button
                         onClick={() => { setUsarBorrador(false); setView("nuevo"); }}
                         className={`flex-1 flex flex-col items-center justify-center gap-1 transition-colors ${view === 'nuevo' ? 'bg-red-600 text-white' : 'bg-white text-red-600'}`}
                     >
-                        <FaPlus size={22}/>
-                        <span className="text-[10px] font-black uppercase">Nuevo Viaje</span>
+                        <FaPlus size={20}/>
+                        <span className="text-[10px] font-black uppercase">Nuevo</span>
                     </button>
                 </nav>
             </div>

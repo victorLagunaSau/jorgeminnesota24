@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
-import { FaSearch, FaTruck } from 'react-icons/fa';
+import { FaSearch, FaTruck, FaPrint } from 'react-icons/fa';
 import * as XLSX from "xlsx";
+import ReactToPrint from "react-to-print";
 import PagosPendientes from "./PagosPendientes";
+import ImprimeCobranza from "./ImprimeCobranza";
 
 const Cobranza = ({ user }) => {
     const [vehiculos, setVehiculos] = useState([]);
@@ -10,6 +12,7 @@ const Cobranza = ({ user }) => {
     const [busqueda, setBusqueda] = useState("");
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedVehiculoId, setSelectedVehiculoId] = useState(null);
+    const printRef = useRef();
 
     useEffect(() => {
         let datosFiados = [];
@@ -114,12 +117,26 @@ const Cobranza = ({ user }) => {
                     <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Cobranza</h2>
                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{vehiculos.length} vehículos con saldo pendiente</p>
                 </div>
-                <button
-                    onClick={exportToExcel}
-                    className="btn btn-sm bg-green-500 hover:bg-green-600 text-white border-none font-bold rounded-xl"
-                >
-                    Exportar a Excel
-                </button>
+                <div className="flex gap-2">
+                    <ReactToPrint
+                        trigger={() => (
+                            <button className="btn btn-sm bg-red-500 hover:bg-red-600 text-white border-none font-bold rounded-xl">
+                                <FaPrint className="mr-1" /> Imprimir
+                            </button>
+                        )}
+                        content={() => printRef.current}
+                        pageStyle={`
+                            @page { size: landscape; margin: 10mm; }
+                            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+                        `}
+                    />
+                    <button
+                        onClick={exportToExcel}
+                        className="btn btn-sm bg-green-500 hover:bg-green-600 text-white border-none font-bold rounded-xl"
+                    >
+                        Exportar a Excel
+                    </button>
+                </div>
             </div>
 
             {/* Cards resumen */}
@@ -227,6 +244,11 @@ const Cobranza = ({ user }) => {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* Componente oculto para impresión */}
+            <div style={{ display: "none" }}>
+                <ImprimeCobranza ref={printRef} vehiculos={filtrados} />
             </div>
 
             {/* Modal de pago */}
