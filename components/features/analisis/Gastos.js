@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { firestore, storage } from "../../../firebase/firebaseIni";
 import { useAuthContext } from "../../../context/auth";
 import imageCompression from "browser-image-compression";
-import Cropper from "react-easy-crop";
 import * as XLSX from "xlsx";
 import { FaCamera, FaTimes, FaCheck, FaSpinner, FaTrash, FaEye, FaChevronLeft, FaChevronRight, FaFileExcel, FaCrop } from "react-icons/fa";
 
@@ -24,22 +23,105 @@ const CATEGORIAS = [
 
 const METODOS_PAGO = ["Cash", "Card", "Check", "Zelle", "Transfer"];
 
-async function getCroppedImg(imageSrc, pixelCrop) {
-    const image = await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = imageSrc;
-    });
+async function autoCropReceipt(blob) {
+    const bitmap = await createImageBitmap(blob);
     const canvas = document.createElement("canvas");
-    canvas.width = pixelCrop.width;
-    canvas.height = pixelCrop.height;
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
-    return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), "image/webp", 0.92);
+    ctx.drawImage(bitmap, 0, 0);
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const data = ctx.getImageData(0, 0, w, h).data;
+
+    const bright = (x, y) => {
+        const i = (y * w + x) * 4;
+        return data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    };
+
+    const step = Math.max(1, Math.floor(Math.min(w, h) / 300));
+
+    // Sample background brightness from corners (10% of each corner)
+    const cornerSize = Math.floor(Math.min(w, h) * 0.08);
+    let bgSum = 0, bgN = 0;
+    const corners = [
+        [0, 0], [w - cornerSize, 0],
+        [0, h - cornerSize], [w - cornerSize, h - cornerSize]
+    ];
+    for (const [cx, cy] of corners) {
+        for (let y = cy; y < cy + cornerSize; y += step) {
+            for (let x = cx; x < cx + cornerSize; x += step) {
+                if (x < w && y < h) { bgSum += bright(x, y); bgN++; }
+            }
+        }
+    }
+    const bgBright = bgN > 0 ? bgSum / bgN : 128;
+
+    // Threshold: how different a pixel must be from background to count as "receipt"
+    const threshold = 25;
+
+    // Check if a row has enough "non-background" pixels (>25% of the row)
+    const rowHasContent = (y) => {
+        let diff = 0, total = 0;
+        for (let x = 0; x < w; x += step) {
+            if (Math.abs(bright(x, y) - bgBright) > threshold) diff++;
+            total++;
+        }
+        return diff / total > 0.25;
+    };
+
+    const colHasContent = (x) => {
+        let diff = 0, total = 0;
+        for (let y = 0; y < h; y += step) {
+            if (Math.abs(bright(x, y) - bgBright) > threshold) diff++;
+            total++;
+        }
+        return diff / total > 0.25;
+    };
+
+    const pad = Math.floor(Math.min(w, h) * 0.01);
+
+    // Scan from each edge
+    let top = 0;
+    for (let y = 0; y < h; y += step) {
+        if (rowHasContent(y)) { top = Math.max(0, y - pad); break; }
+    }
+    let bottom = h;
+    for (let y = h - 1; y >= 0; y -= step) {
+        if (rowHasContent(y)) { bottom = Math.min(h, y + pad); break; }
+    }
+    let left = 0;
+    for (let x = 0; x < w; x += step) {
+        if (colHasContent(x)) { left = Math.max(0, x - pad); break; }
+    }
+    let right = w;
+    for (let x = w - 1; x >= 0; x -= step) {
+        if (colHasContent(x)) { right = Math.min(w, x + pad); break; }
+    }
+
+    const cropW = right - left;
+    const cropH = bottom - top;
+
+    // Only crop if we actually trimmed something significant (>5% from at least one side)
+    if (cropW >= w * 0.95 && cropH >= h * 0.95) return blob;
+    // Safety: if crop area is too small, something went wrong
+    if (cropW < w * 0.15 || cropH < h * 0.15) return blob;
+
+    const out = document.createElement("canvas");
+    out.width = cropW;
+    out.height = cropH;
+    out.getContext("2d").drawImage(canvas, left, top, cropW, cropH, 0, 0, cropW, cropH);
+
+    return new Promise(resolve => {
+        out.toBlob(b => resolve(b || blob), "image/webp", 0.93);
     });
+}
+
+async function autoCropFromUrl(url) {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return autoCropReceipt(blob);
 }
 
 const Gastos = () => {
@@ -66,15 +148,7 @@ const Gastos = () => {
     const [editMetodo, setEditMetodo] = useState("");
     const [guardando, setGuardando] = useState(false);
     const [imagenGrande, setImagenGrande] = useState(null);
-
-    // Crop
-    const [cropMode, setCropMode] = useState(false);
-    const [crop, setCrop] = useState({ x: 0, y: 0 });
-    const [zoom, setZoom] = useState(1);
-    const [cropAspect, setCropAspect] = useState(null);
-    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-    const [guardandoCrop, setGuardandoCrop] = useState(false);
-    const onCropComplete = useCallback((_, pixels) => setCroppedAreaPixels(pixels), []);
+    const [recortando, setRecortando] = useState(false);
 
     useEffect(() => {
         const unsub = firestore()
@@ -98,14 +172,18 @@ const Gastos = () => {
             try { archivoFinal = await imageCompression(file, { maxSizeMB: 3, maxWidthOrHeight: 3000, useWebWorker: true }); }
             catch { alert("Error al comprimir."); setComprimiendo(false); return; }
         }
+        // Auto-detect and crop receipt
+        try {
+            archivoFinal = await autoCropReceipt(archivoFinal);
+        } catch {}
         setComprimiendo(false);
         setSubiendo(true);
         try {
             const ts = Date.now();
-            const ext = archivoFinal.type === "image/webp" ? "webp" : "jpg";
+            const ext = "webp";
             const path = `gastos/${ts}_${Math.random().toString(36).substr(2, 6)}.${ext}`;
             const ref = storage().ref(path);
-            await ref.put(archivoFinal);
+            await ref.put(archivoFinal, { contentType: "image/webp" });
             const url = await ref.getDownloadURL();
             await firestore().collection("gastos").add({
                 imagenUrl: url, imagenPath: path, estado: "pendiente",
@@ -118,6 +196,23 @@ const Gastos = () => {
         } catch { alert("Error al subir."); }
         setSubiendo(false);
         if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const handleRecortarManual = async () => {
+        if (!gastoSeleccionado) return;
+        setRecortando(true);
+        try {
+            const cropped = await autoCropFromUrl(gastoSeleccionado.imagenUrl);
+            const path = gastoSeleccionado.imagenPath || `gastos/${Date.now()}_crop.webp`;
+            const ref = storage().ref(path);
+            await ref.put(cropped, { contentType: "image/webp" });
+            const url = await ref.getDownloadURL();
+            await firestore().collection("gastos").doc(gastoSeleccionado.id).update({ imagenUrl: url });
+            setGastoSeleccionado({ ...gastoSeleccionado, imagenUrl: url });
+        } catch {
+            alert("Error al recortar.");
+        }
+        setRecortando(false);
     };
 
     const handleRevisar = async () => {
@@ -160,7 +255,6 @@ const Gastos = () => {
             "Amount": g.monto || 0,
             "Uploaded By": g.creadoPor?.nombre || "",
         }));
-        // Fila de total
         datos.push({ "Date": "", "Description": "", "Category": "", "Payment Method": "TOTAL", "Amount": totalMes, "Uploaded By": "" });
 
         const ws = XLSX.utils.json_to_sheet(datos);
@@ -204,24 +298,6 @@ const Gastos = () => {
         return `$${parseFloat(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    const handleCropSave = async () => {
-        if (!croppedAreaPixels || !gastoSeleccionado) return;
-        setGuardandoCrop(true);
-        try {
-            const blob = await getCroppedImg(gastoSeleccionado.imagenUrl, croppedAreaPixels);
-            const path = gastoSeleccionado.imagenPath || `gastos/${Date.now()}_crop.webp`;
-            const ref = storage().ref(path);
-            await ref.put(blob, { contentType: "image/webp" });
-            const url = await ref.getDownloadURL();
-            await firestore().collection("gastos").doc(gastoSeleccionado.id).update({ imagenUrl: url });
-            setGastoSeleccionado({ ...gastoSeleccionado, imagenUrl: url });
-            setCropMode(false);
-        } catch {
-            alert("Error al recortar.");
-        }
-        setGuardandoCrop(false);
-    };
-
     const abrirGasto = (g) => {
         setGastoSeleccionado(g);
         setEditMonto(g.monto ? g.monto.toString() : "");
@@ -229,10 +305,6 @@ const Gastos = () => {
         setEditFecha(g.fechaGasto || new Date().toISOString().split("T")[0]);
         setEditCategoria(g.categoria || "");
         setEditMetodo(g.metodoPago || "");
-        setCropMode(false);
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setCropAspect(null);
     };
 
     if (loading) return <div className="flex justify-center py-20"><FaSpinner className="animate-spin text-gray-400 text-2xl" /></div>;
@@ -245,7 +317,7 @@ const Gastos = () => {
                 <div className="flex items-center gap-3">
                     <input ref={fileInputRef} type="file" accept="image/*" capture="environment" onChange={handleFoto} className="hidden" id="foto-gasto" />
                     {(comprimiendo || subiendo) ? (
-                        <span className="text-sm text-gray-500 flex items-center gap-2"><FaSpinner className="animate-spin" /> {comprimiendo ? "Comprimiendo..." : "Subiendo..."}</span>
+                        <span className="text-sm text-gray-500 flex items-center gap-2"><FaSpinner className="animate-spin" /> {comprimiendo ? "Detectando recibo..." : "Subiendo..."}</span>
                     ) : (
                         <label htmlFor="foto-gasto" className="flex items-center gap-2 bg-gray-800 text-white px-3 py-2 rounded text-xs font-bold cursor-pointer hover:bg-gray-700">
                             <FaCamera /> Subir Foto
@@ -368,69 +440,30 @@ const Gastos = () => {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setGastoSeleccionado(null)}>
                     <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                         <div className="relative">
-                            {cropMode ? (
-                                <div className="bg-gray-900 rounded-t-xl overflow-hidden">
-                                    <div className="relative w-full h-80">
-                                        <Cropper
-                                            image={gastoSeleccionado.imagenUrl}
-                                            crop={crop}
-                                            zoom={zoom}
-                                            aspect={cropAspect || 4 / 3}
-                                            onCropChange={setCrop}
-                                            onZoomChange={setZoom}
-                                            onCropComplete={onCropComplete}
-                                            restrictPosition={false}
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between px-3 py-2 bg-gray-800">
-                                        <div className="flex gap-1">
-                                            {[
-                                                { label: "Ancho", val: 16 / 9 },
-                                                { label: "Cuadro", val: 1 },
-                                                { label: "Alto", val: 3 / 4 },
-                                                { label: "Largo", val: 9 / 16 },
-                                            ].map((o) => (
-                                                <button key={o.label}
-                                                    onClick={() => { setCropAspect(o.val); setCrop({ x: 0, y: 0 }); }}
-                                                    className={`px-2 py-1 rounded text-[10px] font-bold ${cropAspect === o.val ? "bg-white text-gray-800" : "text-gray-300 hover:bg-gray-700"}`}>
-                                                    {o.label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                        <div className="flex gap-1.5">
-                                            <button onClick={() => setCropMode(false)} className="bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-500">
-                                                Cancelar
-                                            </button>
-                                            <button onClick={handleCropSave} disabled={guardandoCrop}
-                                                className="bg-white text-gray-800 px-3 py-1.5 rounded text-xs font-bold hover:bg-gray-200 disabled:bg-gray-400 flex items-center gap-1">
-                                                {guardandoCrop ? <FaSpinner className="animate-spin" size={10} /> : <FaCheck size={10} />}
-                                                Recortar
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <>
-                                    <img
-                                        src={gastoSeleccionado.imagenUrl} alt=""
-                                        className="w-full max-h-60 object-contain bg-gray-50 rounded-t-xl cursor-pointer"
-                                        onClick={() => setImagenGrande(gastoSeleccionado.imagenUrl)}
-                                    />
-                                    <button onClick={() => setGastoSeleccionado(null)} className="absolute top-2 right-2 bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60">
-                                        <FaTimes size={12} />
+                            <img
+                                src={gastoSeleccionado.imagenUrl} alt=""
+                                className="w-full max-h-60 object-contain bg-gray-50 rounded-t-xl cursor-pointer"
+                                onClick={() => setImagenGrande(gastoSeleccionado.imagenUrl)}
+                            />
+                            <button onClick={() => setGastoSeleccionado(null)} className="absolute top-2 right-2 bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60">
+                                <FaTimes size={12} />
+                            </button>
+                            <div className="absolute bottom-2 right-2 flex gap-1.5">
+                                {isAdminMaster && (
+                                    <button
+                                        onClick={handleRecortarManual}
+                                        disabled={recortando}
+                                        className="bg-black/40 text-white px-2 py-1.5 rounded-full hover:bg-black/60 flex items-center gap-1 text-[10px] font-bold"
+                                        title="Auto-recortar recibo"
+                                    >
+                                        {recortando ? <FaSpinner className="animate-spin" size={11} /> : <FaCrop size={11} />}
+                                        {recortando ? "Recortando..." : "Auto-recortar"}
                                     </button>
-                                    <div className="absolute bottom-2 right-2 flex gap-1.5">
-                                        {isAdminMaster && (
-                                            <button onClick={() => setCropMode(true)} className="bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60" title="Recortar">
-                                                <FaCrop size={12} />
-                                            </button>
-                                        )}
-                                        <button onClick={() => setImagenGrande(gastoSeleccionado.imagenUrl)} className="bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60">
-                                            <FaEye size={12} />
-                                        </button>
-                                    </div>
-                                </>
-                            )}
+                                )}
+                                <button onClick={() => setImagenGrande(gastoSeleccionado.imagenUrl)} className="bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60">
+                                    <FaEye size={12} />
+                                </button>
+                            </div>
                         </div>
                         <div className="p-4">
                             <p className="text-xs text-gray-400 mb-3">Subido por {gastoSeleccionado.creadoPor?.nombre}</p>
