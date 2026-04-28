@@ -205,15 +205,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Auditoría de Cobros - Solo Admin Master */}
-                        {isAdminMaster && (
-                            <li>
-                                <button className={getButtonClass('migrarPrecios')} onClick={() => handleSelectModule('migrarPrecios')}>
-                                    <FaCog className="mr-3 text-orange-500" size={18} /> Auditoría Cobros
-                                </button>
-                            </li>
-                        )}
-
                         {/* Usuarios - Solo visible para Admin Master */}
                         {isAdminMaster && (
                             <li>
