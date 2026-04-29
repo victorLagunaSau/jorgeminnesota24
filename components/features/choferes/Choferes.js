@@ -46,7 +46,7 @@ const Choferes = ({ user }) => {
                 onSuccess={handleCancelarEdicion}
             />
 
-            <TablaChoferes onEditarChofer={isAdminMaster ? handleEditar : null} />
+            <TablaChoferes onEditarChofer={isAdminMaster ? handleEditar : null} isAdminMaster={isAdminMaster} />
         </motion.div>
     );
 };

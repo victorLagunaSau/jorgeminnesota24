@@ -1,16 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import { useAdminData } from "../../../context/adminData";
 import {
     FaCopy,
-    FaCheck, FaIdCard, FaEdit, FaTimes, FaSave, FaFilter, FaExclamationTriangle, FaTruck, FaUserTie
+    FaCheck, FaIdCard, FaEdit, FaTimes, FaSave, FaFilter, FaExclamationTriangle, FaTruck, FaUserTie, FaTrashAlt
 } from "react-icons/fa";
 import { COLLECTIONS } from "../../../constants";
 import SearchBar from "../../ui/SearchBar";
 import Pagination from "../../ui/Pagination";
 import EmptyState from "../../ui/EmptyState";
 
-const TablaChoferes = ({ onEditarChofer }) => {
+const TablaChoferes = ({ onEditarChofer, isAdminMaster }) => {
     // Usar datos del contexto compartido (ya no hace queries propias)
     const { choferes: lista, empresas: empresasRaw } = useAdminData();
     const empresas = empresasRaw.map(e => ({ id: e.id, nombre: e.nombreEmpresa }));
@@ -25,6 +25,40 @@ const TablaChoferes = ({ onEditarChofer }) => {
     const [nuevaEmpresaFiscal, setNuevaEmpresaFiscal] = useState({ id: "", nombre: "" });
     const [nuevaEmpresaLider, setNuevaEmpresaLider] = useState({ id: "", nombre: "" });
     const [loadingEdit, setLoadingEdit] = useState(false);
+
+    // Viajes por chofer
+    const [viajesPorChofer, setViajesPorChofer] = useState({});
+    const [viajesExpandido, setViajesExpandido] = useState(null);
+    const [viajesDetalle, setViajesDetalle] = useState([]);
+    const [loadingViajes, setLoadingViajes] = useState(false);
+
+    useEffect(() => {
+        firestore().collection("viajesPagados").get().then(snap => {
+            const agrupado = {};
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const choferId = d.chofer?.id;
+                if (choferId) {
+                    if (!agrupado[choferId]) agrupado[choferId] = [];
+                    agrupado[choferId].push({
+                        numViaje: d.numViaje,
+                        fechaPago: d.fechaPago,
+                        vehiculos: (d.vehiculos || []).length,
+                        total: d.resumenFinanciero?.granTotal || 0,
+                    });
+                }
+            });
+            setViajesPorChofer(agrupado);
+        });
+    }, []);
+
+    const toggleViajes = (choferId) => {
+        if (viajesExpandido === choferId) {
+            setViajesExpandido(null);
+        } else {
+            setViajesExpandido(choferId);
+        }
+    };
 
     const xPagina = 10;
 
@@ -48,6 +82,16 @@ const TablaChoferes = ({ onEditarChofer }) => {
             console.error("Error al actualizar vínculos:", error);
         } finally {
             setLoadingEdit(false);
+        }
+    };
+
+    const eliminarChofer = async (chofer) => {
+        if (!confirm(`¿Eliminar al chofer ${chofer.nombreChofer}? Esta acción no se puede deshacer.`)) return;
+        try {
+            await firestore().collection(COLLECTIONS.CHOFERES).doc(chofer.id).delete();
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            alert("Error al eliminar chofer.");
         }
     };
 
@@ -121,6 +165,27 @@ const TablaChoferes = ({ onEditarChofer }) => {
                                     </div>
                                     <div className="text-[10px] text-blue-600 font-black italic mt-0.5 uppercase">
                                         @{c.apodoChofer || 'sin apodo'}
+                                    </div>
+                                    <div className="mt-0.5">
+                                        {viajesPorChofer[c.id]?.length > 0 ? (
+                                            <>
+                                                <button onClick={() => toggleViajes(c.id)} className="text-[9px] text-gray-400 font-bold hover:text-blue-600 cursor-pointer">
+                                                    {viajesPorChofer[c.id].length} viaje{viajesPorChofer[c.id].length > 1 ? 's' : ''}
+                                                    {viajesExpandido === c.id ? ' ▲' : ' ▼'}
+                                                </button>
+                                                {viajesExpandido === c.id && (
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {viajesPorChofer[c.id].map((v, i) => (
+                                                            <span key={i} className="text-[9px] bg-gray-100 text-gray-600 font-mono font-bold px-1.5 py-0.5 rounded">
+                                                                #{v.numViaje}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <span className="text-[9px] text-gray-300 font-bold">Sin viajes</span>
+                                        )}
                                     </div>
                                 </td>
 
@@ -230,12 +295,23 @@ const TablaChoferes = ({ onEditarChofer }) => {
 
                                 {onEditarChofer && (
                                     <td className="text-center">
-                                        <button
-                                            onClick={() => onEditarChofer(c)}
-                                            className="btn btn-xs btn-outline btn-info font-black uppercase text-[9px] gap-1"
-                                        >
-                                            <FaEdit /> Editar
-                                        </button>
+                                        <div className="flex items-center justify-center gap-1">
+                                            <button
+                                                onClick={() => onEditarChofer(c)}
+                                                className="btn btn-xs btn-outline btn-info font-black uppercase text-[9px] gap-1"
+                                            >
+                                                <FaEdit /> Editar
+                                            </button>
+                                            {isAdminMaster && (
+                                                <button
+                                                    onClick={() => eliminarChofer(c)}
+                                                    className="btn btn-xs btn-outline btn-error font-black uppercase text-[9px]"
+                                                    title="Eliminar chofer"
+                                                >
+                                                    <FaTrashAlt />
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 )}
                             </tr>
