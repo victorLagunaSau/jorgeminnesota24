@@ -4,7 +4,7 @@ import { COLLECTIONS } from "../../../constants";
 import EditarEstadosPrecios from "./EditarEstadosPrecios";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import SearchBar from "../../ui/SearchBar";
-import { FaChevronLeft, FaChevronRight, FaEdit, FaMapMarkedAlt } from "react-icons/fa";
+import { FaChevronLeft, FaChevronRight, FaEdit, FaMapMarkedAlt, FaSync } from "react-icons/fa";
 
 // 1. RECIBIMOS EL USER AQUÍ
 const TablaEstadosPrecios = ({ user }) => {
@@ -14,6 +14,7 @@ const TablaEstadosPrecios = ({ user }) => {
     const [pagina, setPagina] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentRegions, setCurrentRegions] = useState(null);
+    const [sincronizando, setSincronizando] = useState(false);
     const xPagina = 8;
 
     useEffect(() => {
@@ -49,6 +50,57 @@ const TablaEstadosPrecios = ({ user }) => {
         setIsModalOpen(true);
     };
 
+    const aplicarPreciosCobro = async () => {
+        if (!confirm("¿Actualizar el precio de Cobro en todos los estados? Se aplicará el precio más reciente a todo el sistema.")) return;
+        setSincronizando(true);
+        try {
+            const snap = await firestore().collection(COLLECTIONS.PROVINCE).get();
+            const batch = firestore().batch();
+            let totalActualizados = 0;
+
+            snap.docs.forEach(doc => {
+                const data = doc.data();
+                const regions = data.regions || [];
+                let cambio = false;
+
+                const regionsActualizadas = regions.map(r => {
+                    // precioPagina es el precio actualizado, price puede estar viejo
+                    const precioReal = r.precioPagina || r.price || "0";
+                    if (String(r.price) !== String(precioReal)) cambio = true;
+                    return {
+                        ...r,
+                        price: precioReal,
+                        precioPagina: precioReal,
+                        profit: (parseFloat(precioReal) - parseFloat(r.cost || 0)).toString()
+                    };
+                });
+
+                if (cambio) {
+                    batch.update(doc.ref, {
+                        regions: regionsActualizadas,
+                        ultimaEdicion: {
+                            usuario: user?.nombre || "Sistema",
+                            idUsuario: user?.id || "sync",
+                            timestamp: new Date()
+                        }
+                    });
+                    totalActualizados++;
+                }
+            });
+
+            await batch.commit();
+            alert(totalActualizados > 0
+                ? `Listo. ${totalActualizados} estado(s) tenían precios desactualizados y fueron corregidos.`
+                : "Todos los precios ya están al día."
+            );
+        } catch (error) {
+            console.error("Error actualizando:", error);
+            alert("Error: " + error.message);
+        } finally {
+            setSincronizando(false);
+        }
+    };
+
     if (loading) return <LoadingSpinner texto="Cargando estados..." />;
 
     return (
@@ -77,6 +129,14 @@ const TablaEstadosPrecios = ({ user }) => {
                     className="w-96"
                 />
                 <div className="flex items-center gap-3">
+                    <button
+                        onClick={aplicarPreciosCobro}
+                        disabled={sincronizando}
+                        className="btn btn-xs btn-warning text-white gap-1 font-black uppercase text-[9px]"
+                    >
+                        <FaSync className={sincronizando ? 'animate-spin' : ''} />
+                        {sincronizando ? 'Aplicando...' : 'Aplicar Precios'}
+                    </button>
                     <div className="text-[11px] font-bold text-gray-500 flex items-center gap-2 uppercase">
                         <FaMapMarkedAlt className="text-blue-800" /> Cobertura y Precios
                     </div>
