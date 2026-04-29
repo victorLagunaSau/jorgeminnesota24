@@ -118,8 +118,12 @@ async function autoCropReceipt(blob) {
     });
 }
 
-async function autoCropFromUrl(url) {
-    const res = await fetch(url);
+async function autoCropFromPath(imagePath) {
+    const ref = storage().ref(imagePath);
+    const url = await ref.getDownloadURL();
+    const proxyUrl = `/api/proxy-storage?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error("Download failed");
     const blob = await res.blob();
     return autoCropReceipt(blob);
 }
@@ -199,17 +203,18 @@ const Gastos = () => {
     };
 
     const handleRecortarManual = async () => {
-        if (!gastoSeleccionado) return;
+        if (!gastoSeleccionado || !gastoSeleccionado.imagenPath) return;
         setRecortando(true);
         try {
-            const cropped = await autoCropFromUrl(gastoSeleccionado.imagenUrl);
-            const path = gastoSeleccionado.imagenPath || `gastos/${Date.now()}_crop.webp`;
+            const cropped = await autoCropFromPath(gastoSeleccionado.imagenPath);
+            const path = gastoSeleccionado.imagenPath;
             const ref = storage().ref(path);
             await ref.put(cropped, { contentType: "image/webp" });
             const url = await ref.getDownloadURL();
             await firestore().collection("gastos").doc(gastoSeleccionado.id).update({ imagenUrl: url });
             setGastoSeleccionado({ ...gastoSeleccionado, imagenUrl: url });
-        } catch {
+        } catch (err) {
+            console.error("Error recortar:", err);
             alert("Error al recortar.");
         }
         setRecortando(false);

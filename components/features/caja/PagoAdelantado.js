@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import { firestore } from "../../../firebase/firebaseIni";
-import { FaMoneyBillWave, FaCheckCircle, FaExclamationTriangle, FaSearch, FaPrint } from 'react-icons/fa';
+import { FaMoneyBillWave, FaCheckCircle, FaExclamationTriangle, FaSearch, FaPrint, FaCreditCard } from 'react-icons/fa';
 import moment from 'moment';
 import ReciboAdelanto from './ReciboAdelanto';
 
@@ -12,13 +12,14 @@ const PagoAdelantado = ({ user }) => {
     const [marca, setMarca] = useState('');
     const [modelo, setModelo] = useState('');
     const [cliente, setCliente] = useState('');
-    const [telefonoCliente, setTelefonoCliente] = useState('');
+    const [telefonoCliente] = useState('');
     const [estado, setEstado] = useState('');
     const [ciudad, setCiudad] = useState('');
     const [price, setPrice] = useState(0);
 
-    // Monto adelantado
+    // Monto adelantado y método de pago
     const [montoAdelanto, setMontoAdelanto] = useState(0);
+    const [metodoPago, setMetodoPago] = useState('efectivo'); // 'efectivo' o 'cc'
 
     // Estados del componente
     const [estados, setEstados] = useState([]);
@@ -70,8 +71,9 @@ const PagoAdelantado = ({ user }) => {
             setCiudades(sel.regions);
             if (sel.regions.length > 0) {
                 setCiudad(sel.regions[0].city);
-                setPrice(parseFloat(sel.regions[0].price || 0));
-                setMontoAdelanto(parseFloat(sel.regions[0].price || 0));
+                const p = parseFloat(sel.regions[0].price || 0);
+                setPrice(p);
+                setMontoAdelanto(p);
             }
         } else {
             setCiudades([]);
@@ -85,8 +87,9 @@ const PagoAdelantado = ({ user }) => {
         const selEstado = estados.find(e => e.state === estado);
         const selRegion = selEstado?.regions?.find(r => r.city === value);
         if (selRegion) {
-            setPrice(parseFloat(selRegion.price || 0));
-            setMontoAdelanto(parseFloat(selRegion.price || 0));
+            const p = parseFloat(selRegion.price || 0);
+            setPrice(p);
+            setMontoAdelanto(p);
         }
     };
 
@@ -162,6 +165,7 @@ const PagoAdelantado = ({ user }) => {
                 // Vehículo ya existe → actualizar con datos de anticipo
                 await firestore().collection("vehiculos").doc(lote).update({
                     anticipoPago: parseFloat(montoAdelanto),
+                    anticipoMetodo: metodoPago,
                     anticipoTimestamp: timestamp,
                     anticipoUsuario: user.nombre || "Admin",
                     anticipoIdUsuario: user.id || "N/A",
@@ -186,6 +190,7 @@ const PagoAdelantado = ({ user }) => {
                     gastosExtra: 0,
                     titulo: "NO",
                     anticipoPago: parseFloat(montoAdelanto),
+                    anticipoMetodo: metodoPago,
                     anticipoTimestamp: timestamp,
                     anticipoUsuario: user.nombre || "Admin",
                     anticipoIdUsuario: user.id || "N/A",
@@ -197,7 +202,8 @@ const PagoAdelantado = ({ user }) => {
                 });
             }
 
-            // Registrar movimiento
+            // Registrar movimiento (cajaRecibo/cajaCC para que el corte lo separe)
+            const monto = parseFloat(montoAdelanto);
             await firestore().collection("movimientos").add({
                 tipo: "Anticipo",
                 binNip: lote,
@@ -208,7 +214,11 @@ const PagoAdelantado = ({ user }) => {
                 estado: estado,
                 ciudad: ciudad,
                 price: price,
-                anticipoPago: parseFloat(montoAdelanto),
+                anticipoPago: monto,
+                cajaRecibo: metodoPago === 'efectivo' ? monto : 0,
+                cajaCC: metodoPago === 'cc' ? monto : 0,
+                cajaCambio: 0,
+                metodoPagoAnticipo: metodoPago,
                 estatus: "PA",
                 usuario: user.nombre,
                 idUsuario: user.id,
@@ -220,6 +230,7 @@ const PagoAdelantado = ({ user }) => {
                 marca, modelo, cliente, telefonoCliente,
                 estado, ciudad, price,
                 anticipoPago: parseFloat(montoAdelanto),
+                metodoPago: metodoPago,
                 usuario: user.nombre || "Admin",
             });
             setMensajeExito(`Pago adelantado de $${montoAdelanto} DLL registrado para lote ${lote}`);
@@ -238,11 +249,11 @@ const PagoAdelantado = ({ user }) => {
         setMarca('');
         setModelo('');
         setCliente('');
-        setTelefonoCliente('');
         setEstado('');
         setCiudad('');
         setPrice(0);
         setMontoAdelanto(0);
+        setMetodoPago('efectivo');
         setCiudades([]);
         setVehiculoExistente(null);
     };
@@ -335,23 +346,13 @@ const PagoAdelantado = ({ user }) => {
                 </div>
 
                 <div className="flex flex-wrap">
-                    <div className="w-1/2 p-1">
+                    <div className="w-full p-1">
                         <label className="block text-black text-sm font-bold">Cliente:</label>
                         <input
                             type="text"
                             value={cliente}
                             onChange={(e) => setCliente(e.target.value)}
                             className="input input-bordered input-sm w-full bg-white text-black"
-                        />
-                    </div>
-                    <div className="w-1/2 p-1">
-                        <label className="block text-black text-sm font-bold">Teléfono:</label>
-                        <input
-                            type="text"
-                            value={telefonoCliente}
-                            onChange={(e) => setTelefonoCliente(e.target.value)}
-                            className="input input-bordered input-sm w-full bg-white text-black"
-                            placeholder="Teléfono del cliente"
                         />
                     </div>
                 </div>
@@ -419,6 +420,24 @@ const PagoAdelantado = ({ user }) => {
                             El cliente paga ${montoAdelanto} de ${price} — al llegar se cobrará la diferencia + extras
                         </p>
                     )}
+
+                    {/* Método de pago */}
+                    <div className="mt-3 flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setMetodoPago('efectivo')}
+                            className={`btn btn-sm flex-1 gap-1 font-black uppercase ${metodoPago === 'efectivo' ? 'btn-success text-white' : 'btn-outline btn-success'}`}
+                        >
+                            <FaMoneyBillWave /> Efectivo
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMetodoPago('cc')}
+                            className={`btn btn-sm flex-1 gap-1 font-black uppercase ${metodoPago === 'cc' ? 'btn-info text-white' : 'btn-outline btn-info'}`}
+                        >
+                            <FaCreditCard /> CC
+                        </button>
+                    </div>
                 </div>
 
                 {/* Botón registrar */}
@@ -446,6 +465,9 @@ const PagoAdelantado = ({ user }) => {
                             <p><strong>Destino:</strong> {ciudad}, {estado}</p>
                             <p className="text-2xl font-black text-green-700 mt-3">
                                 Anticipo: ${montoAdelanto} DLL
+                            </p>
+                            <p className={`text-sm font-black mt-1 ${metodoPago === 'cc' ? 'text-blue-600' : 'text-green-600'}`}>
+                                Método: {metodoPago === 'cc' ? 'CC' : 'Efectivo'}
                             </p>
                             {vehiculoExistente && (
                                 <p className="text-sm text-blue-600 mt-2 font-bold">
