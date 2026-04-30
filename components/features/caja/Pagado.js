@@ -70,10 +70,10 @@ const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
         try {
             setEliminando(true);
 
-            // 1. Buscar movimientos
+            // 1. Buscar movimientos (campo binNip en movimientos)
             const movSnap = await firestore()
                 .collection(COLLECTIONS.MOVIMIENTOS)
-                .where("lote", "==", binNip)
+                .where("binNip", "==", binNip)
                 .get();
 
             // 2. Buscar viajes pagados que contengan este lote

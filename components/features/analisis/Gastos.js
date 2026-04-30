@@ -390,7 +390,7 @@ const Gastos = () => {
                                 {vista === "revisados" && <th className="pb-2 font-medium">Pago</th>}
                                 <th className="pb-2 font-medium">Subido por</th>
                                 <th className="pb-2 text-right font-medium">Monto</th>
-                                {isAdminMaster && <th className="pb-2 w-8"></th>}
+                                <th className="pb-2 w-8"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -415,17 +415,15 @@ const Gastos = () => {
                                     )}
                                     <td className="py-2.5 text-gray-500 truncate max-w-[100px]">{g.creadoPor?.nombre}</td>
                                     <td className="py-2.5 text-right font-bold text-gray-800 whitespace-nowrap">{formatMoneda(g.monto)}</td>
-                                    {isAdminMaster && (
-                                        <td className="py-2.5 pr-1 text-center">
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); handleEliminar(g); }}
-                                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
-                                                title="Eliminar"
-                                            >
-                                                <FaTimes size={10} />
-                                            </button>
-                                        </td>
-                                    )}
+                                    <td className="py-2.5 pr-1 text-center">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleEliminar(g); }}
+                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                            title="Eliminar"
+                                        >
+                                            <FaTimes size={10} />
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -454,17 +452,15 @@ const Gastos = () => {
                                 <FaTimes size={12} />
                             </button>
                             <div className="absolute bottom-2 right-2 flex gap-1.5">
-                                {isAdminMaster && (
-                                    <button
-                                        onClick={handleRecortarManual}
-                                        disabled={recortando}
-                                        className="bg-black/40 text-white px-2 py-1.5 rounded-full hover:bg-black/60 flex items-center gap-1 text-[10px] font-bold"
-                                        title="Auto-recortar recibo"
-                                    >
-                                        {recortando ? <FaSpinner className="animate-spin" size={11} /> : <FaCrop size={11} />}
-                                        {recortando ? "Recortando..." : "Auto-recortar"}
-                                    </button>
-                                )}
+                                <button
+                                    onClick={handleRecortarManual}
+                                    disabled={recortando}
+                                    className="bg-black/40 text-white px-2 py-1.5 rounded-full hover:bg-black/60 flex items-center gap-1 text-[10px] font-bold"
+                                    title="Auto-recortar recibo"
+                                >
+                                    {recortando ? <FaSpinner className="animate-spin" size={11} /> : <FaCrop size={11} />}
+                                    {recortando ? "Recortando..." : "Auto-recortar"}
+                                </button>
                                 <button onClick={() => setImagenGrande(gastoSeleccionado.imagenUrl)} className="bg-black/40 text-white p-1.5 rounded-full hover:bg-black/60">
                                     <FaEye size={12} />
                                 </button>
@@ -482,54 +478,52 @@ const Gastos = () => {
                                 </div>
                             )}
 
-                            {isAdminMaster && (
-                                <div className="border-t border-gray-100 pt-3">
-                                    <div className="mb-2">
-                                        <label className="block text-[11px] text-gray-400 mb-1">Concepto *</label>
-                                        <input type="text" value={editConcepto} onChange={(e) => setEditConcepto(e.target.value)}
-                                            placeholder="Pago de luz, Gasolina..." className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
+                            <div className="border-t border-gray-100 pt-3">
+                                <div className="mb-2">
+                                    <label className="block text-[11px] text-gray-400 mb-1">Concepto *</label>
+                                    <input type="text" value={editConcepto} onChange={(e) => setEditConcepto(e.target.value)}
+                                        placeholder="Pago de luz, Gasolina..." className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
+                                </div>
+                                <div className="mb-2">
+                                    <label className="block text-[11px] text-gray-400 mb-1">Categoria *</label>
+                                    <select value={editCategoria} onChange={(e) => setEditCategoria(e.target.value)}
+                                        className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400">
+                                        <option value="">Seleccionar...</option>
+                                        {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    <div>
+                                        <label className="block text-[11px] text-gray-400 mb-1">Monto *</label>
+                                        <input type="number" step="0.01" value={editMonto} onChange={(e) => setEditMonto(e.target.value)}
+                                            placeholder="0.00" className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
                                     </div>
-                                    <div className="mb-2">
-                                        <label className="block text-[11px] text-gray-400 mb-1">Categoria *</label>
-                                        <select value={editCategoria} onChange={(e) => setEditCategoria(e.target.value)}
+                                    <div>
+                                        <label className="block text-[11px] text-gray-400 mb-1">Fecha *</label>
+                                        <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)}
+                                            className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[11px] text-gray-400 mb-1">Pago *</label>
+                                        <select value={editMetodo} onChange={(e) => setEditMetodo(e.target.value)}
                                             className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400">
-                                            <option value="">Seleccionar...</option>
-                                            {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                                            <option value="">...</option>
+                                            {METODOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2 mb-3">
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Monto *</label>
-                                            <input type="number" step="0.01" value={editMonto} onChange={(e) => setEditMonto(e.target.value)}
-                                                placeholder="0.00" className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Fecha *</label>
-                                            <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)}
-                                                className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-[11px] text-gray-400 mb-1">Pago *</label>
-                                            <select value={editMetodo} onChange={(e) => setEditMetodo(e.target.value)}
-                                                className="w-full border border-gray-200 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-400">
-                                                <option value="">...</option>
-                                                {METODOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={handleRevisar} disabled={guardando}
-                                            className="flex-1 bg-gray-800 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-700 disabled:bg-gray-300 flex items-center justify-center gap-1">
-                                            {guardando ? <FaSpinner className="animate-spin" size={10} /> : <FaCheck size={10} />}
-                                            {gastoSeleccionado.estado === "revisado" ? "Actualizar" : "Confirmar"}
-                                        </button>
-                                        <button onClick={() => handleEliminar(gastoSeleccionado)}
-                                            className="text-red-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-50">
-                                            <FaTrash size={12} />
-                                        </button>
-                                    </div>
                                 </div>
-                            )}
+                                <div className="flex gap-2">
+                                    <button onClick={handleRevisar} disabled={guardando}
+                                        className="flex-1 bg-gray-800 text-white py-1.5 rounded text-xs font-bold hover:bg-gray-700 disabled:bg-gray-300 flex items-center justify-center gap-1">
+                                        {guardando ? <FaSpinner className="animate-spin" size={10} /> : <FaCheck size={10} />}
+                                        {gastoSeleccionado.estado === "revisado" ? "Actualizar" : "Confirmar"}
+                                    </button>
+                                    <button onClick={() => handleEliminar(gastoSeleccionado)}
+                                        className="text-red-500 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-50">
+                                        <FaTrash size={12} />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
