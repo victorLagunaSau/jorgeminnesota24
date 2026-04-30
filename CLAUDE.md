@@ -21,11 +21,31 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 ### Key Architectural Patterns
 
-- **State management:** React Context API only (no Redux). `AuthContext` (auth state) and `AdminDataContext` (real-time cached data for drivers/clients/companies via Firestore `onSnapshot`).
-- **Admin panel:** Single `components/features/Admin.js` acts as module router via a large switch statement (~28 cases). Sidebar navigation sets the active module.
+- **State management:** React Context API only (no Redux). Two context providers: `AuthContext` (`context/auth.js`) wraps the entire app; `AdminDataContext` (`context/adminData.js`) wraps only the admin panel and provides real-time cached data for drivers/clients/companies via Firestore `onSnapshot`.
+- **Admin panel module routing:** `components/features/Admin.js` is a large switch statement (~28 cases) that renders the active module. `components/Layout/Sidebar.js` controls navigation by setting `selectedModule` state, which Admin.js switches on.
 - **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js`. Use it instead of direct Firestore calls.
+- **Constants as single source of truth:** `constants/index.js` exports all enums and config: collection names (`COLLECTIONS`), vehicle/trip statuses, payment methods, user roles (`USER_TYPES`), admin module names (`ADMIN_MODULES`), company info for receipts, field validation limits, and helper functions like `getStatusLabel`.
+- **Custom hooks:** Located in `hooks/` — `useFirestoreCollection` (real-time subscriptions), `useAuth`, `useAlert`, `usePagination`, `useCopyToClipboard`. Note: some components still implement their own Firestore listeners.
 - **Utilities:** Shared helpers in `utils/index.js`. Audit logging via `utils/auditLog.js`.
-- **Custom hooks:** `hooks/useFirestoreCollection.js` for real-time Firestore subscriptions (though many components still implement their own).
+
+### Component Organization
+
+Components are organized into four top-level directories:
+
+- **`components/features/`** — All admin panel modules, organized by domain:
+  - `caja/` — Cash register: vehicle payments, entries/exits, daily/total cuts
+  - `vehiculos/` — Vehicle CRUD, bulk registration, tracking, deletion
+  - `viajes/` — Trip management, driver sheets, verification, liquidation, history
+  - `analisis/` — Financial analysis, advance payments, authorizations, expenses (adminMaster only)
+  - `choferes/`, `clientes/`, `empresas/` — Entity management (drivers, clients, carriers)
+  - `cobranza/` — Collections and pending payments
+  - `reportes/` — Income reports, collection reports, pending payment reports
+  - `config/` — Users, state/price management, migration tools, ERC deletion
+  - `solicitudes/` — Vehicle requests from clients
+- **`components/ui/`** — Shared UI primitives: Alert, EmptyState, LoadingSpinner, Pagination, SearchBar, StatusBadge, StatusSteps, ConfirmModal, buttons, inputs
+- **`components/auth/`** — Login, registration, password recovery forms
+- **`components/Layout/`** — Header, HeaderPanel, Sidebar, Footer, Layout wrapper
+- **`components/marketing/`** — Landing page components (Hero, Pricing, Feature, Catalogo, Testimoni)
 
 ### Vehicle Status Pipeline
 
@@ -40,9 +60,17 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `movimientos`, `entradasCaja`, `salidasCaja` — cash register movements
 - `config` — system configuration and sequential IDs
 
+### Pages and Routing
+
+- **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
+- **Admin panel:** `admin` (renders Admin.js module router)
+- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `portal` (cliente)
+- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy)
+- **Maintenance scripts:** `scripts/` contains audit scripts (`auditActivos`, `auditDesync`, `auditPrecios`) and `rastrearLote` (lot tracking via Puppeteer)
+
 ### User Roles
 
-- `adminMaster` — full system access including user management
+- `adminMaster` — full system access including user management and análisis modules
 - `admin` — daily operations (cash register, vehicles, trips, reports)
 - `empresa` — carrier portal (`/carriers`, `/loads`)
 - `chofer` — driver view (`/misviajes`)
@@ -54,6 +82,7 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - **Styling:** Tailwind + DaisyUI classes directly in JSX. No CSS modules or styled-components.
 - **Components:** Functional components with hooks only. No class components.
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
+- **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.
 
 ## Known Issues to Be Aware Of
 

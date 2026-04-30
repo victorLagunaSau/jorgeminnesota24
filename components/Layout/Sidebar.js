@@ -168,6 +168,15 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </div>
                         </li>
 
+                        {/* Gastos - Visible para admin no master */}
+                        {!isAdminMaster && (
+                            <li>
+                                <button className={getButtonClass('gastos')} onClick={() => handleSelectModule('gastos')}>
+                                    <FaDollarSign className="mr-3 text-red-600" size={18} /> Gastos
+                                </button>
+                            </li>
+                        )}
+
                         {/* Submenú Análisis - Solo Admin Master */}
                         {isAdminMaster && (
                             <li>
@@ -186,7 +195,8 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                         <li><button className={getButtonClass('estadoFinanciero')} onClick={() => handleSelectModule('estadoFinanciero')}>Estado Financiero</button></li>
                                         <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
                                         <li><button className={getButtonClass('historialAutorizaciones')} onClick={() => handleSelectModule('historialAutorizaciones')}>Autorizaciones</button></li>
-                                        <li><button className={getButtonClass('gastos')} onClick={() => handleSelectModule('gastos')}>Gastos</button></li>
+
+                                        <li><button className={getButtonClass('searchMovimientos')} onClick={() => handleSelectModule('searchMovimientos')}>Search</button></li>
                                     </ul>
                                 </div>
                             </li>

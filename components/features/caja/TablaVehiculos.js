@@ -35,7 +35,7 @@ const TablaVehiculos = ({ vehiculosData, totalPago, totalCaja, totalCC, totalPen
   };
   const groupByDate = () => {
     const grouped = {};
-    const filteredData = vehiculosData.filter(movement => parseFloat(movement.totalPago) !== 0);
+    const filteredData = vehiculosData;
     filteredData.forEach((movement) => {
       const date = new Date(movement.timestamp.seconds * 1000).toLocaleDateString();
       if (!grouped[date]) grouped[date] = [];

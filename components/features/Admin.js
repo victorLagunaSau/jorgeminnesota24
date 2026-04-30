@@ -42,6 +42,7 @@ import EstadoFinanciero from "./analisis/EstadoFinanciero";
 import HistorialAnticipos from "./analisis/HistorialAnticipos";
 import HistorialAutorizaciones from "./analisis/HistorialAutorizaciones";
 import Gastos from "./analisis/Gastos";
+import SearchMovimientos from "./analisis/SearchMovimientos";
 
 // Módulos - Otros
 import Cobranza from "./cobranza/Cobranza";
@@ -123,6 +124,8 @@ const Admin = () => {
                 return <HistorialAutorizaciones />;
             case 'gastos':
                 return <Gastos />;
+            case 'searchMovimientos':
+                return <SearchMovimientos user={user} />;
             case 'users':
                 return <Users />;
             case 'registroMasivoVehiculos':
