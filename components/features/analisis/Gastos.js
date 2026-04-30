@@ -142,6 +142,7 @@ const Gastos = () => {
     const hoy = new Date();
     const [mesSeleccionado, setMesSeleccionado] = useState(hoy.getMonth());
     const [anioSeleccionado, setAnioSeleccionado] = useState(hoy.getFullYear());
+    const [mesesAcumulado, setMesesAcumulado] = useState([]);
 
     // Modal
     const [gastoSeleccionado, setGastoSeleccionado] = useState(null);
@@ -281,6 +282,39 @@ const Gastos = () => {
     }, [gastos, mesSeleccionado, anioSeleccionado]);
 
     const totalMes = revisadosMes.reduce((acc, g) => acc + (g.monto || 0), 0);
+
+    // Meses disponibles con datos
+    const mesesDisponibles = useMemo(() => {
+        const meses = {};
+        gastos.forEach(g => {
+            if (g.estado !== "revisado" || !g.fechaGasto) return;
+            const key = g.fechaGasto.substring(0, 7); // "YYYY-MM"
+            if (!meses[key]) meses[key] = { key, total: 0, count: 0 };
+            meses[key].total += (g.monto || 0);
+            meses[key].count++;
+        });
+        return Object.values(meses).sort((a, b) => a.key.localeCompare(b.key));
+    }, [gastos]);
+
+    const totalAcumulado = useMemo(() => {
+        if (mesesAcumulado.length === 0) return null;
+        return mesesAcumulado.reduce((acc, mesKey) => {
+            const found = mesesDisponibles.find(m => m.key === mesKey);
+            return acc + (found ? found.total : 0);
+        }, 0);
+    }, [mesesAcumulado, mesesDisponibles]);
+
+    const toggleMesAcumulado = (mesKey) => {
+        setMesesAcumulado(prev =>
+            prev.includes(mesKey) ? prev.filter(m => m !== mesKey) : [...prev, mesKey]
+        );
+    };
+
+    const formatMesKey = (key) => {
+        const [y, m] = key.split("-");
+        return `${MESES[parseInt(m) - 1].substring(0, 3)} ${y}`;
+    };
+
     const lista = vista === "pendientes" ? pendientes : revisadosMes;
 
     const mesAnterior = () => {
@@ -351,25 +385,55 @@ const Gastos = () => {
                 </button>
             </div>
 
+            {/* Acumulado de meses */}
+            {vista === "revisados" && mesesDisponibles.length > 0 && (
+                <div className="mb-3 bg-gray-50 rounded-lg p-3">
+                    <p className="text-[11px] text-gray-400 uppercase font-bold mb-2">Acumulado por meses</p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                        {mesesDisponibles.map(m => (
+                            <button
+                                key={m.key}
+                                onClick={() => toggleMesAcumulado(m.key)}
+                                className={`px-2 py-1 rounded text-[11px] font-bold transition-colors ${
+                                    mesesAcumulado.includes(m.key)
+                                        ? "bg-gray-800 text-white"
+                                        : "bg-white text-gray-500 border border-gray-200 hover:border-gray-400"
+                                }`}
+                            >
+                                {formatMesKey(m.key)}
+                            </button>
+                        ))}
+                    </div>
+                    {totalAcumulado !== null && mesesAcumulado.length > 0 && (
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                            <span className="text-[11px] text-gray-400">
+                                {mesesAcumulado.length} {mesesAcumulado.length === 1 ? "mes" : "meses"} seleccionados
+                            </span>
+                            <span className="text-sm font-black text-gray-800">{formatMoneda(totalAcumulado)}</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Selector de mes + Excel para revisados */}
             {vista === "revisados" && (
-                <div className="flex items-center justify-between mb-4">
-                    <button onClick={mesAnterior} className="p-2 hover:bg-gray-100 rounded">
-                        <FaChevronLeft size={12} className="text-gray-500" />
-                    </button>
-                    <span className="text-sm font-bold text-gray-700">
-                        {MESES[mesSeleccionado]} {anioSeleccionado}
-                    </span>
-                    <div className="flex items-center gap-2">
-                        <button onClick={mesSiguiente} className="p-2 hover:bg-gray-100 rounded">
-                            <FaChevronRight size={12} className="text-gray-500" />
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1">
+                        <button onClick={mesAnterior} className="p-1 hover:bg-gray-100 rounded">
+                            <FaChevronLeft size={11} className="text-gray-500" />
                         </button>
-                        {revisadosMes.length > 0 && (
-                            <button onClick={exportarExcel} className="flex items-center gap-1 text-xs text-green-700 font-bold hover:bg-green-50 px-2 py-1.5 rounded" title="Exportar Excel">
-                                <FaFileExcel size={13} /> Excel
-                            </button>
-                        )}
+                        <span className="text-sm font-bold text-gray-700">
+                            {MESES[mesSeleccionado]} {anioSeleccionado}
+                        </span>
+                        <button onClick={mesSiguiente} className="p-1 hover:bg-gray-100 rounded">
+                            <FaChevronRight size={11} className="text-gray-500" />
+                        </button>
                     </div>
+                    {revisadosMes.length > 0 && (
+                        <button onClick={exportarExcel} className="flex items-center gap-1 text-xs text-green-700 font-bold hover:bg-green-50 px-2 py-1 rounded" title="Exportar Excel">
+                            <FaFileExcel size={13} /> Excel
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -380,48 +444,52 @@ const Gastos = () => {
                 </p>
             ) : (
                 <>
-                    <table className="w-full text-[13px]">
+                    <table className={`w-full ${vista === "revisados" ? "text-[11px]" : "text-[13px]"}`}>
                         <thead>
-                            <tr className="text-left text-[11px] text-gray-400 uppercase border-b border-gray-200">
-                                <th className="pb-2 pl-1 font-medium w-12"></th>
-                                <th className="pb-2 font-medium">Concepto</th>
-                                {vista === "revisados" && <th className="pb-2 font-medium">Categoria</th>}
-                                <th className="pb-2 font-medium">Fecha</th>
-                                {vista === "revisados" && <th className="pb-2 font-medium">Pago</th>}
-                                <th className="pb-2 font-medium">Subido por</th>
-                                <th className="pb-2 text-right font-medium">Monto</th>
-                                <th className="pb-2 w-8"></th>
+                            <tr className="text-left text-[10px] text-gray-400 uppercase border-b border-gray-200">
+                                {vista === "pendientes" && <th className="pb-1 pl-1 font-medium w-10"></th>}
+                                <th className="pb-1 font-medium">Concepto</th>
+                                {vista === "revisados" && <th className="pb-1 font-medium">Categoria</th>}
+                                <th className="pb-1 font-medium">Fecha</th>
+                                {vista === "revisados" && <th className="pb-1 font-medium">Pago</th>}
+                                {vista === "pendientes" && <th className="pb-1 font-medium">Subido por</th>}
+                                <th className="pb-1 text-right font-medium">Monto</th>
+                                <th className="pb-1 w-6"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {lista.map((g) => (
                                 <tr
                                     key={g.id}
-                                    className="border-b border-gray-100 cursor-pointer hover:bg-gray-200"
+                                    className={`border-b border-gray-100 cursor-pointer hover:bg-gray-200 ${vista === "revisados" ? "leading-tight" : ""}`}
                                     onClick={() => abrirGasto(g)}
                                 >
-                                    <td className="py-2.5 pl-1">
-                                        <img src={g.imagenUrl} alt="" className="w-9 h-9 rounded object-cover bg-gray-100" loading="lazy" />
-                                    </td>
-                                    <td className="py-2.5 text-gray-800 font-medium truncate max-w-[180px]">
+                                    {vista === "pendientes" && (
+                                        <td className="py-2 pl-1">
+                                            <img src={g.imagenUrl} alt="" className="w-8 h-8 rounded object-cover bg-gray-100" loading="lazy" />
+                                        </td>
+                                    )}
+                                    <td className={`${vista === "revisados" ? "py-1" : "py-2"} text-gray-800 font-medium truncate max-w-[180px]`}>
                                         {g.concepto || <span className="text-gray-300 italic font-normal">Sin concepto</span>}
                                     </td>
                                     {vista === "revisados" && (
-                                        <td className="py-2.5 text-gray-500 text-[12px] truncate max-w-[120px]">{g.categoria || "—"}</td>
+                                        <td className="py-1 text-gray-500 truncate max-w-[120px]">{g.categoria || "—"}</td>
                                     )}
-                                    <td className="py-2.5 text-gray-500 whitespace-nowrap">{formatFecha(g.fechaGasto)}</td>
+                                    <td className={`${vista === "revisados" ? "py-1" : "py-2"} text-gray-500 whitespace-nowrap`}>{formatFecha(g.fechaGasto)}</td>
                                     {vista === "revisados" && (
-                                        <td className="py-2.5 text-gray-500 text-[12px]">{g.metodoPago || "—"}</td>
+                                        <td className="py-1 text-gray-500">{g.metodoPago || "—"}</td>
                                     )}
-                                    <td className="py-2.5 text-gray-500 truncate max-w-[100px]">{g.creadoPor?.nombre}</td>
-                                    <td className="py-2.5 text-right font-bold text-gray-800 whitespace-nowrap">{formatMoneda(g.monto)}</td>
-                                    <td className="py-2.5 pr-1 text-center">
+                                    {vista === "pendientes" && (
+                                        <td className="py-2 text-gray-500 truncate max-w-[100px]">{g.creadoPor?.nombre}</td>
+                                    )}
+                                    <td className={`${vista === "revisados" ? "py-1" : "py-2"} text-right font-bold text-gray-800 whitespace-nowrap`}>{formatMoneda(g.monto)}</td>
+                                    <td className={`${vista === "revisados" ? "py-1" : "py-2"} pr-1 text-center`}>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleEliminar(g); }}
-                                            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                            className="text-gray-300 hover:text-red-500 transition-colors p-0.5"
                                             title="Eliminar"
                                         >
-                                            <FaTimes size={10} />
+                                            <FaTimes size={9} />
                                         </button>
                                     </td>
                                 </tr>
@@ -430,9 +498,9 @@ const Gastos = () => {
                     </table>
 
                     {vista === "revisados" && revisadosMes.length > 0 && (
-                        <div className="flex justify-end items-center gap-3 mt-3 pt-3 border-t border-gray-200 pr-1">
-                            <span className="text-xs text-gray-400 uppercase">Total {MESES[mesSeleccionado]}</span>
-                            <span className="text-base font-black text-gray-800">{formatMoneda(totalMes)}</span>
+                        <div className="flex justify-end items-center gap-2 mt-2 pt-2 border-t border-gray-200 pr-1">
+                            <span className="text-[11px] text-gray-400 uppercase">Total {MESES[mesSeleccionado]}</span>
+                            <span className="text-sm font-black text-gray-800">{formatMoneda(totalMes)}</span>
                         </div>
                     )}
                 </>
