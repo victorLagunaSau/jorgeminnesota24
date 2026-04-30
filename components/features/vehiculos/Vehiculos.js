@@ -394,6 +394,7 @@ const Vehiculos = ({user}) => {
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Almacen</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Vehículo</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Cliente</th>
+                        <th className="px-4 py-3 text-center font-black text-black uppercase text-xs">Título</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Acciones</th>
                     </tr>
                     </thead>
@@ -455,6 +456,10 @@ const Vehiculos = ({user}) => {
 
                                 <td className="px-4 py-3">
                                     <strong className="text-black font-black">{vehiculo.cliente}</strong>
+                                </td>
+
+                                <td className={`px-4 py-3 text-center font-black text-sm ${vehiculo.titulo === "SI" ? "text-green-700" : "text-red-500"}`}>
+                                    {vehiculo.titulo === "SI" ? "SI" : "NO"}
                                 </td>
 
                                 <td className="px-4 py-3">
