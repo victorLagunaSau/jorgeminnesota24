@@ -168,14 +168,12 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </div>
                         </li>
 
-                        {/* Gastos - Visible para admin no master */}
-                        {!isAdminMaster && (
-                            <li>
-                                <button className={getButtonClass('gastos')} onClick={() => handleSelectModule('gastos')}>
-                                    <FaDollarSign className="mr-3 text-red-600" size={18} /> Gastos
-                                </button>
-                            </li>
-                        )}
+                        {/* Gastos */}
+                        <li>
+                            <button className={getButtonClass('gastos')} onClick={() => handleSelectModule('gastos')}>
+                                <FaDollarSign className="mr-3 text-red-600" size={18} /> Gastos
+                            </button>
+                        </li>
 
                         {/* Submenú Análisis - Solo Admin Master */}
                         {isAdminMaster && (
