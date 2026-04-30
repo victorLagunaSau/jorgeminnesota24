@@ -719,7 +719,46 @@ const ReporteViajesPagados = ({ user }) => {
             {/* CONTENIDO */}
             {vista === "importados" ? (
                 // VISTA VIAJES IMPORTADOS H-
-                <div className="p-2 overflow-x-auto">
+                <div className="p-2">
+                    {/* CONTADOR FIXED - Total contabilizado en tiempo real */}
+                    {viajesImportados.length > 0 && (() => {
+                        const asignados = viajesImportados.filter(v => !v.choferPendiente && v.chofer?.nombre);
+                        const sinAsignar = viajesImportados.filter(v => v.choferPendiente || !v.chofer?.nombre);
+                        const totalAsignados = asignados.reduce((acc, v) =>
+                            (v.vehiculos || []).reduce((a, vh) =>
+                                a + (parseFloat(vh.flete) || 0) + (parseFloat(vh.storage) || 0) + (parseFloat(vh.sPeso) || 0) + (parseFloat(vh.gExtra) || 0), acc), 0);
+                        const totalSinAsignar = sinAsignar.reduce((acc, v) =>
+                            (v.vehiculos || []).reduce((a, vh) =>
+                                a + (parseFloat(vh.flete) || 0) + (parseFloat(vh.storage) || 0) + (parseFloat(vh.sPeso) || 0) + (parseFloat(vh.gExtra) || 0), acc), 0);
+                        const vehAsignados = asignados.reduce((acc, v) => acc + (v.vehiculos || []).length, 0);
+                        const vehSinAsignar = sinAsignar.reduce((acc, v) => acc + (v.vehiculos || []).length, 0);
+                        return (
+                            <div className="fixed bottom-0 left-0 lg:left-64 right-0 z-30 bg-white border-t-2 border-orange-400 shadow-[0_-4px_12px_rgba(0,0,0,0.1)] px-4 py-2 flex items-center justify-between gap-4 flex-wrap">
+                                <div className="flex items-center gap-4">
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black uppercase text-gray-400">Contabilizados</p>
+                                        <p className="text-lg font-black text-green-700 leading-none">{asignados.length} <span className="text-[10px] text-gray-400 font-bold">viajes</span> <span className="text-[10px] text-green-600 font-bold">({vehAsignados} veh)</span></p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black uppercase text-gray-400">Pendientes</p>
+                                        <p className="text-lg font-black text-orange-600 leading-none">{sinAsignar.length} <span className="text-[10px] text-gray-400 font-bold">viajes</span> <span className="text-[10px] text-orange-500 font-bold">({vehSinAsignar} veh)</span></p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <p className="text-[9px] font-black uppercase text-green-600">Total Contabilizado</p>
+                                        <p className="text-xl font-black text-green-700 leading-none">${totalAsignados.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[9px] font-black uppercase text-orange-500">Falta por asignar</p>
+                                        <p className="text-xl font-black text-orange-600 leading-none">${totalSinAsignar.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    <div className="overflow-x-auto pb-20">
                     <div className="flex items-center gap-3 mb-3 px-2">
                         <span className="text-[10px] font-black uppercase text-gray-400">Filtrar:</span>
                         {[
@@ -754,6 +793,7 @@ const ReporteViajesPagados = ({ user }) => {
                                     <th className="border border-orange-600 px-1 py-2">Lote</th>
                                     <th className="border border-orange-600 px-1 py-2">Ruta</th>
                                     <th className="border border-orange-600 px-1 py-2">Cliente</th>
+                                    <th className="border border-orange-600 px-1 py-2 text-center">Título</th>
                                     <th className="border border-orange-600 px-1 py-2 text-right">Flete</th>
                                     <th className="border border-orange-600 px-1 py-2 text-right">Storage</th>
                                     <th className="border border-orange-600 px-1 py-2 text-right">S.Peso</th>
@@ -825,6 +865,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                 <td className="border border-gray-200 px-1 py-1 font-mono font-black text-blue-700">{v.lote}</td>
                                                 <td className="border border-gray-200 px-1 py-1 uppercase text-[10px]"><span className="text-gray-600">{v.estado}</span> <span className="font-bold text-red-700">{v.ciudad}</span></td>
                                                 <td className="border border-gray-200 px-1 py-1 uppercase font-bold text-gray-800 text-[10px]">{v.clienteNombre || v.clienteAlt}</td>
+                                                <td className={`border border-gray-200 px-1 py-1 text-center font-black text-[10px] ${v.titulo === "SI" ? "text-green-700 bg-green-50" : "text-red-500"}`}>{v.titulo || "NO"}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono font-bold">${v.flete}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.storage || 0}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.sPeso || 0}</td>
@@ -849,6 +890,7 @@ const ReporteViajesPagados = ({ user }) => {
                             </tbody>
                         </table>
                     )}
+                    </div>
                 </div>
             ) : vista === "historial" ? (
                 // VISTA HISTORIAL - TABLA TIPO EXCEL
@@ -868,6 +910,7 @@ const ReporteViajesPagados = ({ user }) => {
                                     <th className="border border-gray-600 px-1 py-2">Lote</th>
                                     <th className="border border-gray-600 px-1 py-2">Ruta</th>
                                     <th className="border border-gray-600 px-1 py-2">Cliente</th>
+                                    <th className="border border-gray-600 px-1 py-2 text-center">Título</th>
                                     <th className="border border-gray-600 px-1 py-2 text-right">Flete</th>
                                     <th className="border border-gray-600 px-1 py-2 text-right">Storage</th>
                                     <th className="border border-gray-600 px-1 py-2 text-right">S.Peso</th>
@@ -942,6 +985,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                 </td>
                                                 <td className="border border-gray-200 px-1 py-1 uppercase text-[10px]"><span className="text-gray-600">{v.estado}</span> <span className="font-bold text-red-700">{v.ciudad}</span></td>
                                                 <td className="border border-gray-200 px-1 py-1 uppercase font-bold text-gray-800 text-[10px]">{v.clienteNombre || v.clienteAlt}</td>
+                                                <td className={`border border-gray-200 px-1 py-1 text-center font-black text-[10px] ${v.titulo === "SI" ? "text-green-700 bg-green-50" : "text-red-500"}`}>{v.titulo || "NO"}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono font-bold">${v.flete}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.storage || 0}</td>
                                                 <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.sPeso || 0}</td>
