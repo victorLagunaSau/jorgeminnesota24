@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaMoneyBillWave, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes } from 'react-icons/fa';
+import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaMoneyBillWave, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie } from 'react-icons/fa';
 
 const SEMANAS_OPTIONS = [
     { value: 1, label: "Semana actual" },
@@ -104,6 +104,7 @@ const EstadoFinanciero = () => {
     const [semanas, setSemanas] = useState(1);
     const [movimientos, setMovimientos] = useState([]);
     const [viajesPagados, setViajesPagados] = useState([]);
+    const [pagosNomina, setPagosNomina] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalData, setModalData] = useState(null);
 
@@ -120,7 +121,7 @@ const EstadoFinanciero = () => {
         setLoading(true);
         setModalData(null);
         let loadedCount = 0;
-        const checkDone = () => { loadedCount++; if (loadedCount >= 2) setLoading(false); };
+        const checkDone = () => { loadedCount++; if (loadedCount >= 3) setLoading(false); };
 
         const unsub1 = firestore()
             .collection(COLLECTIONS.MOVIMIENTOS)
@@ -140,7 +141,16 @@ const EstadoFinanciero = () => {
                 checkDone();
             }, () => checkDone());
 
-        return () => { unsub1(); unsub2(); };
+        const unsub3 = firestore()
+            .collection(COLLECTIONS.PAGOS_NOMINA)
+            .where("fecha", ">=", fechaInicio)
+            .where("fecha", "<=", fechaFin)
+            .onSnapshot((snap) => {
+                setPagosNomina(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                checkDone();
+            }, () => checkDone());
+
+        return () => { unsub1(); unsub2(); unsub3(); };
     }, [fechaInicio, fechaFin]);
 
     // === DATOS FILTRADOS ===
@@ -208,11 +218,13 @@ const EstadoFinanciero = () => {
             totalVehiculos: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalVehiculos) || 0), 0),
         };
 
-        const totalIngresos = v.efectivo + v.cc + ant.total + ab.efectivo + ab.cc + ent.total;
-        const totalEgresos = pc.granTotal;
+        const nomina = { count: pagosNomina.length, total: pagosNomina.reduce((t, p) => t + (parseFloat(p.monto) || 0), 0) };
 
-        return { vehiculos: v, credito: { otorgado: creditoOtorgado, saldoPendiente }, anticipos: ant, abonos: ab, entradas: ent, pagosChoferes: pc, totalIngresos, totalEgresos, balance: totalIngresos - totalEgresos };
-    }, [datos, viajesPagados]);
+        const totalIngresos = v.efectivo + v.cc + ant.total + ab.efectivo + ab.cc + ent.total;
+        const totalEgresos = pc.granTotal + nomina.total;
+
+        return { vehiculos: v, credito: { otorgado: creditoOtorgado, saldoPendiente }, anticipos: ant, abonos: ab, entradas: ent, pagosChoferes: pc, nomina, totalIngresos, totalEgresos, balance: totalIngresos - totalEgresos };
+    }, [datos, viajesPagados, pagosNomina]);
 
     // === COLUMNAS PARA DETALLE ===
     const colVehiculo = (campoMonto, label) => [
@@ -438,6 +450,31 @@ const EstadoFinanciero = () => {
                                 <SubItem label="Sobrepeso" monto={financiero.pagosChoferes.totalSobrepeso} items={choferCon('sPeso')} columnas={colChofer('sPeso', 'Sobrepeso')} setModalData={setModalData} />
                                 <SubItem label="Gastos Extra" monto={financiero.pagosChoferes.totalGastosExtra} items={choferCon('gExtra')} columnas={colChofer('gExtra', 'Extra')} setModalData={setModalData} />
                             </div>
+                        </div>
+
+                        {/* Nómina Empleados */}
+                        <div className="p-4">
+                            <button onClick={() => setModalData({
+                                titulo: 'Nómina de Empleados',
+                                items: pagosNomina,
+                                columnas: [
+                                    { key: 'empleadoNombre', label: 'Empleado', bold: true },
+                                    { key: 'concepto', label: 'Concepto' },
+                                    { key: 'nota', label: 'Nota', render: (m) => m.nota || '-' },
+                                    { key: 'fecha', label: 'Fecha', render: (m) => formatTs(m.fecha) },
+                                    { key: 'monto', label: 'Monto', align: 'right', fmt: true, bold: true, color: 'text-red-700' },
+                                ],
+                                total: financiero.nomina.total
+                            })} className="flex items-center justify-between w-full hover:bg-gray-50 rounded-lg p-1 transition-all cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center"><FaUserTie className="text-purple-600" size={14} /></div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-bold text-gray-800">Nómina Empleados</p>
+                                        <p className="text-[10px] text-gray-400 uppercase">{financiero.nomina.count} pagos</p>
+                                    </div>
+                                </div>
+                                <p className="text-lg font-black text-red-700">{fmt(financiero.nomina.total)}</p>
+                            </button>
                         </div>
 
                         {/* Crédito Otorgado */}

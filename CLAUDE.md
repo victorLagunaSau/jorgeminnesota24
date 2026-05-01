@@ -23,8 +23,8 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 ### Key Architectural Patterns
 
-- **State management:** React Context API only (no Redux). Two context providers: `AuthContext` (`context/auth.js`) wraps the entire app; `AdminDataContext` (`context/adminData.js`) wraps only the admin panel and provides real-time cached data for drivers/clients/companies via Firestore `onSnapshot`.
-- **Admin panel module routing:** `components/features/Admin.js` is a large switch statement (~28 cases) that renders the active module. `components/Layout/Sidebar.js` controls navigation by setting `selectedModule` state, which Admin.js switches on.
+- **State management:** React Context API only (no Redux). Two context providers: `AuthContext` (`context/auth.js`) wraps the entire app; `AdminDataContext` (`context/adminData.js`) wraps only the admin panel and provides real-time cached data for drivers/clients/companies via Firestore `onSnapshot`. AdminDataContext also exposes lookup helpers: `getChoferById`, `getClienteById`, `getEmpresaById`, `getChoferByNombre`, `getClienteByNombre`.
+- **Admin panel module routing:** `components/features/Admin.js` is a large switch statement (~30 cases) that renders the active module. `components/Layout/Sidebar.js` controls navigation by setting `selectedModule` state, which Admin.js switches on. **Note:** only ~19 module names are defined in `ADMIN_MODULES` in `constants/index.js`; the remaining (~11, mostly análisis submodules like `estadoFinanciero`, `gastos`, `empleados`, `historialAnticipos`, `historialAutorizaciones`, and utility modules like `registroMasivoVehiculos`, `eliminaVehiculos`) use string literals directly in Sidebar.js and Admin.js.
 - **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js`. Use it instead of direct Firestore calls. Includes a **sequential ID system** (`getNextConsecutive`, `runTransactionWithConsecutive`) for generating incrementing IDs stored in the `config` collection.
 - **Constants as single source of truth:** `constants/index.js` exports all enums and config: collection names (`COLLECTIONS`), vehicle/trip statuses, payment methods, user roles (`USER_TYPES`), admin module names (`ADMIN_MODULES`), company info for receipts, field validation limits, and helper functions like `getStatusLabel`.
 - **Custom hooks:** Located in `hooks/` — `useFirestoreCollection` (real-time subscriptions), `useAuth`, `useAlert`, `usePagination`, `useCopyToClipboard`. Note: some components still implement their own Firestore listeners.
@@ -70,7 +70,7 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
-- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `portal` (cliente)
+- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `portal` + `solicitar` (cliente)
 - **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy)
 - **Maintenance scripts:** `scripts/` contains audit scripts (`auditActivos`, `auditDesync`, `auditPrecios`) and `rastrearLote` (lot tracking via Puppeteer)
 
@@ -85,7 +85,7 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 ## Code Conventions
 
 - **Language mix:** Variables, UI text, and collection names are in Spanish. Framework/React patterns use English.
-- **Styling:** Tailwind + DaisyUI classes directly in JSX. No CSS modules or styled-components.
+- **Styling:** Tailwind + DaisyUI classes directly in JSX. No CSS modules or styled-components. Custom DaisyUI theme `mytheme` defined in `tailwind.config.js` with brand primary color `#b40a0a` (dark red).
 - **Components:** Functional components with hooks only. No class components.
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
 - **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.

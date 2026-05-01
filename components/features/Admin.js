@@ -42,7 +42,7 @@ import EstadoFinanciero from "./analisis/EstadoFinanciero";
 import HistorialAnticipos from "./analisis/HistorialAnticipos";
 import HistorialAutorizaciones from "./analisis/HistorialAutorizaciones";
 import Gastos from "./analisis/Gastos";
-import SearchMovimientos from "./analisis/SearchMovimientos";
+import Empleados from "./analisis/Empleados";
 
 // Módulos - Otros
 import Cobranza from "./cobranza/Cobranza";
@@ -124,8 +124,8 @@ const Admin = () => {
                 return <HistorialAutorizaciones />;
             case 'gastos':
                 return <Gastos />;
-            case 'searchMovimientos':
-                return <SearchMovimientos user={user} />;
+            case 'empleados':
+                return <Empleados />;
             case 'users':
                 return <Users />;
             case 'registroMasivoVehiculos':
@@ -156,6 +156,8 @@ const Admin = () => {
                     user={user}
                     onLogout={handleLogout}
                     onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+                    onSelectModule={setSelectedModule}
+                    selectedModule={selectedModule}
                 />
 
                 <main className="lg:ml-64 mt-16 p-4 lg:p-8 min-h-screen">

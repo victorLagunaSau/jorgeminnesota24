@@ -18,6 +18,7 @@ export const COLLECTIONS = {
   SOLICITUDES_VEHICULOS: "solicitudesVehiculos",
   TOKENS_CHOFER: "tokensChofer",
   AUDIT_LOG: "auditLog",
+  PAGOS_NOMINA: "pagosNomina",
 };
 
 // ===========================================
