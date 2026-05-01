@@ -91,8 +91,8 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
         setSuccess('');
         setError('');
 
-        if (!gatePass || !marca || !modelo || !cliente) {
-            setError('Los campos Bin, Marca, Modelo y Teléfono del cliente son obligatorios.');
+        if (!marca || !modelo) {
+            setError('Los campos Marca y Modelo son obligatorios.');
             return;
         }
 
@@ -100,32 +100,38 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
         try {
             await handleActualizarVehiculo();
             setSuccess('Vehículo actualizado con éxito.');
-            onClose(); // Cerrar el formulario después de una actualización exitosa
+            onClose();
+        } catch (err) {
+            console.error("Error al actualizar vehículo:", err);
+            setError(`Error al actualizar: ${err.message || err}`);
         } finally {
             setSaving(false);
         }
     };
 
     const handleActualizarVehiculo = async () => {
-        try {
-            const nuevos = { gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad, price, storage, sobrePeso, gastosExtra, titulo, estatus };
-            const cambios = {};
-            Object.keys(nuevos).forEach(campo => {
-                const antes = vehiculo[campo] !== undefined ? vehiculo[campo] : '';
-                const despues = nuevos[campo] !== undefined ? nuevos[campo] : '';
-                if (String(antes) !== String(despues)) {
-                    cambios[campo] = { antes, despues };
-                }
-            });
-
-            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update(nuevos);
-
-            if (Object.keys(cambios).length > 0) {
-                await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
+        const todos = {
+            gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad,
+            price: String(price),
+            storage: parseFloat(storage) || 0,
+            sobrePeso: parseFloat(sobrePeso) || 0,
+            gastosExtra: parseFloat(gastosExtra) || 0,
+            titulo, estatus
+        };
+        const nuevos = Object.fromEntries(Object.entries(todos).filter(([, v]) => v !== undefined));
+        const cambios = {};
+        Object.keys(nuevos).forEach(campo => {
+            const antes = vehiculo[campo] !== undefined ? vehiculo[campo] : '';
+            const despues = nuevos[campo] !== undefined ? nuevos[campo] : '';
+            if (String(antes) !== String(despues)) {
+                cambios[campo] = { antes, despues };
             }
-        } catch (error) {
-            console.error("Error al actualizar vehículo:", error);
-            setError('Error al actualizar el vehículo. Por favor, intente nuevamente. Error:');
+        });
+
+        await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update(nuevos);
+
+        if (Object.keys(cambios).length > 0) {
+            await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
         }
     };
     const handleDeleteVehiculo = async () => {

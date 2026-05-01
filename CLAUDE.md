@@ -17,13 +17,15 @@ No test framework or linter is configured.
 
 Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles from auction purchase (IAA/Copart) through delivery, including trips, payments, drivers, and financial reports.
 
-**Stack:** Next.js 12.3.1, React 17, Tailwind CSS 3 + DaisyUI 4, Firebase v7 (Auth, Firestore, Storage), Puppeteer (auction scraping)
+**Stack:** Next.js 12.3.1, React 17, Tailwind CSS 3 + DaisyUI 4, Firebase v7 (Auth, Firestore, Storage, Functions), Puppeteer (auction scraping), Framer Motion (animations), moment.js (dates)
+
+**Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). No `next.config.js` — uses default Next.js 12 config.
 
 ### Key Architectural Patterns
 
 - **State management:** React Context API only (no Redux). Two context providers: `AuthContext` (`context/auth.js`) wraps the entire app; `AdminDataContext` (`context/adminData.js`) wraps only the admin panel and provides real-time cached data for drivers/clients/companies via Firestore `onSnapshot`.
 - **Admin panel module routing:** `components/features/Admin.js` is a large switch statement (~28 cases) that renders the active module. `components/Layout/Sidebar.js` controls navigation by setting `selectedModule` state, which Admin.js switches on.
-- **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js`. Use it instead of direct Firestore calls.
+- **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js`. Use it instead of direct Firestore calls. Includes a **sequential ID system** (`getNextConsecutive`, `runTransactionWithConsecutive`) for generating incrementing IDs stored in the `config` collection.
 - **Constants as single source of truth:** `constants/index.js` exports all enums and config: collection names (`COLLECTIONS`), vehicle/trip statuses, payment methods, user roles (`USER_TYPES`), admin module names (`ADMIN_MODULES`), company info for receipts, field validation limits, and helper functions like `getStatusLabel`.
 - **Custom hooks:** Located in `hooks/` — `useFirestoreCollection` (real-time subscriptions), `useAuth`, `useAlert`, `usePagination`, `useCopyToClipboard`. Note: some components still implement their own Firestore listeners.
 - **Utilities:** Shared helpers in `utils/index.js`. Audit logging via `utils/auditLog.js`.
@@ -58,6 +60,10 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `vehiculos` — vehicle inventory with status tracking
 - `viajesPendientes` / `viajesPagados` — unpaid / paid trips
 - `movimientos`, `entradasCaja`, `salidasCaja` — cash register movements
+- `choferes`, `clientes`, `empresas` — entity data (cached in AdminDataContext)
+- `solicitudesVehiculos` — client vehicle requests
+- `lotesEnTransito` — lot tracking
+- `auditLog` — audit trail entries
 - `config` — system configuration and sequential IDs
 
 ### Pages and Routing
