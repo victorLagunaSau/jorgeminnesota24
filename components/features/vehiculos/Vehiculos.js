@@ -11,7 +11,7 @@ import Pagination from "../../ui/Pagination";
 import SearchBar from "../../ui/SearchBar";
 import Alert from "../../ui/Alert";
 import { useAdminData } from "../../../context/adminData";
-import { FaBell, FaBellSlash, FaExclamationCircle } from "react-icons/fa";
+import { FaBell, FaBellSlash, FaExclamationCircle, FaSpinner, FaCheck } from "react-icons/fa";
 
 const Vehiculos = ({user}) => {
     const { clientes } = useAdminData();
@@ -49,6 +49,9 @@ const Vehiculos = ({user}) => {
         });
         return mapa;
     }, [clientes]);
+
+    const [enviandoAviso, setEnviandoAviso] = useState({});
+    const [avisoExitoso, setAvisoExitoso] = useState({});
 
     const [isLoteModalOpen, setIsLoteModalOpen] = useState(false);
     const [loteTargetVehiculo, setLoteTargetVehiculo] = useState(null);
@@ -410,7 +413,7 @@ const Vehiculos = ({user}) => {
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Almacen</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Vehículo</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Cliente</th>
-                        <th className="px-4 py-3 text-center font-black text-black uppercase text-xs">Avisar</th>
+                        {isAdminMaster && <th className="px-4 py-3 text-center font-black text-black uppercase text-xs">Avisar</th>}
                         <th className="px-4 py-3 text-center font-black text-black uppercase text-xs">Título</th>
                         <th className="px-4 py-3 text-left font-black text-black uppercase text-xs">Acciones</th>
                     </tr>
@@ -475,6 +478,7 @@ const Vehiculos = ({user}) => {
                                     <strong className="text-black font-black">{vehiculo.cliente}</strong>
                                 </td>
 
+                                {isAdminMaster && (
                                 <td className="px-4 py-3 text-center">
                                     {(() => {
                                         const tel = telefonosPorCliente[vehiculo.cliente?.toLowerCase()];
@@ -492,16 +496,40 @@ const Vehiculos = ({user}) => {
                                         };
                                         const estado = colores[Math.min(avisos, 3)];
 
-                                        const handleAvisar = (e) => {
+                                        const handleAvisar = async (e) => {
                                             e.preventDefault();
-                                            if (avisos >= 3) return;
-                                            const num = tel.replace(/[^0-9]/g, '');
+                                            if (avisos >= 3 || enviandoAviso[vehiculo.id]) return;
+
                                             const mensaje = '\u{1F525} *Jorge Minnesota Logistic LLC* \u{1F525}\n\nEstimado cliente, le informamos que tenemos un vehiculo registrado a su nombre:\n\n\u{1F522} *Lote:* #' + vehiculo.binNip + '\n\u{1F697} *Marca:* ' + (vehiculo.marca || '-') + '\n\u{1F698} *Modelo:* ' + (vehiculo.modelo || '-') + '\n\u{1F4CD} *Origen:* ' + (vehiculo.ciudad || '-') + ', ' + (vehiculo.estado || '-') + '\n\nEste vehiculo debera ser pagado y recogido para evitar gastos de storage.\n\nAgradecemos su pago y preferencia. \u{1F4AF}';
-                                            firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.id).update({
-                                                avisosCliente: avisos + 1
-                                            });
-                                            window.open('https://api.whatsapp.com/send?phone=' + num + '&text=' + encodeURIComponent(mensaje), '_blank');
+
+                                            setEnviandoAviso(prev => ({ ...prev, [vehiculo.id]: true }));
+                                            try {
+                                                const resp = await fetch('/api/send-whatsapp', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ telefono: tel, mensaje })
+                                                });
+                                                const data = await resp.json();
+                                                if (data.success) {
+                                                    await firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.id).update({
+                                                        avisosCliente: avisos + 1
+                                                    });
+                                                    setAvisoExitoso(prev => ({ ...prev, [vehiculo.id]: true }));
+                                                    setTimeout(() => setAvisoExitoso(prev => ({ ...prev, [vehiculo.id]: false })), 2000);
+                                                } else {
+                                                    setAlertMsg({ mostrar: true, mensaje: 'Error al enviar: ' + (data.error || 'Error desconocido'), tipo: 'error' });
+                                                    setTimeout(() => setAlertMsg({ mostrar: false, mensaje: '', tipo: '' }), 4000);
+                                                }
+                                            } catch (err) {
+                                                setAlertMsg({ mostrar: true, mensaje: 'Error de conexion: ' + err.message, tipo: 'error' });
+                                                setTimeout(() => setAlertMsg({ mostrar: false, mensaje: '', tipo: '' }), 4000);
+                                            } finally {
+                                                setEnviandoAviso(prev => ({ ...prev, [vehiculo.id]: false }));
+                                            }
                                         };
+
+                                        const enviando = enviandoAviso[vehiculo.id];
+                                        const exito = avisoExitoso[vehiculo.id];
 
                                         return (
                                             <div className="flex flex-col items-center gap-1">
@@ -509,15 +537,18 @@ const Vehiculos = ({user}) => {
                                                     onClick={handleAvisar}
                                                     className={`${estado.icon} ${avisos >= 3 ? 'cursor-not-allowed opacity-60' : 'hover:scale-110'} transition-all`}
                                                     title={avisos >= 3 ? 'Ya se enviaron 3 avisos' : 'Enviar aviso ' + (avisos + 1) + '/3'}
-                                                    disabled={avisos >= 3}
+                                                    disabled={avisos >= 3 || enviando}
                                                 >
-                                                    {avisos >= 3 ? <FaExclamationCircle size={20} /> : <FaBell size={18} />}
+                                                    {enviando ? <FaSpinner size={18} className="animate-spin" /> :
+                                                     exito ? <FaCheck size={18} className="text-green-500" /> :
+                                                     avisos >= 3 ? <FaExclamationCircle size={20} /> : <FaBell size={18} />}
                                                 </button>
                                                 <span className={`text-[10px] font-black ${estado.bg}`}>{estado.label}</span>
                                             </div>
                                         );
                                     })()}
                                 </td>
+                                )}
 
                                 <td className={`px-4 py-3 text-center font-black text-sm ${vehiculo.titulo === "SI" ? "text-green-700" : "text-red-500"}`}>
                                     {vehiculo.titulo === "SI" ? "SI" : "NO"}
