@@ -1,16 +1,17 @@
 import React, { useState } from "react";
-import { FaCashRegister, FaFileInvoice, FaCar, FaUsers, FaCog, FaDollarSign, FaUserFriends, FaTruckMoving, FaTimes, FaChevronDown, FaChevronRight, FaChartBar } from "react-icons/fa";
+import { FaCashRegister, FaFileInvoice, FaCar, FaCog, FaDollarSign, FaUserFriends, FaTruckMoving, FaTimes, FaChevronDown, FaChevronRight } from "react-icons/fa";
 import { useAuthContext } from "../../context/auth";
 
 const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
     const { user } = useAuthContext();
     const isAdminMaster = user?.adminMaster === true;
+    const nombreLower = (user?.nombre || "").toLowerCase();
+    const puedeVerAnticipos = isAdminMaster || nombreLower.includes("olivia") || nombreLower.includes("cristela");
     const [openSubMenu, setOpenSubMenu] = useState({
         caja: false,
         reportes: false,
         vehiculos: false,
-        viajesMenu: false,
-        analisis: false
+        viajesMenu: false
     });
 
     const toggleSubMenu = (menu) => {
@@ -19,7 +20,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
             reportes: false,
             vehiculos: false,
             viajesMenu: false,
-            analisis: false,
             [menu]: !prevState[menu],
         }));
     };
@@ -110,6 +110,15 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
+                        {/* Pagos Adelantados - AdminMaster, Olivia, Cristela */}
+                        {puedeVerAnticipos && (
+                            <li>
+                                <button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>
+                                    <FaDollarSign className="mr-3 text-red-600" size={18} /> Pagos Adelantados
+                                </button>
+                            </li>
+                        )}
+
                         {/* Submenú Reportes */}
                         <li>
                             <button
@@ -175,30 +184,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Submenú Análisis - Solo Admin Master */}
-                        {isAdminMaster && (
-                            <li>
-                                <button
-                                    className={getMenuButtonClass(openSubMenu.analisis)}
-                                    onClick={() => toggleSubMenu('analisis')}
-                                >
-                                    <span className="flex items-center">
-                                        <FaChartBar className="mr-3 text-red-600" size={18} />
-                                        Análisis
-                                    </span>
-                                    {openSubMenu.analisis ? <FaChevronDown size={12} /> : <FaChevronRight size={12} />}
-                                </button>
-                                <div className={`overflow-hidden transition-all duration-300 ${openSubMenu.analisis ? 'max-h-96' : 'max-h-0'}`}>
-                                    <ul className="bg-gray-50 border-l-4 border-red-500 ml-4">
-                                        <li><button className={getButtonClass('estadoFinanciero')} onClick={() => handleSelectModule('estadoFinanciero')}>Estado Financiero</button></li>
-                                        <li><button className={getButtonClass('historialAnticipos')} onClick={() => handleSelectModule('historialAnticipos')}>Pagos Adelantados</button></li>
-                                        <li><button className={getButtonClass('historialAutorizaciones')} onClick={() => handleSelectModule('historialAutorizaciones')}>Autorizaciones</button></li>
-
-                                        <li><button className={getButtonClass('searchMovimientos')} onClick={() => handleSelectModule('searchMovimientos')}>Search</button></li>
-                                    </ul>
-                                </div>
-                            </li>
-                        )}
 
                         {/* Vehículos */}
                         <li>
@@ -214,14 +199,6 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                             </button>
                         </li>
 
-                        {/* Usuarios - Solo visible para Admin Master */}
-                        {isAdminMaster && (
-                            <li>
-                                <button className={getButtonClass('users')} onClick={() => handleSelectModule('users')}>
-                                    <FaUsers className="mr-3 text-red-600" size={18} /> Usuarios
-                                </button>
-                            </li>
-                        )}
 
                     </ul>
                 </nav>

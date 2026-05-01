@@ -871,7 +871,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
             })()}
 
             <div
-                className="sticky top-0 z-[50] p-6 bg-white border-b-2 border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
+                className="sticky top-0 z-[40] p-6 bg-white border-b-2 border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
                 <div>
                     <h2 className="text-3xl font-black text-gray-900 uppercase italic tracking-tighter leading-none">
                         {user.admin ? "Control Administrativo" : "Mis Despachos"}
@@ -1391,7 +1391,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
 
                                                         <ReactToPrint
                                                             onBeforeGetContent={() => setViajeAImprimir(viaje)}
-                                                            documentTitle={`Hoja Chofer - Folio ${viaje.numViaje}`}
+                                                            documentTitle={`Hoja Chofer - ${viaje.chofer?.nombre || "PENDIENTE"}`}
                                                             trigger={() => (
                                                                 <button
                                                                     className="btn btn-xs bg-white hover:bg-gray-100 border-2 border-gray-300 text-gray-800 font-black text-[9px] uppercase h-10 w-full flex items-center justify-center gap-2 transition-all shadow-sm">
@@ -1405,7 +1405,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                             <button onClick={() => {
                                                                 setModal({
                                                                     show: true,
-                                                                    mensaje: `¿Eliminar viaje #${viaje.numViaje}? Esta acción eliminará el viaje y ${viaje.vehiculos.length} vehículo(s) asociado(s). NO SE PUEDE DESHACER.`,
+                                                                    mensaje: `¿Eliminar viaje? Esta acción eliminará el viaje y ${viaje.vehiculos.length} vehículo(s) asociado(s). NO SE PUEDE DESHACER.`,
                                                                     accion: () => eliminarViaje(viaje.id),
                                                                     tipo: "eliminar"
                                                                 });

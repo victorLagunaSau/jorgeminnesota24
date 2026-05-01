@@ -78,10 +78,11 @@ const Clientes = ({ user }) => {
     //  - vehículos entregados con fiado (saldoFiado)
     //  - vehículos legacy con pagosPendientes (pagoTotalPendiente)
     const getDeudaCliente = (nombreCliente) => {
-        const enPatio = todosVehiculos.filter(v => v.cliente === nombreCliente);
+        const nombreNorm = nombreCliente?.toLowerCase() || '';
+        const enPatio = todosVehiculos.filter(v => v.cliente?.toLowerCase() === nombreNorm);
         const deudaPatio = enPatio.reduce((sum, v) => sum + calcularPrecioVehiculo(v), 0);
 
-        const fiadosCliente = vehiculosFiados.filter(v => v.cliente === nombreCliente);
+        const fiadosCliente = vehiculosFiados.filter(v => v.cliente?.toLowerCase() === nombreNorm);
         const deudaFiado = fiadosCliente.reduce(
             (sum, v) => sum + (parseFloat(v.saldoFiado) || 0),
             0
@@ -90,7 +91,7 @@ const Clientes = ({ user }) => {
         // Legacy: solo los que NO están ya contados como fiado nuevo
         const idsFiado = new Set(fiadosCliente.map(v => v.id));
         const legacyCliente = vehiculosLegacy.filter(
-            v => v.cliente === nombreCliente && !idsFiado.has(v.id)
+            v => v.cliente?.toLowerCase() === nombreNorm && !idsFiado.has(v.id)
         );
         const deudaLegacy = legacyCliente.reduce(
             (sum, v) => sum + (parseFloat(v.pagoTotalPendiente) || 0),

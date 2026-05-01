@@ -1,13 +1,15 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import moment from 'moment';
 import { VEHICLE_TYPES, VEHICLE_WAREHOUSES, TITLE_OPTIONS, PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS, TIMEOUTS } from "../../../constants";
+import { useAdminData } from "../../../context/adminData";
 import Alert from "../../ui/Alert";
 
 const FormDatosVehiculo = ({user, onClose}) => {
+    const { clientes: clientesRaw } = useAdminData();
     const [estado, setEstado] = useState('');
     const [ciudad, setCiudad] = useState('');
     const [price, setPrice] = useState(0);
@@ -17,6 +19,11 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const [marca, setMarca] = useState('');
     const [modelo, setModelo] = useState('');
     const [cliente, setCliente] = useState('');
+    const [clienteId, setClienteId] = useState('');
+    const [clienteConfirmado, setClienteConfirmado] = useState(false);
+    const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+    const [clienteDropdownIdx, setClienteDropdownIdx] = useState(0);
+    const clienteRef = useRef(null);
     const [telefonoCliente, setTelefonoCliente] = useState('');
     const [descripcion, setDescripcion] = useState('');
     const [error, setError] = useState('');
@@ -29,6 +36,19 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const [gastosExtra, setGastosExtra] = useState(0);
     const [titulo, setTitulo] = useState('NO');
     const [saving, setSaving] = useState(false);
+
+    const clientesFiltrados = clientesRaw.filter(c =>
+        c.cliente?.toLowerCase().includes(cliente.toLowerCase())
+    ).slice(0, 10);
+
+    const seleccionarClienteItem = (c) => {
+        setCliente(c.cliente);
+        setClienteId(c.id);
+        setTelefonoCliente(c.telefonoCliente || '');
+        setClienteConfirmado(true);
+        setShowClienteDropdown(false);
+        setClienteDropdownIdx(0);
+    };
 
     useEffect(() => {
         let timeoutId;
@@ -70,7 +90,11 @@ const FormDatosVehiculo = ({user, onClose}) => {
         setError('');
 
         if (!binNip || !gatePass || !marca || !modelo || !cliente) {
-            setError('Los campos Bin, Marca, Modelo y Teléfono del cliente son obligatorios.');
+            setError('Los campos Bin, Marca, Modelo y Cliente son obligatorios.');
+            return;
+        }
+        if (!clienteConfirmado) {
+            setError('Debes seleccionar un cliente del catálogo.');
             return;
         }
         setSaving(true);
@@ -165,6 +189,8 @@ const FormDatosVehiculo = ({user, onClose}) => {
         setMarca('');
         setModelo('');
         setCliente('');
+        setClienteId('');
+        setClienteConfirmado(false);
         setTelefonoCliente('');
         setDescripcion('');
         setStorage(0);
@@ -344,15 +370,61 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 </div>
             </div>
             <div className="flex flex-wrap">
-                <div className="w-1/4 p-1">
+                <div className="w-1/4 p-1 relative">
                     <label htmlFor="cliente" className="block text-black-500">* Cliente:</label>
                     <input
+                        ref={clienteRef}
                         type="text"
                         id="cliente"
                         value={cliente}
-                        onChange={(e) => setCliente(e.target.value)}
-                        className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                        onChange={(e) => {
+                            setCliente(e.target.value.toUpperCase());
+                            setClienteConfirmado(false);
+                            setClienteId('');
+                            setShowClienteDropdown(true);
+                            setClienteDropdownIdx(0);
+                        }}
+                        onFocus={() => setShowClienteDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowClienteDropdown(false), 150)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'ArrowDown') {
+                                e.preventDefault();
+                                setClienteDropdownIdx(i => Math.min(i + 1, Math.max(clientesFiltrados.length - 1, 0)));
+                            } else if (e.key === 'ArrowUp') {
+                                e.preventDefault();
+                                setClienteDropdownIdx(i => Math.max(i - 1, 0));
+                            } else if (e.key === 'Enter' && clientesFiltrados[clienteDropdownIdx]) {
+                                e.preventDefault();
+                                seleccionarClienteItem(clientesFiltrados[clienteDropdownIdx]);
+                            } else if (e.key === 'Tab' && clientesFiltrados[clienteDropdownIdx] && !clienteConfirmado) {
+                                seleccionarClienteItem(clientesFiltrados[clienteDropdownIdx]);
+                            } else if (e.key === 'Escape') {
+                                setShowClienteDropdown(false);
+                            }
+                        }}
+                        className={`input input-bordered w-full text-black-500 input-sm uppercase font-bold ${
+                            clienteConfirmado ? 'bg-green-50 border-green-400 text-green-800' : 'bg-white-100'
+                        }`}
+                        placeholder="Buscar cliente..."
                     />
+                    {clienteConfirmado && (
+                        <span className="absolute top-0 right-2 text-[8px] font-black text-green-700 bg-white px-1 rounded">✓</span>
+                    )}
+                    {showClienteDropdown && cliente.length > 0 && clientesFiltrados.length > 0 && !clienteConfirmado && (
+                        <ul className="absolute z-50 bg-white border border-gray-300 rounded-md shadow-lg mt-1 w-full max-h-48 overflow-y-auto">
+                            {clientesFiltrados.map((c, idx) => (
+                                <li
+                                    key={c.id}
+                                    onMouseDown={() => seleccionarClienteItem(c)}
+                                    className={`px-3 py-2 cursor-pointer text-sm ${
+                                        idx === clienteDropdownIdx ? 'bg-blue-100 font-bold' : 'hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {c.cliente} {c.telefonoCliente ? `- ${c.telefonoCliente}` : ''}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </div>
                 <div className="w-1/8 p-1">
                     <label htmlFor="telefonoCliente" className="block text-black-500">Telefono Cliente:</label>
