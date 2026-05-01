@@ -593,7 +593,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                         <div className="px-6 py-5">
                             <p className="text-sm text-gray-600 font-semibold mb-4">
                                 Estás a punto de cambiar el chofer del viaje
-                                <span className="font-black text-black"> #{confirmarChofer.viaje.numViaje || "PENDIENTE"}</span>
+                                <span className="font-black text-black"> PENDIENTE</span>
                             </p>
 
                             <div className="flex items-center gap-3 mb-4">
@@ -896,7 +896,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                         <div className={`p-3 flex justify-between items-center text-white transition-all duration-300 ${vistaPrecios[viaje.id] === "cliente" ? "bg-gradient-to-r from-emerald-500 to-teal-500" : "bg-gray-100"}`}>
                             <div className="flex items-center gap-4">
                                 <div className={`px-3 py-1.5 italic font-black text-lg skew-x-[-10deg] flex items-center gap-2 transition-colors duration-300 rounded-lg border ${vistaPrecios[viaje.id] === 'cliente' ? 'bg-white/20 text-white border-white/40' : 'bg-red-50 text-red-600 border-red-300'}`}>
-                                    {viaje.numViaje ? `VIAJE #${viaje.numViaje}` : "VIAJE - PENDIENTE"}
+                                    VIAJE - PENDIENTE
                                 </div>
                                 <div className="relative">
                                     <p className={`text-[9px] uppercase font-bold leading-none ${vistaPrecios[viaje.id] === 'cliente' ? 'text-emerald-100' : 'text-gray-500'}`}>Transportista</p>
@@ -1088,7 +1088,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                     <button
                                                         onClick={() => setModal({
                                                             show: true,
-                                                            mensaje: `¿Eliminar el vehículo ${v.lote || '(sin lote)'} del viaje #${viaje.numViaje}?`,
+                                                            mensaje: `¿Eliminar el vehículo ${v.lote || '(sin lote)'} del viaje?`,
                                                             accion: () => eliminarVehiculoDeViaje(viaje.id, idx, v.lote),
                                                             tipo: "eliminar"
                                                         })}
