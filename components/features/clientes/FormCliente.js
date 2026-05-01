@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import { FaUserLock, FaEye, FaEyeSlash } from "react-icons/fa";
@@ -100,12 +98,16 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                             }
                             await secondaryApp.auth().signOut();
 
-                            // Actualizar users
-                            await firestore().collection(COLLECTIONS.USERS).doc(clienteId).update({
-                                email: datos.emailAcceso.toLowerCase(),
-                                username: datos.cliente,
-                                telefono: datos.telefonoCliente
-                            });
+                            // Actualizar users (el doc puede estar con authUid o con clienteId)
+                            const userDocId = clienteAEditar.authUid || clienteId;
+                            const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(userDocId).get();
+                            if (userDoc.exists) {
+                                await firestore().collection(COLLECTIONS.USERS).doc(userDocId).update({
+                                    email: datos.emailAcceso.toLowerCase(),
+                                    username: datos.cliente,
+                                    telefono: datos.telefonoCliente
+                                });
+                            }
                         } catch (authError) {
                             console.error("Error actualizando Auth:", authError);
                             mostrarAviso("Error al actualizar credenciales: " + authError.message, "error");
@@ -227,11 +229,10 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
         }
     };
 
-    // Formulario válido: nombre y teléfono obligatorios, credenciales opcionales pero completas si se ponen
+    // Formulario válido: nombre obligatorio, teléfono y credenciales opcionales
     const credencialesValidas = (!datos.emailAcceso && !datos.passwordAcceso) ||
                                 (datos.emailAcceso?.includes("@") && datos.passwordAcceso?.length >= 6);
     const formularioValido = datos.cliente.trim() !== "" &&
-                            datos.telefonoCliente.length > 5 &&
                             credencialesValidas;
 
     return (
@@ -249,20 +250,14 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                 </div>
 
                 <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono: *</label>
-                    <PhoneInput
-                        onlyCountries={PHONE_CONFIG.COUNTRIES}
-                        country={PHONE_CONFIG.DEFAULT_COUNTRY}
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono:</label>
+                    <input
+                        type="text"
+                        name="telefonoCliente"
                         value={datos.telefonoCliente}
-                        onChange={(val, country) => {
-                            setDatos({
-                                ...datos,
-                                telefonoCliente: val.startsWith('+') ? val : '+' + val,
-                                paisCliente: country.name
-                            });
-                        }}
-                        inputStyle={{ paddingLeft: '48px', width: '100%' }}
-                        inputProps={{ className: 'input input-bordered w-full text-black input-sm bg-white font-bold' }}
+                        onChange={handleChange}
+                        placeholder="+52 1 868 241 1355"
+                        className="input input-bordered w-full text-black input-sm bg-white font-bold"
                     />
                 </div>
 
