@@ -53,6 +53,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
     const [tokenValido, setTokenValido] = useState(false);
     const [choferManual, setChoferManual] = useState("");
     const [tokenUsado, setTokenUsado] = useState(null);
+    const [choferLibre, setChoferLibre] = useState(false);
 
     // Estado para modal de nuevo cliente rápido
     const [modalNuevoCliente, setModalNuevoCliente] = useState({ visible: false, vehiculoId: null });
@@ -265,6 +266,30 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
         }));
         setBusquedaChofer(choferManual.trim().toUpperCase() + " (TEMPORAL)");
         setMostrarLista(false);
+    };
+
+    // Confirmar chofer libre (masterAdmin sin token)
+    const confirmarChoferLibre = () => {
+        if (!choferManual || choferManual.trim() === "") {
+            setAlertMessage({ msg: "Ingresa el nombre del chofer", tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+            return;
+        }
+        setEncabezado(prev => ({
+            ...prev,
+            choferId: "LIBRE_" + Date.now(),
+            choferManual: choferManual.trim().toUpperCase()
+        }));
+        setBusquedaChofer(choferManual.trim().toUpperCase() + " (LIBRE)");
+        setMostrarLista(false);
+    };
+
+    // Cancelar modo chofer libre
+    const cancelarChoferLibre = () => {
+        setChoferLibre(false);
+        setChoferManual("");
+        setEncabezado(prev => ({ ...prev, choferId: "", choferManual: "" }));
+        setBusquedaChofer("");
     };
 
     // Cancelar modo token
@@ -511,8 +536,8 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
 
             const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
 
-            // Verificar si es chofer temporal (con token)
-            const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_");
+            // Verificar si es chofer temporal (con token) o libre (masterAdmin)
+            const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_") || encabezado.choferId?.startsWith("LIBRE_");
             let choferData;
 
             if (esChoferTemporal) {
@@ -522,7 +547,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     empresa: "PENDIENTE DE ASIGNAR",
                     telefono: "",
                     esTemporal: true,
-                    tokenUsado: tokenUsado
+                    tokenUsado: tokenUsado || null
                 };
             } else {
                 choferData = choferes.find(c => c.id === encabezado.choferId);
@@ -535,7 +560,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                 empresaId: user.id,
                 empresaLiderId: esChoferTemporal ? "" : (choferData?.empresaLiderId || ""),
                 estatus: "PENDIENTE",
-                fechaCreacion: new Date(),
+                fechaCreacion: encabezado.fechaInput ? new Date(encabezado.fechaInput + "T12:00:00") : new Date(),
                 creadoPor: {
                     id: user?.id || "N/A",
                     nombre: user?.nombre || "Admin",
@@ -583,6 +608,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     setTokenUsado(null);
                     setChoferManual("");
                     setTokenInput("");
+                    setChoferLibre(false);
                     setAlertMessage({msg: '', tipo: ''});
                     onViajeCreado();
                 }, 1500);
@@ -644,6 +670,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                             setTokenUsado(null);
                             setChoferManual("");
                             setTokenInput("");
+                            setChoferLibre(false);
                         }} className="btn btn-success text-white w-full mt-4 h-14 gap-3 font-black uppercase shadow-lg">
                             <FaCheckDouble/> Registrar Nuevo Viaje
                         </button>
@@ -919,9 +946,9 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     </label>
                     <input
                         type="text"
-                        disabled={true}
+                        disabled
                         className="input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] bg-gray-100"
-                        value=""
+                        value={encabezado.numViaje}
                         placeholder="Se asigna al pagar"
                         style={{fontSize: '16px'}}
                     />
@@ -929,43 +956,62 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                 <div className="relative">
                     <div className="flex items-center justify-between mb-1">
                         <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase italic">Chofer *</label>
-                        {/* Botón de Token */}
-                        {!viajeIniciado && !tokenValido && (
-                            <button
-                                onClick={() => setMostrarModalToken(true)}
-                                className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 uppercase"
-                                title="¿Chofer no está en la lista? Usa un token"
-                            >
-                                <FaKey size={10} /> Token
-                            </button>
-                        )}
-                        {tokenValido && (
-                            <button
-                                onClick={cancelarModoToken}
-                                className="text-[9px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 uppercase"
-                            >
-                                <FaTimes size={10} /> Cancelar Token
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {/* Botón Libre (solo masterAdmin) */}
+                            {isAdminMaster && !viajeIniciado && !tokenValido && !choferLibre && (
+                                <button
+                                    onClick={() => { setChoferLibre(true); setChoferManual(""); }}
+                                    className="text-[9px] font-bold text-green-600 hover:text-green-800 flex items-center gap-1 uppercase"
+                                >
+                                    <FaCar size={10} /> Libre
+                                </button>
+                            )}
+                            {/* Botón de Token */}
+                            {!viajeIniciado && !tokenValido && !choferLibre && (
+                                <button
+                                    onClick={() => setMostrarModalToken(true)}
+                                    className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 uppercase"
+                                    title="¿Chofer no está en la lista? Usa un token"
+                                >
+                                    <FaKey size={10} /> Token
+                                </button>
+                            )}
+                            {tokenValido && (
+                                <button
+                                    onClick={cancelarModoToken}
+                                    className="text-[9px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 uppercase"
+                                >
+                                    <FaTimes size={10} /> Cancelar Token
+                                </button>
+                            )}
+                            {choferLibre && (
+                                <button
+                                    onClick={cancelarChoferLibre}
+                                    className="text-[9px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 uppercase"
+                                >
+                                    <FaTimes size={10} /> Cancelar
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* INPUT DE BÚSQUEDA O CHOFER MANUAL */}
-                    {tokenValido ? (
-                        // Modo Token: Input para chofer manual
+                    {tokenValido || choferLibre ? (
+                        // Modo manual: Input para chofer libre o con token
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 disabled={viajeIniciado || encabezado.choferId}
                                 placeholder="Nombre del chofer..."
-                                className="input input-bordered input-md md:input-sm flex-1 bg-blue-50 text-black font-bold uppercase text-[16px] md:text-[14px] border-blue-300"
+                                className={`input input-bordered input-md md:input-sm flex-1 text-black font-bold uppercase text-[16px] md:text-[14px] ${choferLibre ? 'bg-green-50 border-green-300' : 'bg-blue-50 border-blue-300'}`}
                                 value={choferManual}
                                 onChange={(e) => setChoferManual(e.target.value.toUpperCase())}
                                 style={{fontSize: '16px'}}
                             />
                             {!encabezado.choferId && (
                                 <button
-                                    onClick={confirmarChoferManual}
-                                    className="btn btn-sm btn-info text-white font-black"
+                                    onClick={choferLibre ? confirmarChoferLibre : confirmarChoferManual}
+                                    className={`btn btn-sm text-white font-black ${choferLibre ? 'btn-success' : 'btn-info'}`}
                                 >
                                     OK
                                 </button>
@@ -1031,8 +1077,19 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                         </div>
                     )}
                     </div>
-                <div
-                    className="text-center font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</div>
+                <div className="text-center">
+                    {isAdminMaster ? (
+                        <input
+                            type="date"
+                            value={encabezado.fechaInput || ""}
+                            onChange={(e) => setEncabezado({...encabezado, fechaInput: e.target.value, fecha: e.target.value ? new Date(e.target.value + "T12:00:00").toLocaleDateString() : new Date().toLocaleDateString()})}
+                            className="input input-bordered input-sm w-full text-black font-bold text-center text-[14px]"
+                            style={{fontSize: '16px'}}
+                        />
+                    ) : (
+                        <span className="font-mono font-bold text-gray-500 uppercase text-xs">{encabezado.fecha}</span>
+                    )}
+                </div>
 
                 <button onClick={viajeIniciado ? () => {
                     setViajeIniciado(false);
