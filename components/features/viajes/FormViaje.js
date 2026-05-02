@@ -5,7 +5,7 @@ import { useAdminData } from "../../../context/adminData";
 import {
     FaTrash, FaCheckCircle,
     FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink,
-    FaStickyNote, FaRegStickyNote, FaKey
+    FaStickyNote, FaRegStickyNote, FaKey, FaUserPlus
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
 import { COLLECTIONS, FIELD_LIMITS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
@@ -53,6 +53,11 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
     const [tokenValido, setTokenValido] = useState(false);
     const [choferManual, setChoferManual] = useState("");
     const [tokenUsado, setTokenUsado] = useState(null);
+
+    // Estado para modal de nuevo cliente rápido
+    const [modalNuevoCliente, setModalNuevoCliente] = useState({ visible: false, vehiculoId: null });
+    const [nuevoClienteData, setNuevoClienteData] = useState({ cliente: "", telefonoCliente: "", apodoCliente: "", ciudadCliente: "", estadoCliente: "" });
+    const [guardandoCliente, setGuardandoCliente] = useState(false);
 
     const [encabezado, setEncabezado] = useState({
         numViaje: "",
@@ -270,6 +275,83 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
         setTokenInput("");
         setEncabezado(prev => ({ ...prev, choferId: "", choferManual: "" }));
         setBusquedaChofer("");
+    };
+
+    // --- CREAR CLIENTE RÁPIDO ---
+    const abrirModalNuevoCliente = (vehiculoId) => {
+        const vehiculo = vehiculos.find(v => v.id === vehiculoId);
+        setNuevoClienteData({
+            cliente: vehiculo?.clienteAlt || "",
+            telefonoCliente: "",
+            apodoCliente: "",
+            ciudadCliente: "",
+            estadoCliente: ""
+        });
+        setModalNuevoCliente({ visible: true, vehiculoId });
+        setClienteDropdownId(null);
+    };
+
+    const guardarNuevoCliente = async () => {
+        if (!nuevoClienteData.cliente.trim()) {
+            setAlertMessage({ msg: "El nombre del cliente es obligatorio", tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+            return;
+        }
+        setGuardandoCliente(true);
+        try {
+            const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+            const docCon = await conRef.get();
+            const nuevoFolio = (docCon.data().clientes || 0) + 1;
+
+            const clienteFinal = {
+                cliente: nuevoClienteData.cliente.trim().toUpperCase(),
+                telefonoCliente: nuevoClienteData.telefonoCliente,
+                apodoCliente: nuevoClienteData.apodoCliente.toUpperCase(),
+                ciudadCliente: nuevoClienteData.ciudadCliente.toUpperCase(),
+                estadoCliente: nuevoClienteData.estadoCliente.toUpperCase(),
+                paisCliente: "United States",
+                rfcCliente: "",
+                emailCliente: "",
+                emailAcceso: "",
+                passwordAcceso: "",
+                folio: nuevoFolio,
+                registro: {
+                    usuario: user?.nombre || "Admin",
+                    idUsuario: user?.id || user?.uid || "N/A",
+                    timestamp: new Date()
+                }
+            };
+
+            const docRef = await firestore().collection(COLLECTIONS.CLIENTES).add(clienteFinal);
+            await conRef.update({ clientes: nuevoFolio });
+
+            // Auto-seleccionar el cliente en el vehículo
+            if (modalNuevoCliente.vehiculoId) {
+                setVehiculos(prev => prev.map(veh =>
+                    veh.id === modalNuevoCliente.vehiculoId
+                        ? {
+                            ...veh,
+                            clienteAlt: clienteFinal.cliente,
+                            clienteId: docRef.id,
+                            clienteNombre: clienteFinal.cliente,
+                            clienteTelefono: clienteFinal.telefonoCliente,
+                            clienteConfirmado: true
+                        }
+                        : veh
+                ));
+            }
+
+            setModalNuevoCliente({ visible: false, vehiculoId: null });
+            setNuevoClienteData({ cliente: "", telefonoCliente: "", apodoCliente: "", ciudadCliente: "", estadoCliente: "" });
+            setAlertMessage({ msg: `Cliente "${clienteFinal.cliente}" creado y asignado`, tipo: 'success' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+        } catch (e) {
+            console.error("Error al crear cliente:", e);
+            setAlertMessage({ msg: "Error al crear cliente: " + e.message, tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 4000);
+        } finally {
+            setGuardandoCliente(false);
+        }
     };
 
     // --- LÓGICA DE LA TABLA ---
@@ -664,6 +746,110 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                 </div>
             )}
 
+            {/* MODAL DE NUEVO CLIENTE RÁPIDO */}
+            {modalNuevoCliente.visible && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl border-2 border-t-8 border-green-600 p-6">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                <FaUserPlus className="text-green-600" size={18}/>
+                            </div>
+                            <div>
+                                <h4 className="text-lg font-black uppercase text-gray-800">Nuevo Cliente</h4>
+                                <p className="text-[10px] text-gray-400 uppercase">Registro rápido sin salir del viaje</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Nombre / Razón Social *</label>
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={nuevoClienteData.cliente}
+                                    onChange={(e) => setNuevoClienteData({...nuevoClienteData, cliente: e.target.value.toUpperCase()})}
+                                    className="input input-bordered w-full input-sm bg-white text-black font-bold uppercase"
+                                    placeholder="Nombre del cliente"
+                                    style={{fontSize: '16px'}}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Teléfono</label>
+                                    <input
+                                        type="text"
+                                        value={nuevoClienteData.telefonoCliente}
+                                        onChange={(e) => setNuevoClienteData({...nuevoClienteData, telefonoCliente: e.target.value})}
+                                        className="input input-bordered w-full input-sm bg-white text-black font-bold"
+                                        placeholder="+1 555 123 4567"
+                                        style={{fontSize: '16px'}}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Referencia (Apodo)</label>
+                                    <input
+                                        type="text"
+                                        value={nuevoClienteData.apodoCliente}
+                                        onChange={(e) => setNuevoClienteData({...nuevoClienteData, apodoCliente: e.target.value.toUpperCase()})}
+                                        className="input input-bordered w-full input-sm bg-white text-black font-bold uppercase"
+                                        placeholder="Apodo"
+                                        style={{fontSize: '16px'}}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2">
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Ciudad</label>
+                                    <input
+                                        type="text"
+                                        value={nuevoClienteData.ciudadCliente}
+                                        onChange={(e) => setNuevoClienteData({...nuevoClienteData, ciudadCliente: e.target.value.toUpperCase()})}
+                                        className="input input-bordered w-full input-sm bg-white text-black font-bold uppercase"
+                                        placeholder="Ciudad"
+                                        style={{fontSize: '16px'}}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Edo</label>
+                                    <input
+                                        type="text"
+                                        value={nuevoClienteData.estadoCliente}
+                                        onChange={(e) => setNuevoClienteData({...nuevoClienteData, estadoCliente: e.target.value.toUpperCase()})}
+                                        maxLength={4}
+                                        className="input input-bordered w-full input-sm bg-white text-black font-bold uppercase text-center"
+                                        placeholder="TX"
+                                        style={{fontSize: '16px'}}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-6">
+                            <button
+                                onClick={() => {
+                                    setModalNuevoCliente({ visible: false, vehiculoId: null });
+                                    setNuevoClienteData({ cliente: "", telefonoCliente: "", apodoCliente: "", ciudadCliente: "", estadoCliente: "" });
+                                }}
+                                className="btn btn-ghost flex-1 font-bold"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={guardarNuevoCliente}
+                                disabled={guardandoCliente || !nuevoClienteData.cliente.trim()}
+                                className="btn btn-success text-white flex-1 font-bold gap-2"
+                            >
+                                {guardandoCliente ? (
+                                    <span className="loading loading-spinner loading-sm"></span>
+                                ) : (
+                                    <><FaCheckCircle/> Crear y Asignar</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* DROPDOWN DE CLIENTES - Solo para admins, renderizado fuera del overflow */}
             {user?.admin && clienteDropdownId && (
                 <>
@@ -701,6 +887,13 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                                             No se encontró cliente...
                                         </div>
                                     )}
+                                    {/* Botón Nuevo Cliente */}
+                                    <div
+                                        className="p-3 cursor-pointer text-[11px] font-black uppercase border-t-2 border-dashed border-green-300 bg-green-50 hover:bg-green-100 transition-colors flex items-center gap-2 text-green-700"
+                                        onClick={() => abrirModalNuevoCliente(clienteDropdownId)}
+                                    >
+                                        <FaUserPlus size={14}/> Crear Nuevo Cliente
+                                    </div>
                                 </>
                             );
                         })()}

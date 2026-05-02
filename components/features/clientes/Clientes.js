@@ -194,6 +194,12 @@ const Clientes = ({ user }) => {
         setClienteAEditar(null);
     };
 
+    const handleDeleteCliente = () => {
+        setShowFormModal(false);
+        setClienteAEditar(null);
+        setClienteSeleccionado(null);
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
@@ -426,6 +432,7 @@ const Clientes = ({ user }) => {
                                         user={user}
                                         clienteAEditar={clienteAEditar}
                                         onSuccess={cerrarForm}
+                                        onDelete={handleDeleteCliente}
                                     />
                                 </div>
                             </motion.div>
