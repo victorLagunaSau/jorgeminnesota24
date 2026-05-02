@@ -3,7 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
 import {
     FaSearch, FaFileExcel, FaTruck, FaBuilding, FaFileInvoice, FaLayerGroup,
-    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt, FaCommentDots
+    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt, FaCommentDots, FaExchangeAlt
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import moment from "moment";
@@ -154,10 +154,64 @@ const ReporteViajesPagados = ({ user }) => {
         }
     };
 
+    // Reasignar chofer de un viaje pagado (solo masterAdmin)
+    const [reasignandoChofer, setReasignandoChofer] = useState(null); // docId del viaje
+    const [busquedaChoferReasignar, setBusquedaChoferReasignar] = useState("");
+    const [loadingReasignar, setLoadingReasignar] = useState(false);
+
+    const reasignarChoferViaje = async (viaje, chofer) => {
+        setLoadingReasignar(true);
+        try {
+            const docId = viaje.docId || viaje.numViaje;
+            const nuevoChofer = {
+                id: chofer.id,
+                nombre: chofer.nombreChofer,
+                empresa: chofer.empresaNombre || "",
+            };
+
+            // 1. Actualizar el viaje pagado
+            await firestore().collection("viajesPagados").doc(docId).update({
+                chofer: nuevoChofer,
+                empresaLiquidada: chofer.empresaNombre || "",
+                empresaLiderId: chofer.empresaLiderId || "",
+            });
+
+            // 2. Actualizar vehículos relacionados en la colección vehiculos
+            if (viaje.vehiculos) {
+                const batch = firestore().batch();
+                viaje.vehiculos.forEach(v => {
+                    if (v.lote) {
+                        const vRef = firestore().collection("vehiculos").doc(v.lote);
+                        batch.update(vRef, {
+                            empresaLiderId: chofer.empresaLiderId || "",
+                        });
+                    }
+                });
+                await batch.commit();
+            }
+
+            // 3. Actualizar estado local
+            setViajes(prev => prev.map(v =>
+                (v.docId || v.numViaje) === docId
+                    ? { ...v, chofer: nuevoChofer, empresaLiquidada: chofer.empresaNombre || "", empresaLiderId: chofer.empresaLiderId || "" }
+                    : v
+            ));
+
+            setReasignandoChofer(null);
+            setBusquedaChoferReasignar("");
+        } catch (e) {
+            console.error(e);
+            alert("Error al reasignar chofer: " + e.message);
+        } finally {
+            setLoadingReasignar(false);
+        }
+    };
+
     // Verificar si el usuario puede eliminar viajes
     const puedeEliminarViajes = user?.adminMaster === true || user?.eliminarViajes === true;
     // Solo Admin Master puede cambiar el número de viaje en el historial
     const puedeEditarNumViaje = user?.adminMaster === true;
+    const puedeReasignarChofer = user?.adminMaster === true;
 
     // Abre modal de confirmación
     const eliminarViaje = (viaje) => {
@@ -953,10 +1007,32 @@ const ReporteViajesPagados = ({ user }) => {
                                                 </td>
                                                 <td className="border border-gray-200 px-1 py-1 uppercase text-gray-700" style={{ minWidth: "130px" }}>
                                                     {idx === 0 ? (
-                                                        viaje.chofer?.nombre ? (
-                                                            <div>
-                                                                <div className="font-black text-blue-800 text-[11px] truncate">{viaje.chofer.nombre}</div>
-                                                                {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic">Ref: {viaje.choferExcel}</div>}
+                                                        reasignandoChofer === (viaje.docId || viaje.numViaje) ? (
+                                                            <div className="relative">
+                                                                <div className="flex items-center gap-1">
+                                                                    <input type="text" placeholder="Buscar chofer..." className="input input-xs w-full font-bold uppercase text-[10px] bg-yellow-50 border-yellow-300" value={busquedaChoferReasignar} onChange={(e) => setBusquedaChoferReasignar(e.target.value)} autoFocus />
+                                                                    <button onClick={() => { setReasignandoChofer(null); setBusquedaChoferReasignar(""); }} className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-400 text-white"><FaTimes size={8}/></button>
+                                                                </div>
+                                                                <div className="absolute z-[200] w-72 bg-white border-2 border-black shadow-2xl rounded-md max-h-48 overflow-y-auto mt-1 left-0">
+                                                                    {choferes.filter(c => { const t = busquedaChoferReasignar.toUpperCase(); return !t || c.nombreChofer?.toUpperCase().includes(t) || c.empresaNombre?.toUpperCase().includes(t); }).slice(0, 15).map(c => (
+                                                                        <div key={c.id} className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between" onClick={() => reasignarChoferViaje(viaje, c)}>
+                                                                            <span>{c.nombreChofer}</span>
+                                                                            <span className="text-[8px] opacity-60">{c.empresaNombre}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : viaje.chofer?.nombre ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <div className="flex-1 min-w-0">
+                                                                    <div className="font-black text-blue-800 text-[11px] truncate">{viaje.chofer.nombre}</div>
+                                                                    {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic">Ref: {viaje.choferExcel}</div>}
+                                                                </div>
+                                                                {puedeReasignarChofer && (
+                                                                    <button onClick={() => { setReasignandoChofer(viaje.docId || viaje.numViaje); setBusquedaChoferReasignar(""); }} className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-blue-600 hover:text-white" title="Reasignar chofer">
+                                                                        <FaExchangeAlt size={8}/>
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         ) : viaje.choferPendiente ? (
                                                             <div className="relative">
