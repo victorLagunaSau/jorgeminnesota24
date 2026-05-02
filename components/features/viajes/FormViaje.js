@@ -473,7 +473,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim().length === FIELD_LIMITS.LOT && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && v.clienteConfirmado && parseFloat(v.flete) > 0
+        v.lote.trim().length === FIELD_LIMITS.LOT && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && (user?.admin ? v.clienteConfirmado : true) && parseFloat(v.flete) > 0
     );
 
     const getClientesFiltrados = (vehiculoId) => {
