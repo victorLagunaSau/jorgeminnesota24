@@ -4,7 +4,7 @@ import {firestore} from "../../../firebase/firebaseIni";
 import { useAdminData } from "../../../context/adminData";
 import {
     FaTrash, FaCheckCircle,
-    FaPrint, FaCar, FaCheckDouble, FaTimes, FaLink,
+    FaPrint, FaCheckDouble, FaTimes, FaLink,
     FaStickyNote, FaRegStickyNote, FaKey, FaUserPlus
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
@@ -53,7 +53,6 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
     const [tokenValido, setTokenValido] = useState(false);
     const [choferManual, setChoferManual] = useState("");
     const [tokenUsado, setTokenUsado] = useState(null);
-    const [choferLibre, setChoferLibre] = useState(false);
 
     // Estado para modal de nuevo cliente rápido
     const [modalNuevoCliente, setModalNuevoCliente] = useState({ visible: false, vehiculoId: null });
@@ -251,7 +250,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
         }
     };
 
-    // Confirmar chofer manual con token
+    // Confirmar chofer manual con token (solo carriers)
     const confirmarChoferManual = () => {
         if (!choferManual || choferManual.trim() === "") {
             setAlertMessage({ msg: "Ingresa el nombre del chofer", tipo: 'error' });
@@ -268,29 +267,56 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
         setMostrarLista(false);
     };
 
-    // Confirmar chofer libre (masterAdmin sin token)
-    const confirmarChoferLibre = () => {
-        if (!choferManual || choferManual.trim() === "") {
-            setAlertMessage({ msg: "Ingresa el nombre del chofer", tipo: 'error' });
+    // Registrar chofer nuevo desde el dropdown (admin/masterAdmin)
+    const [registrandoChoferNuevo, setRegistrandoChoferNuevo] = useState(false);
+    const registrarChoferNuevo = async (nombre) => {
+        if (!nombre || nombre.trim() === "") return;
+        setRegistrandoChoferNuevo(true);
+        try {
+            const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+            const docCon = await conRef.get();
+            const nuevoFolio = (docCon.data().choferes || 0) + 1;
+
+            const choferData = {
+                folio: nuevoFolio,
+                nombreChofer: nombre.trim().toUpperCase(),
+                apodoChofer: "",
+                telefonoChofer: "",
+                paisChofer: "United States",
+                licencia: "N/A",
+                empresaId: "",
+                empresaNombre: "PENDIENTE",
+                empresaLiderId: "",
+                empresaLiderNombre: "SIN LIDER",
+                esNuevo: true,
+                registro: {
+                    usuario: user?.nombre || "Admin",
+                    idUsuario: user?.id || "N/A",
+                    timestamp: new Date()
+                }
+            };
+
+            const docRef = await firestore().collection(COLLECTIONS.CHOFERES).add(choferData);
+            await conRef.update({ choferes: nuevoFolio });
+
+            // Seleccionar el chofer recién creado
+            setEncabezado(prev => ({
+                ...prev,
+                choferId: docRef.id
+            }));
+            setBusquedaChofer(nombre.trim().toUpperCase() + " (NUEVO)");
+            setMostrarLista(false);
+            setAlertMessage({ msg: `Chofer "${nombre.trim().toUpperCase()}" registrado como nuevo`, tipo: 'success' });
             setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
-            return;
+        } catch (e) {
+            console.error("Error al registrar chofer nuevo:", e);
+            setAlertMessage({ msg: "Error al registrar chofer", tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+        } finally {
+            setRegistrandoChoferNuevo(false);
         }
-        setEncabezado(prev => ({
-            ...prev,
-            choferId: "LIBRE_" + Date.now(),
-            choferManual: choferManual.trim().toUpperCase()
-        }));
-        setBusquedaChofer(choferManual.trim().toUpperCase() + " (LIBRE)");
-        setMostrarLista(false);
     };
 
-    // Cancelar modo chofer libre
-    const cancelarChoferLibre = () => {
-        setChoferLibre(false);
-        setChoferManual("");
-        setEncabezado(prev => ({ ...prev, choferId: "", choferManual: "" }));
-        setBusquedaChofer("");
-    };
 
     // Cancelar modo token
     const cancelarModoToken = () => {
@@ -537,7 +563,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
             const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
 
             // Verificar si es chofer temporal (con token) o libre (masterAdmin)
-            const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_") || encabezado.choferId?.startsWith("LIBRE_");
+            const esChoferTemporal = encabezado.choferId?.startsWith("TEMPORAL_");
             let choferData;
 
             if (esChoferTemporal) {
@@ -608,7 +634,6 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     setTokenUsado(null);
                     setChoferManual("");
                     setTokenInput("");
-                    setChoferLibre(false);
                     setAlertMessage({msg: '', tipo: ''});
                     onViajeCreado();
                 }, 1500);
@@ -670,8 +695,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                             setTokenUsado(null);
                             setChoferManual("");
                             setTokenInput("");
-                            setChoferLibre(false);
-                        }} className="btn btn-success text-white w-full mt-4 h-14 gap-3 font-black uppercase shadow-lg">
+                                }} className="btn btn-success text-white w-full mt-4 h-14 gap-3 font-black uppercase shadow-lg">
                             <FaCheckDouble/> Registrar Nuevo Viaje
                         </button>
                     </div>
@@ -957,17 +981,8 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     <div className="flex items-center justify-between mb-1">
                         <label className="block text-[10px] md:text-[10px] font-black text-gray-600 uppercase italic">Chofer *</label>
                         <div className="flex items-center gap-2">
-                            {/* Botón Libre (solo masterAdmin) */}
-                            {isAdminMaster && !viajeIniciado && !tokenValido && !choferLibre && (
-                                <button
-                                    onClick={() => { setChoferLibre(true); setChoferManual(""); }}
-                                    className="text-[9px] font-bold text-green-600 hover:text-green-800 flex items-center gap-1 uppercase"
-                                >
-                                    <FaCar size={10} /> Libre
-                                </button>
-                            )}
-                            {/* Botón de Token */}
-                            {!viajeIniciado && !tokenValido && !choferLibre && (
+                            {/* Botón de Token - solo para carriers (no admin) */}
+                            {!user?.admin && !viajeIniciado && !tokenValido && (
                                 <button
                                     onClick={() => setMostrarModalToken(true)}
                                     className="text-[9px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 uppercase"
@@ -984,34 +999,26 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                                     <FaTimes size={10} /> Cancelar Token
                                 </button>
                             )}
-                            {choferLibre && (
-                                <button
-                                    onClick={cancelarChoferLibre}
-                                    className="text-[9px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 uppercase"
-                                >
-                                    <FaTimes size={10} /> Cancelar
-                                </button>
-                            )}
                         </div>
                     </div>
 
                     {/* INPUT DE BÚSQUEDA O CHOFER MANUAL */}
-                    {tokenValido || choferLibre ? (
-                        // Modo manual: Input para chofer libre o con token
+                    {tokenValido ? (
+                        // Modo manual: Input para chofer con token
                         <div className="flex gap-2">
                             <input
                                 type="text"
                                 disabled={viajeIniciado || encabezado.choferId}
                                 placeholder="Nombre del chofer..."
-                                className={`input input-bordered input-md md:input-sm flex-1 text-black font-bold uppercase text-[16px] md:text-[14px] ${choferLibre ? 'bg-green-50 border-green-300' : 'bg-blue-50 border-blue-300'}`}
+                                className="input input-bordered input-md md:input-sm flex-1 text-black font-bold uppercase text-[16px] md:text-[14px] bg-blue-50 border-blue-300"
                                 value={choferManual}
                                 onChange={(e) => setChoferManual(e.target.value.toUpperCase())}
                                 style={{fontSize: '16px'}}
                             />
                             {!encabezado.choferId && (
                                 <button
-                                    onClick={choferLibre ? confirmarChoferLibre : confirmarChoferManual}
-                                    className={`btn btn-sm text-white font-black ${choferLibre ? 'btn-success' : 'btn-info'}`}
+                                    onClick={confirmarChoferManual}
+                                    className="btn btn-sm text-white font-black btn-info"
                                 >
                                     OK
                                 </button>
@@ -1068,8 +1075,17 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                                         ))
                                     }
                                     {choferes.filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase())).length === 0 && (
-                                        <div className="p-3 text-gray-400 text-[10px] italic font-bold">
-                                            No se encontró al chofer...
+                                        <div className="p-3">
+                                            <div className="text-gray-400 text-[10px] italic font-bold">No se encontró al chofer...</div>
+                                            {user?.admin && busquedaChofer.trim().length >= 3 && (
+                                                <button
+                                                    onClick={() => registrarChoferNuevo(busquedaChofer)}
+                                                    disabled={registrandoChoferNuevo}
+                                                    className="mt-2 w-full btn btn-sm btn-outline border-purple-400 text-purple-700 hover:bg-purple-600 hover:text-white hover:border-purple-600 font-black uppercase text-[10px] gap-1"
+                                                >
+                                                    {registrandoChoferNuevo ? <span className="loading loading-spinner loading-xs"></span> : <><FaUserPlus size={10}/> Registrar "{busquedaChofer.trim().toUpperCase()}" como nuevo</>}
+                                                </button>
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -77,7 +77,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
         setLoading(true);
         try {
             if (choferAEditar) {
-                await firestore().collection(COLLECTIONS.CHOFERES).doc(choferAEditar.id).update({
+                const updateChofer = {
                     nombreChofer: datos.nombreChofer.toUpperCase(),
                     apodoChofer: datos.apodoChofer.toUpperCase(),
                     telefonoChofer: datos.telefonoChofer,
@@ -87,8 +87,54 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                     empresaNombre: datos.empresaNombre,
                     empresaLiderId: datos.empresaLiderId || "",
                     empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
-                });
-                mostrarAviso(`Chofer #${choferAEditar.folio} actualizado`, "success");
+                };
+                if (choferAEditar.esNuevo) updateChofer.esNuevo = false;
+                await firestore().collection(COLLECTIONS.CHOFERES).doc(choferAEditar.id).update(updateChofer);
+
+                // Propagar cambios a viajes pendientes y pagados
+                const nombreAnterior = (choferAEditar.nombreChofer || "").toUpperCase();
+                const nuevoChoferViaje = {
+                    id: choferAEditar.id,
+                    nombre: datos.nombreChofer.toUpperCase(),
+                    empresa: datos.empresaNombre,
+                    empresaLiderId: datos.empresaLiderId || "",
+                    empresaLiderNombre: datos.empresaLiderNombre || "SIN LIDER",
+                };
+
+                // Función para verificar si un viaje pertenece a este chofer (por ID o por nombre anterior)
+                const esDelChofer = (d) => {
+                    const chofer = d.data().chofer;
+                    if (!chofer) return false;
+                    if (chofer.id === choferAEditar.id) return true;
+                    if (nombreAnterior && chofer.nombre?.toUpperCase() === nombreAnterior) return true;
+                    return false;
+                };
+
+                let viajesActualizados = 0;
+                try {
+                    const pendSnap = await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).get();
+                    const pendDocs = pendSnap.docs.filter(esDelChofer);
+                    if (pendDocs.length > 0) {
+                        const b = firestore().batch();
+                        pendDocs.forEach(d => { b.update(d.ref, { chofer: nuevoChoferViaje, empresaLiderId: datos.empresaLiderId || "" }); });
+                        await b.commit();
+                        viajesActualizados += pendDocs.length;
+                    }
+                } catch (e) { console.error("Error propagando a pendientes:", e); }
+
+                try {
+                    const pagSnap = await firestore().collection("viajesPagados").get();
+                    const pagDocs = pagSnap.docs.filter(esDelChofer);
+                    for (let i = 0; i < pagDocs.length; i += 400) {
+                        const chunk = pagDocs.slice(i, i + 400);
+                        const b = firestore().batch();
+                        chunk.forEach(d => { b.update(d.ref, { chofer: nuevoChoferViaje, empresaLiderId: datos.empresaLiderId || "", empresaLiquidada: datos.empresaNombre }); });
+                        await b.commit();
+                    }
+                    viajesActualizados += pagDocs.length;
+                } catch (e) { console.error("Error propagando a pagados:", e); }
+
+                mostrarAviso(`Chofer #${choferAEditar.folio} actualizado. ${viajesActualizados} viaje(s) sincronizados.`, "success");
             } else {
                 const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
                 const docCon = await conRef.get();

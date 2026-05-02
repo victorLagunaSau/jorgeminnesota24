@@ -69,14 +69,72 @@ const TablaChoferes = ({ onEditarChofer, isAdminMaster }) => {
         }
         setLoadingEdit(true);
         try {
-            await firestore().collection(COLLECTIONS.CHOFERES).doc(choferId).update({
+            const choferActual = lista.find(c => c.id === choferId);
+            const updateData = {
                 // Empresa 1: Fiscal (Dueño)
                 empresaId: nuevaEmpresaFiscal.id,
                 empresaNombre: nuevaEmpresaFiscal.nombre,
                 // Empresa 2: Líder (Despacho) - Puede ser distinta a la Fiscal
                 empresaLiderId: nuevaEmpresaLider.id || "",
                 empresaLiderNombre: nuevaEmpresaLider.nombre || "SIN LIDER"
-            });
+            };
+            // Si era nuevo, quitarle la bandera
+            if (choferActual?.esNuevo) {
+                updateData.esNuevo = false;
+            }
+            await firestore().collection(COLLECTIONS.CHOFERES).doc(choferId).update(updateData);
+
+            // Actualizar viajes relacionados con el nuevo chofer data
+            const choferNombre = (choferActual?.nombreChofer || "").toUpperCase();
+            const nuevoChoferViaje = {
+                id: choferId,
+                nombre: choferNombre,
+                empresa: nuevaEmpresaFiscal.nombre,
+                empresaLiderId: nuevaEmpresaLider.id || "",
+                empresaLiderNombre: nuevaEmpresaLider.nombre || "SIN LIDER",
+            };
+
+            // Buscar por ID o por nombre del chofer
+            const esDelChofer = (doc) => {
+                const ch = doc.data().chofer;
+                if (!ch) return false;
+                if (ch.id === choferId) return true;
+                if (choferNombre && ch.nombre?.toUpperCase() === choferNombre) return true;
+                return false;
+            };
+
+            try {
+                const pendientesSnap = await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).get();
+                const pendientesDelChofer = pendientesSnap.docs.filter(esDelChofer);
+                if (pendientesDelChofer.length > 0) {
+                    const batchPend = firestore().batch();
+                    pendientesDelChofer.forEach(doc => {
+                        batchPend.update(doc.ref, {
+                            chofer: nuevoChoferViaje,
+                            empresaLiderId: nuevaEmpresaLider.id || "",
+                        });
+                    });
+                    await batchPend.commit();
+                }
+            } catch (e) { console.error("Error actualizando pendientes:", e); }
+
+            try {
+                const pagadosSnap = await firestore().collection("viajesPagados").get();
+                const pagadosDelChofer = pagadosSnap.docs.filter(esDelChofer);
+                for (let i = 0; i < pagadosDelChofer.length; i += 400) {
+                    const chunk = pagadosDelChofer.slice(i, i + 400);
+                    const batchPag = firestore().batch();
+                    chunk.forEach(doc => {
+                        batchPag.update(doc.ref, {
+                            chofer: nuevoChoferViaje,
+                            empresaLiderId: nuevaEmpresaLider.id || "",
+                            empresaLiquidada: nuevaEmpresaFiscal.nombre,
+                        });
+                    });
+                    await batchPag.commit();
+                }
+            } catch (e) { console.error("Error actualizando pagados:", e); }
+
             setEditandoId(null);
         } catch (error) {
             console.error("Error al actualizar vínculos:", error);
@@ -102,6 +160,11 @@ const TablaChoferes = ({ onEditarChofer, isAdminMaster }) => {
         );
         const coincideEmpresa = filtroEmpresa === "" || c.empresaId === filtroEmpresa;
         return coincideTexto && coincideEmpresa;
+    }).sort((a, b) => {
+        // Choferes nuevos (esNuevo) van primero
+        if (a.esNuevo && !b.esNuevo) return -1;
+        if (!a.esNuevo && b.esNuevo) return 1;
+        return 0;
     });
 
     const paginados = filtrados.slice((pagina - 1) * xPagina, pagina * xPagina);
@@ -158,10 +221,11 @@ const TablaChoferes = ({ onEditarChofer, isAdminMaster }) => {
                         const fiscalExiste = empresas.some(e => e.id === c.empresaId);
 
                         return (
-                            <tr key={c.id} className={`hover:bg-blue-50/50 transition-colors border-b ${!fiscalExiste ? 'bg-red-50' : ''}`}>
+                            <tr key={c.id} className={`hover:bg-blue-50/50 transition-colors border-b ${c.esNuevo ? 'bg-purple-50 border-l-4 border-l-purple-500' : !fiscalExiste ? 'bg-red-50' : ''}`}>
                                 <td className="pl-6">
                                     <div className="font-black text-gray-800 uppercase text-[12px] leading-tight">
                                         <span className="text-red-600 mr-1 italic text-[9px]">#{c.folio}</span> {c.nombreChofer}
+                                        {c.esNuevo && <span className="ml-2 text-[8px] bg-purple-600 text-white px-1.5 py-0.5 rounded-full font-black">NUEVO</span>}
                                     </div>
                                     <div className="text-[10px] text-blue-600 font-black italic mt-0.5 uppercase">
                                         @{c.apodoChofer || 'sin apodo'}
