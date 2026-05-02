@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import { FaUserLock, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaUserLock, FaEye, FaEyeSlash, FaTrash } from "react-icons/fa";
 import { PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS } from "../../../constants";
 import Alert from "../../ui/Alert";
 
-const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
+const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
     const [loading, setLoading] = useState(false);
     const [alerta, setAlerta] = useState({ mostrar: false, mensaje: "", tipo: "" });
     const [mostrarPassword, setMostrarPassword] = useState(false);
+    const [mostrarConfirmEliminar, setMostrarConfirmEliminar] = useState(false);
+    const [eliminando, setEliminando] = useState(false);
 
     const [datos, setDatos] = useState({
         cliente: "",
@@ -229,6 +231,28 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
         }
     };
 
+    const ejecutarEliminacion = async () => {
+        if (!clienteAEditar?.id) return;
+        setEliminando(true);
+        try {
+            // Si tiene credenciales de auth, eliminar el doc de users
+            if (clienteAEditar.authUid) {
+                const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(clienteAEditar.authUid).get();
+                if (userDoc.exists) {
+                    await firestore().collection(COLLECTIONS.USERS).doc(clienteAEditar.authUid).delete();
+                }
+            }
+            await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteAEditar.id).delete();
+            setMostrarConfirmEliminar(false);
+            if (onDelete) onDelete();
+            else if (onSuccess) onSuccess();
+        } catch (error) {
+            console.error("Error al eliminar cliente:", error);
+            mostrarAviso("Error al eliminar: " + error.message, "error");
+            setEliminando(false);
+        }
+    };
+
     // Formulario válido: nombre obligatorio, teléfono y credenciales opcionales
     const credencialesValidas = (!datos.emailAcceso && !datos.passwordAcceso) ||
                                 (datos.emailAcceso?.includes("@") && datos.passwordAcceso?.length >= 6);
@@ -339,8 +363,16 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                 </p>
             </div>
 
-            {/* Botón Guardar */}
-            <div className="flex justify-end">
+            {/* Botones Guardar / Eliminar */}
+            <div className={`flex ${clienteAEditar ? 'justify-between' : 'justify-end'} items-center`}>
+                {clienteAEditar && (
+                    <button
+                        onClick={() => setMostrarConfirmEliminar(true)}
+                        className="btn btn-sm btn-outline border-red-300 text-red-500 hover:bg-red-50 hover:border-red-400 font-bold gap-2"
+                    >
+                        <FaTrash size={12}/> Eliminar Cliente
+                    </button>
+                )}
                 <button
                     onClick={() => { if(formularioValido) document.getElementById('modal-confirmar-cliente').checked = true; }}
                     disabled={!formularioValido || loading}
@@ -350,7 +382,7 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                 </button>
             </div>
 
-            {/* Modal de Confirmación */}
+            {/* Modal de Confirmación de Guardado */}
             <input type="checkbox" id="modal-confirmar-cliente" className="modal-toggle" />
             <div className="modal">
                 <div className="modal-box bg-white border-t-4 border-info">
@@ -377,6 +409,33 @@ const FormCliente = ({ user, onSuccess, clienteAEditar }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Modal de Confirmación de Eliminación */}
+            {mostrarConfirmEliminar && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
+                    <div className="bg-white rounded-xl max-w-xs w-full shadow-xl p-6 text-center">
+                        <h3 className="text-lg font-black text-gray-800 uppercase tracking-tight">
+                            Confirmar Eliminación
+                        </h3>
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => setMostrarConfirmEliminar(false)}
+                                disabled={eliminando}
+                                className="flex-1 btn btn-sm btn-outline border-gray-300 text-gray-700 hover:bg-red-600 hover:text-white hover:border-red-600 font-black uppercase"
+                            >
+                                No
+                            </button>
+                            <button
+                                onClick={ejecutarEliminacion}
+                                disabled={eliminando}
+                                className="flex-1 btn btn-sm btn-outline border-gray-300 text-gray-700 hover:bg-red-600 hover:text-white hover:border-red-600 font-black uppercase"
+                            >
+                                {eliminando ? <span className="loading loading-spinner loading-sm"></span> : "Sí"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
