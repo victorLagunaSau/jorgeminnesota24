@@ -83,10 +83,9 @@ const Vehiculos = ({user}) => {
                     .collection(COLLECTIONS.VEHICULOS)
                     .where("estatus", "!=", "EN")
                     .onSnapshot((vehiculosSnapshot) => {
-                        const vehiculosNoAsignados = vehiculosSnapshot.docs.map((doc) => ({
-                            id: doc.id,
-                            ...doc.data(),
-                        }));
+                        const vehiculosNoAsignados = vehiculosSnapshot.docs
+                            .map((doc) => ({ id: doc.id, ...doc.data() }))
+                            .filter((v) => v.estatus !== "PA");
                         setVehiculosNoAsignados(vehiculosNoAsignados);
                     });
 

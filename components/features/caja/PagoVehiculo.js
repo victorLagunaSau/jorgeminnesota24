@@ -264,24 +264,8 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                     {tieneAnticipo && (
                         <div className="mt-4 p-4 rounded-xl border-l-8 border-green-700 bg-green-100 shadow-lg">
                             <p className="text-xl font-black text-green-800 uppercase">
-                                Pago Adelantado: ${montoAnticipo} DLL
+                                Anticipo: ${montoAnticipo} DLL
                             </p>
-                            <p className="text-lg font-bold text-black mt-1">
-                                Total sin anticipo: ${total.toFixed(2)} DLL
-                            </p>
-                            <p className="text-2xl font-black text-green-700 mt-1">
-                                Resta por cobrar: ${restante.toFixed(2)} DLL
-                            </p>
-                            {anticipoExcedente > 0 && (
-                                <div className="mt-2 p-2 rounded-lg bg-yellow-200 border border-yellow-500">
-                                    <p className="text-lg font-black text-yellow-800">
-                                        Anticipo excedente: ${anticipoExcedente.toFixed(2)} DLL
-                                    </p>
-                                    <p className="text-sm text-yellow-700">
-                                        El anticipo supera el total. Se registrará el excedente como saldo a favor.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     )}
 
@@ -409,19 +393,9 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                             Anticipo: <strong>- ${montoAnticipo} DLL</strong>
                         </p>
                     )}
-                    {tieneAnticipo && (
-                        <p className="mt-2 text-3xl font-black text-green-800">
-                            A cobrar: <strong>$ {restante.toFixed(2)} DLL</strong>
-                        </p>
-                    )}
-                    <p className="mt-2 text-2xl">
-                        Efectivo + CC + Crédito: <strong>$ {cubierto.toFixed(2)} DLL</strong>
+                    <p className={`mt-2 text-3xl font-black ${totalConAnticipo < 0 ? 'text-red-600' : 'text-green-800'}`}>
+                        A cobrar: <strong>$ {tieneAnticipo ? totalConAnticipo.toFixed(2) : total.toFixed(2)} DLL</strong>
                     </p>
-                    {pCredito === 0 && (
-                        <p className="mt-2 text-3xl">
-                            Cambio: <strong>$ {cajaCambio.toFixed(2)} DLL</strong>
-                        </p>
-                    )}
                     {esFiado && (
                         <div className="mt-4 p-3 rounded-lg border-l-8 border-orange-600 bg-orange-100">
                             <p className="text-lg font-black text-orange-800 uppercase">

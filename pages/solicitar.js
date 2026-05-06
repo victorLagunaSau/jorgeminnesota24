@@ -77,9 +77,12 @@ const SolicitarPage = () => {
         setVehicleResult(null);
 
         try {
-            const response = await fetch("/api/scrape-vehicle", {
+            const response = await fetch("http://159.89.93.222:4000/api/scrape", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": "db831f6fb15f35bd5ecaece924d27b482e7dde9a3dff56d86acc9000b4c24ed6"
+                },
                 body: JSON.stringify({ lotNumber: lotNumber.trim(), gatePass: gatePass.trim() })
             });
 

@@ -99,9 +99,14 @@ const FormDatosVehiculo = ({user, onClose}) => {
         }
         setSaving(true);
         try {
-            if (!(await verificarBinNipEnFirebase(binNip))) {
+            const existe = await verificarBinNipEnFirebase(binNip);
+            if (!existe) {
                 await handleAgregarMovimiento();
                 setSuccess('Vehículo guardado con éxito.');
+                limpiarFormulario();
+            } else if (existe === "PA") {
+                await handleAgregarMovimiento(true);
+                setSuccess('Vehículo con pago adelantado registrado con éxito.');
                 limpiarFormulario();
             } else {
                 setError('El bin ingresado ya existe, por favor ingrese otro.');
@@ -114,13 +119,16 @@ const FormDatosVehiculo = ({user, onClose}) => {
     const verificarBinNipEnFirebase = async (binNip) => {
         const vehiculoRef = firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip);
         const doc = await vehiculoRef.get();
-        return doc.exists;
+        if (!doc.exists) return false;
+        // Si es PA, permitir re-registro (se actualizará conservando anticipo)
+        if (doc.data().estatus === "PA") return "PA";
+        return true;
     };
 
-    const handleAgregarMovimiento = async () => {
+    const handleAgregarMovimiento = async (esPA = false) => {
         try {
             const timestamp = moment().toDate();
-            await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).set({
+            const vehiculoData = {
                 asignado: false,
                 active: true,
                 binNip: binNip,
@@ -146,7 +154,13 @@ const FormDatosVehiculo = ({user, onClose}) => {
                 gastosExtra: gastosExtra,
                 comentariosChofer: null,
                 titulo: titulo,
-            });
+            };
+            if (esPA) {
+                // Merge para conservar campos de anticipo (anticipoPago, anticipoMetodo, etc.)
+                await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).set(vehiculoData, { merge: true });
+            } else {
+                await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).set(vehiculoData);
+            }
             await firebase.firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
                 asignado: false,
                 tipo: "+",

@@ -56,6 +56,12 @@ const Admin = () => {
     const { user, loading, isAdmin, signOut } = useAuthContext();
     const [selectedModule, setSelectedModule] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [pendingBinNip, setPendingBinNip] = useState(null);
+
+    const navegarACobro = (binNip) => {
+        setPendingBinNip(binNip);
+        setSelectedModule('salidaVehiculo');
+    };
 
     // Redirigir si no está autenticado o no es admin
     useEffect(() => {
@@ -78,7 +84,7 @@ const Admin = () => {
             case 'clientes':
                 return <Clientes user={user} />;
             case 'salidaVehiculo':
-                return <SalidaVehiculo user={user} />;
+                return <SalidaVehiculo user={user} initialBinNip={pendingBinNip} onBinNipConsumed={() => setPendingBinNip(null)} />;
             case 'pagoAdelantado':
                 return <PagoAdelantado user={user} />;
             case 'eliminaVehiculos':
@@ -119,7 +125,7 @@ const Admin = () => {
             case 'estadoFinanciero':
                 return <EstadoFinanciero />;
             case 'historialAnticipos':
-                return <HistorialAnticipos />;
+                return <HistorialAnticipos onNavegarACobro={navegarACobro} />;
             case 'historialAutorizaciones':
                 return <HistorialAutorizaciones />;
             case 'gastos':

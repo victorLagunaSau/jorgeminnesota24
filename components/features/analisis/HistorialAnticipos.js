@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaSearch, FaHistory, FaClock } from 'react-icons/fa';
+import { FaSearch, FaHistory, FaClock, FaTruck } from 'react-icons/fa';
 import moment from 'moment';
 
-const HistorialAnticipos = () => {
+const HistorialAnticipos = ({ onNavegarACobro }) => {
     const [movimientos, setMovimientos] = useState([]);
     const [vehiculosMap, setVehiculosMap] = useState({});
     const [loading, setLoading] = useState(true);
@@ -108,6 +108,17 @@ const HistorialAnticipos = () => {
     const finalizados = movimientos.filter(m => esFinalizado(m));
 
     const totalAnticipos = filtrados.reduce((sum, m) => sum + (parseFloat(m.anticipoPago) || 0), 0);
+    const totalPendientes = pendientes.reduce((sum, m) => sum + (parseFloat(m.anticipoPago) || 0), 0);
+    const totalLiquidados = finalizados.reduce((sum, m) => sum + (parseFloat(m.anticipoPago) || 0), 0);
+
+    const fmt = (n) => `$${Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+    const formatFecha = (ts) => {
+        if (!ts) return '-';
+        if (ts.seconds) return new Date(ts.seconds * 1000).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        if (ts instanceof Date) return ts.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+        return '-';
+    };
 
     if (loading) {
         return (
@@ -119,101 +130,93 @@ const HistorialAnticipos = () => {
 
     return (
         <div className="w-full">
-            <div className="mb-6">
-                <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">
-                    Pagos Adelantados
-                </h2>
-                <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
-                    {pendientes.length} pendientes · {finalizados.length} liquidados
-                </p>
-            </div>
-
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-96">
-                        <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por cliente, lote, marca..."
-                            className="input w-full pl-12 bg-white border-2 border-gray-200 focus:border-red-500 text-gray-800 font-semibold rounded-xl"
-                            value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
-                        />
-                    </div>
-                    <button
-                        onClick={() => setVerHistorial(!verHistorial)}
-                        className={`btn btn-sm gap-1 font-black uppercase text-[10px] ${verHistorial ? 'btn-info text-white' : 'btn-outline btn-info'}`}
-                    >
-                        {verHistorial ? <FaClock /> : <FaHistory />}
-                        {verHistorial ? 'Pendientes' : 'Historial'}
-                    </button>
-                </div>
-                <div className="text-right">
-                    <p className="text-xs text-gray-400 font-bold uppercase">
-                        {verHistorial ? 'Total liquidados' : 'Total pendientes'}
+            {/* Header */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Pagos Adelantados</h2>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">
+                        {pendientes.length} pendientes · {finalizados.length} liquidados
                     </p>
-                    <p className="text-2xl font-black text-gray-800">${totalAnticipos.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <button
+                    onClick={() => setVerHistorial(!verHistorial)}
+                    className={`btn btn-sm gap-1 font-black uppercase text-[10px] rounded-xl ${verHistorial ? 'bg-blue-500 hover:bg-blue-600 text-white border-none' : 'btn-outline btn-info'}`}
+                >
+                    {verHistorial ? <FaClock /> : <FaHistory />}
+                    {verHistorial ? 'Ver Pendientes' : 'Ver Historial'}
+                </button>
+            </div>
+
+            {/* Buscador + Card pendientes */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <div className="relative w-full md:w-96">
+                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                    type="text"
+                    placeholder="Buscar por cliente, lote, vehículo..."
+                    className="input w-full pl-12 bg-white border-2 border-gray-200 focus:border-red-500 text-gray-800 font-semibold rounded-xl"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                />
+            </div>
+                <div className="text-right">
+                    <p className="text-xs font-bold text-green-600 uppercase tracking-wider">Pendientes</p>
+                    <p className="text-2xl font-black text-green-700 mt-1">{fmt(totalPendientes)}</p>
                 </div>
             </div>
 
-            <div className="overflow-x-auto">
-                <table className="table table-sm w-full">
-                    <thead>
-                        <tr className="border-b border-gray-200 text-[10px] text-gray-400 font-bold uppercase">
-                            <th className="py-3">Estado</th>
-                            <th>Cliente</th>
-                            <th>Lote</th>
-                            <th>Vehículo</th>
-                            <th>Método</th>
-                            <th>Cobrado por</th>
-                            <th>Fecha</th>
-                            <th className="text-right">Anticipo</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                        {filtrados.length === 0 ? (
-                            <tr>
-                                <td colSpan="8" className="text-center py-10 text-gray-300">
-                                    {verHistorial ? 'No hay anticipos liquidados' : 'No hay anticipos pendientes'}
-                                </td>
+            {/* Tabla */}
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="table table-sm w-full">
+                        <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200 text-[10px] text-gray-400 font-bold uppercase">
+                                <th className="py-3">#</th>
+                                <th className="py-3">Fecha</th>
+                                <th className="py-3">Cliente</th>
+                                <th className="py-3">Lote</th>
+                                <th className="py-3">Vehículo</th>
+                                <th className="py-3">Método</th>
+                                <th className="py-3">Cobrado por</th>
+                                <th className="py-3 text-right">Anticipo</th>
                             </tr>
-                        ) : (
-                            filtrados.map((m) => {
-                                const finalizado = esFinalizado(m);
-                                const metodo = m.metodoPagoAnticipo || m.anticipoMetodo || 'efectivo';
-                                return (
-                                    <tr key={m.id} className={`border-b border-gray-50 hover:bg-gray-50/50 ${finalizado ? 'opacity-70' : ''}`}>
-                                        <td>
-                                            <span className={`badge badge-sm font-black uppercase text-[8px] text-white ${finalizado ? 'badge-success' : 'badge-warning'}`}>
-                                                {finalizado ? 'Liquidado' : 'Pendiente'}
-                                            </span>
-                                        </td>
-                                        <td className="font-bold text-gray-800">{m.cliente}</td>
-                                        <td className="font-mono font-bold text-blue-600">{m.binNip}</td>
-                                        <td className="text-gray-600">{m.marca} {m.modelo}</td>
-                                        <td>
-                                            <span className={`text-[10px] font-black uppercase ${metodo === 'cc' ? 'text-blue-600' : 'text-green-600'}`}>
-                                                {metodo === 'cc' ? 'CC' : 'Efectivo'}
-                                            </span>
-                                        </td>
-                                        <td className="text-gray-500 font-semibold">{m.usuario || '-'}</td>
-                                        <td className="text-gray-400">
-                                            {m.timestamp?.seconds
-                                                ? moment(m.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm')
-                                                : m.timestamp instanceof Date
-                                                    ? moment(m.timestamp).format('DD/MM/YYYY HH:mm')
-                                                    : '-'
-                                            }
-                                        </td>
-                                        <td className="text-right font-black text-green-700">
-                                            ${(parseFloat(m.anticipoPago) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="text-sm">
+                            {filtrados.length === 0 ? (
+                                <tr>
+                                    <td colSpan="8" className="text-center py-16 text-gray-300">
+                                        <FaTruck className="mx-auto text-4xl mb-2" />
+                                        <p className="font-bold">{verHistorial ? 'No hay anticipos liquidados' : 'No hay anticipos pendientes'}</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filtrados.map((m, i) => {
+                                    const finalizado = esFinalizado(m);
+                                    const metodo = m.metodoPagoAnticipo || m.anticipoMetodo || 'efectivo';
+                                    return (
+                                        <tr key={m.id} onClick={() => !finalizado && onNavegarACobro && onNavegarACobro(m.binNip)} className={`border-b border-gray-50 hover:bg-orange-50/30 ${finalizado ? 'opacity-70' : 'cursor-pointer'}`}>
+                                            <td className="text-gray-300 text-xs">{i + 1}</td>
+                                            <td className="text-gray-500 text-xs whitespace-nowrap">{formatFecha(m.timestamp)}</td>
+                                            <td className="font-bold text-gray-800">{m.cliente}</td>
+                                            <td className="font-mono font-bold text-blue-600">{m.binNip}</td>
+                                            <td className="text-gray-600">{m.marca} {m.modelo}</td>
+                                            <td>
+                                                <span className={`text-[10px] font-black uppercase ${metodo === 'cc' ? 'text-blue-600' : 'text-green-600'}`}>
+                                                    {metodo === 'cc' ? 'CC' : 'Efectivo'}
+                                                </span>
+                                            </td>
+                                            <td className="text-gray-500 font-semibold">{m.usuario || '-'}</td>
+                                            <td className="text-right font-black text-green-700">
+                                                {fmt(parseFloat(m.anticipoPago) || 0)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
             </div>
         </div>
     );

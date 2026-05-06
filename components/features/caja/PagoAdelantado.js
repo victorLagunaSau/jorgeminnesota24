@@ -16,6 +16,9 @@ const PagoAdelantado = ({ user }) => {
     const [estado, setEstado] = useState('');
     const [ciudad, setCiudad] = useState('');
     const [price, setPrice] = useState(0);
+    const [sobrePeso, setSobrePeso] = useState(0);
+    const [storage, setStorage] = useState(0);
+    const [gastosExtra, setGastosExtra] = useState(0);
 
     // Monto adelantado y método de pago
     const [montoAdelanto, setMontoAdelanto] = useState(0);
@@ -45,6 +48,7 @@ const PagoAdelantado = ({ user }) => {
                     state: doc.data().state,
                     regions: doc.data().regions || []
                 }));
+                data.sort((a, b) => a.state.localeCompare(b.state));
                 setEstados(data);
             } catch (error) {
                 console.error("Error fetching estados:", error);
@@ -52,6 +56,11 @@ const PagoAdelantado = ({ user }) => {
         };
         fetchEstados();
     }, []);
+
+    // Recalcular monto adelanto cuando cambian extras o precio
+    useEffect(() => {
+        setMontoAdelanto(price + sobrePeso + storage + gastosExtra);
+    }, [price, sobrePeso, storage, gastosExtra]);
 
     // Limpiar mensajes después de 5 segundos
     useEffect(() => {
@@ -68,12 +77,11 @@ const PagoAdelantado = ({ user }) => {
         setEstado(value);
         const sel = estados.find(e => e.state === value);
         if (sel) {
-            setCiudades(sel.regions);
+            setCiudades([...sel.regions].sort((a, b) => a.city.localeCompare(b.city)));
             if (sel.regions.length > 0) {
                 setCiudad(sel.regions[0].city);
                 const p = parseFloat(sel.regions[0].price || 0);
                 setPrice(p);
-                setMontoAdelanto(p);
             }
         } else {
             setCiudades([]);
@@ -89,7 +97,6 @@ const PagoAdelantado = ({ user }) => {
         if (selRegion) {
             const p = parseFloat(selRegion.price || 0);
             setPrice(p);
-            setMontoAdelanto(p);
         }
     };
 
@@ -119,10 +126,12 @@ const PagoAdelantado = ({ user }) => {
                     setEstado(data.estado || '');
                     setCiudad(data.ciudad || '');
                     setPrice(parseFloat(data.price || 0));
-                    setMontoAdelanto(parseFloat(data.price || 0));
+                    setSobrePeso(parseFloat(data.sobrePeso || 0));
+                    setStorage(parseFloat(data.storage || 0));
+                    setGastosExtra(parseFloat(data.gastosExtra || 0));
                     // Cargar ciudades del estado
                     const sel = estados.find(e => e.state === data.estado);
-                    if (sel) setCiudades(sel.regions);
+                    if (sel) setCiudades([...sel.regions].sort((a, b) => a.city.localeCompare(b.city)));
                 }
             }
         } catch (error) {
@@ -170,6 +179,9 @@ const PagoAdelantado = ({ user }) => {
                     anticipoUsuario: user.nombre || "Admin",
                     anticipoIdUsuario: user.id || "N/A",
                     estatusAnterior: vehiculoExistente.estatus,
+                    sobrePeso: sobrePeso,
+                    storage: storage,
+                    gastosExtra: gastosExtra,
                 });
             } else {
                 // Vehículo NO existe → crear nuevo con estatus PA
@@ -185,9 +197,9 @@ const PagoAdelantado = ({ user }) => {
                     estatus: "PA",
                     asignado: false,
                     active: true,
-                    storage: 0,
-                    sobrePeso: 0,
-                    gastosExtra: 0,
+                    storage: storage,
+                    sobrePeso: sobrePeso,
+                    gastosExtra: gastosExtra,
                     titulo: "NO",
                     anticipoPago: parseFloat(montoAdelanto),
                     anticipoMetodo: metodoPago,
@@ -214,6 +226,9 @@ const PagoAdelantado = ({ user }) => {
                 estado: estado,
                 ciudad: ciudad,
                 price: price,
+                sobrePeso: sobrePeso,
+                storage: storage,
+                gastosExtra: gastosExtra,
                 anticipoPago: monto,
                 cajaRecibo: metodoPago === 'efectivo' ? monto : 0,
                 cajaCC: metodoPago === 'cc' ? monto : 0,
@@ -229,6 +244,7 @@ const PagoAdelantado = ({ user }) => {
                 binNip: lote,
                 marca, modelo, cliente, telefonoCliente,
                 estado, ciudad, price,
+                sobrePeso, storage, gastosExtra,
                 anticipoPago: parseFloat(montoAdelanto),
                 metodoPago: metodoPago,
                 usuario: user.nombre || "Admin",
@@ -252,6 +268,9 @@ const PagoAdelantado = ({ user }) => {
         setEstado('');
         setCiudad('');
         setPrice(0);
+        setSobrePeso(0);
+        setStorage(0);
+        setGastosExtra(0);
         setMontoAdelanto(0);
         setMetodoPago('efectivo');
         setCiudades([]);
@@ -394,6 +413,48 @@ const PagoAdelantado = ({ user }) => {
                     </div>
                 </div>
 
+                {/* Cargos adicionales */}
+                <div className="flex flex-wrap mt-2">
+                    <div className="w-1/3 p-1">
+                        <label className="block text-black text-sm font-bold">Sobrepeso:</label>
+                        <input
+                            type="number"
+                            value={sobrePeso}
+                            onChange={(e) => setSobrePeso(parseFloat(e.target.value) || 0)}
+                            className="input input-bordered input-sm w-full bg-white text-black"
+                            min="0"
+                            step="any"
+                        />
+                    </div>
+                    <div className="w-1/3 p-1">
+                        <label className="block text-black text-sm font-bold">Storage:</label>
+                        <input
+                            type="number"
+                            value={storage}
+                            onChange={(e) => setStorage(parseFloat(e.target.value) || 0)}
+                            className="input input-bordered input-sm w-full bg-white text-black"
+                            min="0"
+                            step="any"
+                        />
+                    </div>
+                    <div className="w-1/3 p-1">
+                        <label className="block text-black text-sm font-bold">Gastos Extra:</label>
+                        <input
+                            type="number"
+                            value={gastosExtra}
+                            onChange={(e) => setGastosExtra(parseFloat(e.target.value) || 0)}
+                            className="input input-bordered input-sm w-full bg-white text-black"
+                            min="0"
+                            step="any"
+                        />
+                    </div>
+                </div>
+                {(sobrePeso > 0 || storage > 0 || gastosExtra > 0) && (
+                    <div className="text-sm text-gray-600 font-bold mt-1 px-1">
+                        Total estimado: ${price + sobrePeso + storage + gastosExtra} DLL (flete + extras)
+                    </div>
+                )}
+
                 {/* Monto del adelanto */}
                 <div className="mt-4 p-4 bg-green-50 border-2 border-green-500 rounded-lg">
                     <label className="block text-green-800 font-black text-lg mb-1">
@@ -415,9 +476,9 @@ const PagoAdelantado = ({ user }) => {
                         />
                         <span className="text-2xl font-bold ml-2">DLL</span>
                     </div>
-                    {montoAdelanto < price && montoAdelanto > 0 && (
+                    {montoAdelanto < (price + sobrePeso + storage + gastosExtra) && montoAdelanto > 0 && (
                         <p className="text-orange-600 font-bold text-sm mt-1">
-                            El cliente paga ${montoAdelanto} de ${price} — al llegar se cobrará la diferencia + extras
+                            El cliente paga ${montoAdelanto} de ${price + sobrePeso + storage + gastosExtra} — al llegar se cobrará la diferencia (${(price + sobrePeso + storage + gastosExtra) - montoAdelanto} DLL)
                         </p>
                     )}
 
@@ -463,6 +524,14 @@ const PagoAdelantado = ({ user }) => {
                             <p><strong>Vehículo:</strong> {marca} {modelo}</p>
                             <p><strong>Cliente:</strong> {cliente}</p>
                             <p><strong>Destino:</strong> {ciudad}, {estado}</p>
+                            {(sobrePeso > 0 || storage > 0 || gastosExtra > 0) && (
+                                <div className="mt-2 text-sm">
+                                    {sobrePeso > 0 && <p><strong>Sobrepeso:</strong> ${sobrePeso} DLL</p>}
+                                    {storage > 0 && <p><strong>Storage:</strong> ${storage} DLL</p>}
+                                    {gastosExtra > 0 && <p><strong>Gastos Extra:</strong> ${gastosExtra} DLL</p>}
+                                    <p className="font-bold">Total estimado: ${price + sobrePeso + storage + gastosExtra} DLL</p>
+                                </div>
+                            )}
                             <p className="text-2xl font-black text-green-700 mt-3">
                                 Anticipo: ${montoAdelanto} DLL
                             </p>
