@@ -1,21 +1,31 @@
-import puppeteer from 'puppeteer';
+import chromium from '@sparticuz/chromium';
+import puppeteerCore from 'puppeteer-core';
+
+// En local usamos puppeteer completo, en Vercel usamos puppeteer-core + @sparticuz/chromium
+async function getBrowser() {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    // Producción (Vercel / Lambda)
+    return puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+  }
+
+  // Local development — usar puppeteer completo (tiene su propio Chromium)
+  const puppeteer = await import('puppeteer');
+  return puppeteer.default.launch({
+    headless: 'shell',
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  });
+}
 
 async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
   let browser;
 
   try {
-    browser = await puppeteer.launch({
-      headless: 'shell',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--window-size=1920,1080'
-      ]
-    });
-
+    browser = await getBrowser();
     const page = await browser.newPage();
 
     await page.setUserAgent(
@@ -25,16 +35,11 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
     await page.setViewport({ width: 1920, height: 1080 });
 
     await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, 'webdriver', {
-        get: () => false,
-      });
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
     });
 
     const url = `https://bid.cars/en/lot/${prefix}-${lotNumber}`;
-    await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 60000
-    });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 45000 });
 
     await new Promise(resolve => setTimeout(resolve, 3000));
     await page.waitForSelector('body', { timeout: 10000 });
@@ -169,8 +174,9 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
     };
 
   } catch (error) {
+    console.error(`Error scraping ${sourceName}:`, error.message);
     if (browser) {
-      await browser.close();
+      try { await browser.close(); } catch (e) {}
     }
     return null;
   }
@@ -202,7 +208,6 @@ export default async function handler(req, res) {
       scrapeSingleSource(lotNumber, '1', 'Copart', gatePass.toUpperCase()),
     ]);
 
-    // Priorizar IAA, si no hay resultado usar Copart
     const result = iaa || copart;
 
     if (!result) {
