@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactToPrint from "react-to-print";
 import { useAdminData } from "../../../context/adminData";
 import { firestore } from "../../../firebase/firebaseIni";
 import FormCliente from "./FormCliente";
 import {
     FaTimes, FaSearch, FaChevronLeft, FaChevronRight,
-    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus
+    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus, FaPrint
 } from "react-icons/fa";
 
 const Clientes = ({ user }) => {
@@ -24,6 +25,7 @@ const Clientes = ({ user }) => {
     const [todosVehiculos, setTodosVehiculos] = useState([]);
     const [vehiculosFiados, setVehiculosFiados] = useState([]);
     const [vehiculosLegacy, setVehiculosLegacy] = useState([]);
+    const printRef = useRef();
 
     const xPagina = 15;
 
@@ -235,12 +237,23 @@ const Clientes = ({ user }) => {
                     >
                         <FaChevronLeft /> Volver
                     </button>
-                    <button
-                        onClick={() => handleEditarCliente(clienteSeleccionado)}
-                        className="btn btn-sm bg-red-600 hover:bg-red-700 text-white border-none font-bold gap-2"
-                    >
-                        <FaEdit /> Editar
-                    </button>
+                    <div className="flex gap-2">
+                        <ReactToPrint
+                            trigger={() => (
+                                <button className="btn btn-sm bg-gray-800 hover:bg-gray-900 text-white border-none font-bold gap-2">
+                                    <FaPrint /> Imprimir PDF
+                                </button>
+                            )}
+                            content={() => printRef.current}
+                            documentTitle={`Estado_Cuenta_${clienteSeleccionado.cliente}`}
+                        />
+                        <button
+                            onClick={() => handleEditarCliente(clienteSeleccionado)}
+                            className="btn btn-sm bg-red-600 hover:bg-red-700 text-white border-none font-bold gap-2"
+                        >
+                            <FaEdit /> Editar
+                        </button>
+                    </div>
                 </div>
 
                 {/* Card Principal del Cliente */}
@@ -296,6 +309,26 @@ const Clientes = ({ user }) => {
                     </div>
                 </div>
 
+                {/* Contenido Imprimible — desde Total a Pagar + tablas */}
+                <div ref={printRef} className="print-estado-cuenta">
+                <style>{`
+                    @media print {
+                        .print-estado-cuenta { padding: 10px; font-size: 9px; }
+                        .print-estado-cuenta * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                        .print-estado-cuenta table { width: 100%; border-collapse: collapse; }
+                        .print-estado-cuenta th, .print-estado-cuenta td { padding: 2px 4px; white-space: nowrap; font-size: 9px; }
+                    }
+                `}</style>
+
+                <div style={{ borderBottom: '2px solid #1f2937', paddingBottom: 8, marginBottom: 12 }}>
+                    <p style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: '#6b7280' }}>
+                        Estado de Cuenta — {clienteSeleccionado.cliente} {clienteSeleccionado.apodoCliente ? `"${clienteSeleccionado.apodoCliente}"` : ''}
+                    </p>
+                    <p style={{ fontSize: 22, fontWeight: 900 }}>
+                        Total a Pagar: ${deudaTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                </div>
+
                 {/* Tabla En Espera */}
                 <div className="mb-10">
                     <p className="text-xs font-black text-gray-500 uppercase tracking-wide mb-3">
@@ -315,8 +348,9 @@ const Clientes = ({ user }) => {
                                         <th>Origen</th>
                                         <th>Estatus</th>
                                         <th className="text-right">Flete</th>
+                                        <th className="text-right">Sobrepeso</th>
                                         <th className="text-right">Storage</th>
-                                        <th className="text-right">Extras</th>
+                                        <th className="text-right">Gastos Extra</th>
                                         <th className="text-right">Total</th>
                                     </tr>
                                 </thead>
@@ -328,15 +362,16 @@ const Clientes = ({ user }) => {
                                             <td className="text-gray-400">{v.ciudad}, {v.estado}</td>
                                             <td className="text-xs font-bold text-gray-400">{v.estatus}</td>
                                             <td className="text-right">${parseFloat(v.price || 0).toFixed(2)}</td>
+                                            <td className="text-right">${parseFloat(v.sobrePeso || 0).toFixed(2)}</td>
                                             <td className="text-right">${parseFloat(v.storage || 0).toFixed(2)}</td>
-                                            <td className="text-right">${(parseFloat(v.sobrePeso || 0) + parseFloat(v.gastosExtra || 0)).toFixed(2)}</td>
+                                            <td className="text-right">${parseFloat(v.gastosExtra || 0).toFixed(2)}</td>
                                             <td className="text-right font-bold">${montoDeudaVehiculo(v).toFixed(2)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot>
                                     <tr className="text-sm">
-                                        <td colSpan="7" className="text-right text-gray-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
+                                        <td colSpan="8" className="text-right text-gray-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
                                         <td className="text-right font-black pt-2">${totalEspera.toFixed(2)}</td>
                                     </tr>
                                 </tfoot>
@@ -344,6 +379,8 @@ const Clientes = ({ user }) => {
                         </div>
                     )}
                 </div>
+
+                </div>{/* Fin Contenido Imprimible */}
 
                 {/* Tabla Fiados */}
                 <div className="mb-10">
@@ -363,7 +400,6 @@ const Clientes = ({ user }) => {
                                         <th>Lote</th>
                                         <th>Vehículo</th>
                                         <th className="text-right">Precio</th>
-                                        <th className="text-right">Abono</th>
                                         <th className="text-right">Cobrado</th>
                                         <th className="text-right">Pendiente</th>
                                     </tr>
@@ -384,8 +420,7 @@ const Clientes = ({ user }) => {
                                                 <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
                                                 <td className="text-gray-700">{v.marca} {v.modelo}</td>
                                                 <td className="text-right">${precio.toFixed(2)}</td>
-                                                <td className="text-right text-green-600">${cobrado.toFixed(2)}</td>
-                                                <td className="text-right font-bold">${cobrado.toFixed(2)}</td>
+                                                <td className="text-right font-bold text-green-600">${cobrado.toFixed(2)}</td>
                                                 <td className="text-right font-bold text-orange-600">${saldo.toFixed(2)}</td>
                                             </tr>
                                         );
@@ -393,7 +428,7 @@ const Clientes = ({ user }) => {
                                 </tbody>
                                 <tfoot>
                                     <tr className="text-sm">
-                                        <td colSpan="6" className="text-right text-orange-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
+                                        <td colSpan="5" className="text-right text-orange-400 font-bold uppercase text-[10px] pt-2">Subtotal</td>
                                         <td className="text-right font-black text-orange-600 pt-2">${deudaFiadaCliente.toFixed(2)}</td>
                                     </tr>
                                 </tfoot>

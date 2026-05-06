@@ -9,10 +9,12 @@ import { registrarAuditLog } from "../../../utils/auditLog";
 import Alert from "../../ui/Alert";
 
 const FormEditVehiculo = ({vehiculo, onClose, user}) => {
+    const isAdminMaster = user?.adminMaster === true;
     const { clientes: clientesRaw } = useAdminData();
     const [estado, setEstado] = useState(vehiculo.estado);
     const [ciudad, setCiudad] = useState(vehiculo.ciudad);
     const [price, setPrice] = useState(0);
+    const [flete, setFlete] = useState(0);
     const [gatePass, setGatePass] = useState('');
     const [tipoVehiculo, setTipoVehiculo] = useState('');
     const [marca, setMarca] = useState('');
@@ -92,6 +94,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
             setDescripcion(vehiculo.descripcion);
             setAlmacen(vehiculo.almacen);
             setEstatus(vehiculo.estatus);
+            setFlete(vehiculo.flete !== undefined ? vehiculo.flete : 0);
             setStorage(vehiculo.storage !== undefined ? vehiculo.storage : 0);
             setSobrePeso(vehiculo.sobrePeso !== undefined ? vehiculo.sobrePeso : 0);
             setGastosExtra(vehiculo.gastosExtra !== undefined ? vehiculo.gastosExtra : 0);
@@ -145,6 +148,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
         const todos = {
             gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad,
             price: String(price),
+            flete: parseFloat(flete) || 0,
             storage: parseFloat(storage) || 0,
             sobrePeso: parseFloat(sobrePeso) || 0,
             gastosExtra: parseFloat(gastosExtra) || 0,
@@ -237,7 +241,34 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                 </div>
                 <div className="w-1/4 p-1">
                     <label htmlFor="precio" className="block text-black-500">Precio:</label>
-                    <p className="text-xl">$ {price} Dll</p>
+                    {isAdminMaster ? (
+                        <input
+                            type="number"
+                            value={price}
+                            onChange={(e) => setPrice(Math.max(0, e.target.value))}
+                            onFocus={(e) => e.target.select()}
+                            className="input input-bordered w-full text-black-500 input-sm bg-white-100"
+                            min="0"
+                        />
+                    ) : (
+                        <p className="text-xl">$ {price} Dll</p>
+                    )}
+                </div>
+                <div className="w-1/4 p-1">
+                    <label htmlFor="flete" className="block text-black-500">Flete (Precio Cliente):</label>
+                    {isAdminMaster ? (
+                        <input
+                            type="number"
+                            id="flete"
+                            value={flete}
+                            onChange={(e) => setFlete(Math.max(0, e.target.value))}
+                            onFocus={(e) => e.target.select()}
+                            className="input input-bordered w-full text-black-500 input-sm bg-yellow-50 border-yellow-400 font-bold"
+                            min="0"
+                        />
+                    ) : (
+                        <p className="text-xl">$ {flete} Dll</p>
+                    )}
                 </div>
             </div>
             <div className="flex flex-wrap">

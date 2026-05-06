@@ -260,7 +260,7 @@ const SolicitarPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Link href="/portal">
+                    <Link href="/clients">
                         <a className="btn btn-ghost btn-sm text-blue-600">
                             <FaCar className="mr-1"/> Mis Vehículos
                         </a>

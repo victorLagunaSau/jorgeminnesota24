@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import {
-    FaFilePdf, FaFileImage, FaMapMarkerAlt, FaPencilAlt, FaUserCircle
+    FaFilePdf, FaFileImage, FaMapMarkerAlt, FaEdit, FaUserCircle, FaTrashAlt
 } from "react-icons/fa";
 import { COLLECTIONS } from "../../../constants";
 import SearchBar from "../../ui/SearchBar";
@@ -9,7 +9,7 @@ import Pagination from "../../ui/Pagination";
 import EmptyState from "../../ui/EmptyState";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 
-const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por props
+const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
     const [lista, setLista] = useState([]);
     const [busqueda, setBusqueda] = useState("");
     const [pagina, setPagina] = useState(1);
@@ -27,6 +27,16 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
             });
         return () => unsubscribe();
     }, []);
+
+    const eliminarEmpresa = async (empresa) => {
+        if (!confirm(`¿Eliminar la empresa ${empresa.nombreEmpresa}? Esta acción no se puede deshacer.`)) return;
+        try {
+            await firestore().collection(COLLECTIONS.EMPRESAS).doc(empresa.id).delete();
+        } catch (error) {
+            console.error("Error al eliminar:", error);
+            alert("Error al eliminar empresa.");
+        }
+    };
 
     const filtrados = lista.filter(e => {
         const b = busqueda.toLowerCase();
@@ -118,13 +128,23 @@ const TablaEmpresas = ({ onEditar }) => { // Recibimos la función onEditar por 
 
                             {onEditar && (
                                 <td className="text-center">
-                                    <button
-                                        onClick={() => onEditar(e)}
-                                        className="btn btn-circle btn-ghost btn-xs text-orange-600 hover:bg-orange-100"
-                                        title="Editar datos y acceso"
-                                    >
-                                        <FaPencilAlt size={14} />
-                                    </button>
+                                    <div className="flex items-center justify-center gap-1">
+                                        <button
+                                            onClick={() => onEditar(e)}
+                                            className="btn btn-xs btn-outline btn-info font-black uppercase text-[9px] gap-1"
+                                        >
+                                            <FaEdit /> Editar
+                                        </button>
+                                        {isAdminMaster && (
+                                            <button
+                                                onClick={() => eliminarEmpresa(e)}
+                                                className="btn btn-xs btn-outline btn-error font-black uppercase text-[9px]"
+                                                title="Eliminar empresa"
+                                            >
+                                                <FaTrashAlt />
+                                            </button>
+                                        )}
+                                    </div>
                                 </td>
                             )}
                         </tr>

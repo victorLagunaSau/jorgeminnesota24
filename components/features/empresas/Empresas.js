@@ -51,7 +51,7 @@ const Empresas = ({ user }) => {
                 onSuccess={cancelarEdicion}
             />
 
-            <TablaEmpresas onEditar={isAdminMaster ? handleEditar : null} />
+            <TablaEmpresas onEditar={isAdminMaster ? handleEditar : null} isAdminMaster={isAdminMaster} />
         </motion.div>
     );
 };
