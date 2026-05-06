@@ -150,7 +150,7 @@ const Header = () => {
                             </Link>
 
                         ) : (
-                            <Link href="/portal">
+                            <Link href="/clients">
                                 <a
                                     onClick={() => setActiveLink("login")}
                                     className="font-medium tracking-wide py-2 px-5 sm:px-8 border border-primary text-white-500 bg-primary outline-none rounded-l-full rounded-r-full capitalize hover:bg-white-500 hover:text-primary transition-all hover:shadow-primary"

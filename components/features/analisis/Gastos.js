@@ -3,7 +3,7 @@ import { firestore, storage } from "../../../firebase/firebaseIni";
 import { useAuthContext } from "../../../context/auth";
 import imageCompression from "browser-image-compression";
 import * as XLSX from "xlsx";
-import { FaCamera, FaTimes, FaCheck, FaSpinner, FaTrash, FaEye, FaChevronLeft, FaChevronRight, FaFileExcel, FaCrop } from "react-icons/fa";
+import { FaCamera, FaTimes, FaCheck, FaSpinner, FaTrash, FaEye, FaFileExcel, FaCrop } from "react-icons/fa";
 
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
@@ -142,7 +142,6 @@ const Gastos = () => {
     const hoy = new Date();
     const [mesSeleccionado, setMesSeleccionado] = useState(hoy.getMonth());
     const [anioSeleccionado, setAnioSeleccionado] = useState(hoy.getFullYear());
-    const [mesesAcumulado, setMesesAcumulado] = useState([]);
 
     // Modal
     const [gastoSeleccionado, setGastoSeleccionado] = useState(null);
@@ -288,43 +287,27 @@ const Gastos = () => {
         const meses = {};
         gastos.forEach(g => {
             if (g.estado !== "revisado" || !g.fechaGasto) return;
-            const key = g.fechaGasto.substring(0, 7); // "YYYY-MM"
-            if (!meses[key]) meses[key] = { key, total: 0, count: 0 };
-            meses[key].total += (g.monto || 0);
-            meses[key].count++;
+            const key = g.fechaGasto.substring(0, 7);
+            if (!meses[key]) meses[key] = 0;
+            meses[key]++;
         });
-        return Object.values(meses).sort((a, b) => a.key.localeCompare(b.key));
+        return Object.keys(meses).sort((a, b) => a.localeCompare(b));
     }, [gastos]);
-
-    const totalAcumulado = useMemo(() => {
-        if (mesesAcumulado.length === 0) return null;
-        return mesesAcumulado.reduce((acc, mesKey) => {
-            const found = mesesDisponibles.find(m => m.key === mesKey);
-            return acc + (found ? found.total : 0);
-        }, 0);
-    }, [mesesAcumulado, mesesDisponibles]);
-
-    const toggleMesAcumulado = (mesKey) => {
-        setMesesAcumulado(prev =>
-            prev.includes(mesKey) ? prev.filter(m => m !== mesKey) : [...prev, mesKey]
-        );
-    };
 
     const formatMesKey = (key) => {
         const [y, m] = key.split("-");
         return `${MESES[parseInt(m) - 1].substring(0, 3)} ${y}`;
     };
 
-    const lista = vista === "pendientes" ? pendientes : revisadosMes;
+    const seleccionarMes = (mesKey) => {
+        const [y, m] = mesKey.split("-");
+        setAnioSeleccionado(parseInt(y));
+        setMesSeleccionado(parseInt(m) - 1);
+    };
 
-    const mesAnterior = () => {
-        if (mesSeleccionado === 0) { setMesSeleccionado(11); setAnioSeleccionado(a => a - 1); }
-        else setMesSeleccionado(m => m - 1);
-    };
-    const mesSiguiente = () => {
-        if (mesSeleccionado === 11) { setMesSeleccionado(0); setAnioSeleccionado(a => a + 1); }
-        else setMesSeleccionado(m => m + 1);
-    };
+    const mesKeyActual = `${anioSeleccionado}-${String(mesSeleccionado + 1).padStart(2, "0")}`;
+
+    const lista = vista === "pendientes" ? pendientes : revisadosMes;
 
     const formatFecha = (f) => {
         if (!f) return "—";
@@ -385,55 +368,29 @@ const Gastos = () => {
                 </button>
             </div>
 
-            {/* Acumulado de meses */}
+            {/* Selector de mes para revisados */}
             {vista === "revisados" && mesesDisponibles.length > 0 && (
                 <div className="mb-3 bg-gray-50 rounded-lg p-3">
-                    <p className="text-[11px] text-gray-400 uppercase font-bold mb-2">Acumulado por meses</p>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                        {mesesDisponibles.map(m => (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {mesesDisponibles.map(key => (
                             <button
-                                key={m.key}
-                                onClick={() => toggleMesAcumulado(m.key)}
+                                key={key}
+                                onClick={() => seleccionarMes(key)}
                                 className={`px-2 py-1 rounded text-[11px] font-bold transition-colors ${
-                                    mesesAcumulado.includes(m.key)
+                                    mesKeyActual === key
                                         ? "bg-gray-800 text-white"
                                         : "bg-white text-gray-500 border border-gray-200 hover:border-gray-400"
                                 }`}
                             >
-                                {formatMesKey(m.key)}
+                                {formatMesKey(key)}
                             </button>
                         ))}
+                        {revisadosMes.length > 0 && (
+                            <button onClick={exportarExcel} className="ml-auto flex items-center gap-1 text-xs text-green-700 font-bold hover:bg-green-50 px-2 py-1 rounded" title="Exportar Excel">
+                                <FaFileExcel size={13} /> Excel
+                            </button>
+                        )}
                     </div>
-                    {totalAcumulado !== null && mesesAcumulado.length > 0 && (
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                            <span className="text-[11px] text-gray-400">
-                                {mesesAcumulado.length} {mesesAcumulado.length === 1 ? "mes" : "meses"} seleccionados
-                            </span>
-                            <span className="text-sm font-black text-gray-800">{formatMoneda(totalAcumulado)}</span>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Selector de mes + Excel para revisados */}
-            {vista === "revisados" && (
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-1">
-                        <button onClick={mesAnterior} className="p-1 hover:bg-gray-100 rounded">
-                            <FaChevronLeft size={11} className="text-gray-500" />
-                        </button>
-                        <span className="text-sm font-bold text-gray-700">
-                            {MESES[mesSeleccionado]} {anioSeleccionado}
-                        </span>
-                        <button onClick={mesSiguiente} className="p-1 hover:bg-gray-100 rounded">
-                            <FaChevronRight size={11} className="text-gray-500" />
-                        </button>
-                    </div>
-                    {revisadosMes.length > 0 && (
-                        <button onClick={exportarExcel} className="flex items-center gap-1 text-xs text-green-700 font-bold hover:bg-green-50 px-2 py-1 rounded" title="Exportar Excel">
-                            <FaFileExcel size={13} /> Excel
-                        </button>
-                    )}
                 </div>
             )}
 
