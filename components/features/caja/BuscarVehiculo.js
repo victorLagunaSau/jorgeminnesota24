@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS, VEHICLE_STATUS, VEHICLE_STATUS_CODES } from "../../../constants";
 
-const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
+const BuscarVehiculo = ({ onVehiculoEncontrado, initialBinNip, onBinNipConsumed }) => {
     const [binNip, setBinNip] = useState("");
     const [mensajeError, setMensajeError] = useState("");
     const [cargando, setCargando] = useState(false);
@@ -31,6 +31,35 @@ const BuscarVehiculo = ({ onVehiculoEncontrado }) => {
             setCargando(false);
         }
     };
+
+    // Auto-buscar si viene un binNip inicial (desde otro módulo)
+    useEffect(() => {
+        if (initialBinNip) {
+            setBinNip(initialBinNip);
+            // Buscar directamente con el valor recibido
+            (async () => {
+                try {
+                    setCargando(true);
+                    setMensajeError("");
+                    const vehiculoSnapshot = await firestore().collection(COLLECTIONS.VEHICULOS).doc(initialBinNip).get();
+                    if (!vehiculoSnapshot.exists) {
+                        setMensajeError("Vehículo no encontrado");
+                        onVehiculoEncontrado(null, "");
+                    } else {
+                        const vehiculo = vehiculoSnapshot.data();
+                        const estatusVehiculo = vehiculo.estatus || "";
+                        onVehiculoEncontrado(vehiculo, estatusVehiculo, initialBinNip);
+                        setEstatus(estatusVehiculo);
+                    }
+                } catch (error) {
+                    setMensajeError("Ocurrió un error al buscar el vehículo");
+                } finally {
+                    setCargando(false);
+                    if (onBinNipConsumed) onBinNipConsumed();
+                }
+            })();
+        }
+    }, [initialBinNip]);
 
     // Manejo del evento de entrada de texto
     const handleInputChange = (event) => {

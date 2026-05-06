@@ -360,12 +360,17 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
         try {
             const consecutivoRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
 
-            // VERIFICAR LOTES YA PAGADOS
+            // VERIFICAR LOTES YA PAGADOS (excluir los que tienen pago adelantado PA)
             const lotesExistentes = [];
+            const lotesPA = [];
             for (const v of viaje.vehiculos) {
                 const docExistente = await firestore().collection(COLLECTIONS.VEHICULOS).doc(v.lote).get();
                 if (docExistente.exists) {
-                    lotesExistentes.push(v.lote);
+                    if (docExistente.data().estatus === "PA") {
+                        lotesPA.push(v.lote);
+                    } else {
+                        lotesExistentes.push(v.lote);
+                    }
                 }
             }
 
@@ -397,6 +402,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
 
                     // Verificar si el lote ya está pagado
                     const yaPagado = lotesExistentes.includes(v.lote);
+                    const esPA = lotesPA.includes(v.lote);
 
                     if (yaPagado) {
                         // LOTE YA PAGADO - Actualizar precios (cliente y chofer), preservar anticipoPago existente
@@ -490,7 +496,12 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)
-                        transaction.set(vehiculoRef, dataComun);
+                        // Si es PA, merge para conservar campos de anticipo
+                        if (esPA) {
+                            transaction.set(vehiculoRef, dataComun, { merge: true });
+                        } else {
+                            transaction.set(vehiculoRef, dataComun);
+                        }
 
                         // Guardar en la colección de MOVIMIENTOS (Historial de Auditoría)
                         transaction.set(movimientoRef, {

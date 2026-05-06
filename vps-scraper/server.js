@@ -4,6 +4,17 @@ const puppeteer = require('puppeteer');
 const app = express();
 app.use(express.json());
 
+// CORS - permitir peticiones desde el frontend
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 const API_KEY = process.env.SCRAPER_API_KEY || 'CHANGE_ME_TO_A_SECURE_KEY';
 const PORT = process.env.PORT || 4000;
 

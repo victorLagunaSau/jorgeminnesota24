@@ -3,7 +3,7 @@ import BuscarVehiculo from './BuscarVehiculo';
 import Pagado from './Pagado';
 import Cobrar from './Cobrar';
 
-const SalidaVehiculo = ({user}) => {
+const SalidaVehiculo = ({user, initialBinNip, onBinNipConsumed}) => {
     const [vehiculo, setVehiculo] = useState([]);
     const [estatus, setEstatus] = useState("");
     const [binNip, setBinNip] = useState("");
@@ -42,7 +42,7 @@ const SalidaVehiculo = ({user}) => {
 
 
                 <div className="max-w-5xl bg-white-500">
-                    <BuscarVehiculo onVehiculoEncontrado={handleVehiculoEncontrado}/>
+                    <BuscarVehiculo onVehiculoEncontrado={handleVehiculoEncontrado} initialBinNip={initialBinNip} onBinNipConsumed={onBinNipConsumed}/>
                 </div>
 
             {/* Mostrar datos si el vehículo existe */}

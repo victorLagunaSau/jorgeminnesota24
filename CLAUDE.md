@@ -72,9 +72,9 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
-- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `portal` + `solicitar` (cliente)
+- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `clients` + `solicitar` (cliente)
 - **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging)
-- **Maintenance scripts:** `scripts/` contains audit scripts (`auditActivos`, `auditDesync`, `auditPrecios`) and `rastrearLote` (lot tracking via Puppeteer)
+- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF)
 
 ### User Roles and Permissions
 
@@ -83,7 +83,7 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `admin` — daily operations (cash register if `caja` flag set, vehicles, trips, reports); with `adminMaster` flag: full access
 - `empresa` — carrier portal (`/carriers`, `/loads`)
 - `chofer` — driver view (`/misviajes`)
-- `cliente` — client portal (`/portal`, `/solicitar`)
+- `cliente` — client portal (`/clients`, `/solicitar`)
 
 ## Code Conventions
 

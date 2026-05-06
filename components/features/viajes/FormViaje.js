@@ -487,6 +487,13 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
             ]);
 
             if (docV.exists) {
+                const docData = docV.data();
+                if (docData.estatus === "PA") {
+                    // Vehículo con pago adelantado — permitir sin precargar datos
+                    setVehiculos(vehiculos.map(v => v.id === id ? { ...v, yaPagado: false, esPA: true } : v));
+                    setAlertMessage({msg: `Lote ${loteLimpio} tiene pago adelantado de $${docData.anticipoPago}.`, tipo: 'success'});
+                    setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                } else {
                 // Lote YA PAGADO - Permitir pero marcar como advertencia
                 // Solo mostrar alerta visual si es admin
                 if (user.admin) {
@@ -494,6 +501,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
                 }
                 setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: true} : v));
+                }
             } else if (docT.exists) {
                 // Validar si el viaje asignado realmente sigue existiendo; si no, es huérfano
                 const viajeAsignadoId = docT.data()?.viajeAsignado;
