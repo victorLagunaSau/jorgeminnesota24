@@ -16,6 +16,8 @@ const SolicitarPage = () => {
     const [lotNumber, setLotNumber] = useState("");
     const [gatePass, setGatePass] = useState("");
     const [searching, setSearching] = useState(false);
+    const [searchProgress, setSearchProgress] = useState(0);
+    const [searchStep, setSearchStep] = useState("");
     const [vehicleResult, setVehicleResult] = useState(null);
     const [searchError, setSearchError] = useState("");
 
@@ -75,6 +77,24 @@ const SolicitarPage = () => {
         setSearching(true);
         setSearchError("");
         setVehicleResult(null);
+        setSearchProgress(0);
+        setSearchStep("Conectando con subastas...");
+
+        // Progreso simulado que avanza mientras espera la respuesta real
+        const steps = [
+            { at: 5, text: "Conectando...", pct: 10 },
+            { at: 1500, text: "Buscando vehículo...", pct: 25 },
+            { at: 3500, text: "Revisando subastas...", pct: 45 },
+            { at: 5500, text: "Analizando resultados...", pct: 65 },
+            { at: 7500, text: "Extrayendo datos del vehículo...", pct: 85 },
+        ];
+
+        const timers = steps.map(s =>
+            setTimeout(() => {
+                setSearchProgress(s.pct);
+                setSearchStep(s.text);
+            }, s.at)
+        );
 
         try {
             const response = await fetch("https://jorgeminnesota.duckdns.org/api/scrape", {
@@ -86,15 +106,23 @@ const SolicitarPage = () => {
                 body: JSON.stringify({ lotNumber: lotNumber.trim(), gatePass: gatePass.trim() })
             });
 
+            timers.forEach(t => clearTimeout(t));
+
             const data = await response.json();
 
             if (!response.ok) {
+                setSearchProgress(0);
                 setSearchError(data.error || "Error al buscar vehículo");
                 return;
             }
 
+            setSearchProgress(100);
+            setSearchStep("¡Vehículo encontrado!");
+            await new Promise(r => setTimeout(r, 500));
             setVehicleResult(data.vehicle);
         } catch (error) {
+            timers.forEach(t => clearTimeout(t));
+            setSearchProgress(0);
             setSearchError("Error de conexión. Intenta de nuevo.");
         } finally {
             setSearching(false);
@@ -342,7 +370,7 @@ const SolicitarPage = () => {
                                 >
                                     {searching ? (
                                         <>
-                                            <FaSpinner className="animate-spin mr-2"/> Buscando en IAA y Copart...
+                                            <FaSpinner className="animate-spin mr-2"/> Buscando...
                                         </>
                                     ) : (
                                         <>
@@ -351,6 +379,51 @@ const SolicitarPage = () => {
                                     )}
                                 </button>
                             </form>
+
+                            {/* Barra de progreso */}
+                            {searching && (
+                                <div className="mt-5 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                                            <span className="text-sm font-medium text-gray-700">{searchStep}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-blue-600">{searchProgress}%</span>
+                                    </div>
+                                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-600 to-blue-500 transition-all duration-700 ease-out"
+                                            style={{ width: `${searchProgress}%`, backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }}
+                                        ></div>
+                                    </div>
+                                    <style jsx>{`
+                                        @keyframes shimmer {
+                                            0% { background-position: 200% 0; }
+                                            100% { background-position: -200% 0; }
+                                        }
+                                    `}</style>
+                                    <div className="flex items-center justify-center gap-6 pt-1">
+                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 25 ? "text-blue-600" : "text-gray-400"}`}>
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 25 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                                {searchProgress >= 45 ? <FaCheckCircle /> : "1"}
+                                            </div>
+                                            Conexión
+                                        </div>
+                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 45 ? "text-blue-600" : "text-gray-400"}`}>
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 45 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                                {searchProgress >= 65 ? <FaCheckCircle /> : "2"}
+                                            </div>
+                                            Búsqueda
+                                        </div>
+                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 80 ? "text-blue-600" : "text-gray-400"}`}>
+                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 80 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
+                                                {searchProgress >= 100 ? <FaCheckCircle /> : "3"}
+                                            </div>
+                                            Datos
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             {searchError && (
                                 <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
