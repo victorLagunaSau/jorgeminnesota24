@@ -18,6 +18,45 @@ app.use((req, res, next) => {
 const API_KEY = process.env.SCRAPER_API_KEY || 'CHANGE_ME_TO_A_SECURE_KEY';
 const PORT = process.env.PORT || 4000;
 
+// Browser persistente — se reutiliza entre requests.
+// Cada request usa su propio BrowserContext efímero (cookies/storage limpios),
+// para que bid.cars / Cloudflare no flagueen la sesión tras el primer scrape.
+let browserInstance = null;
+let browserLaunchPromise = null;
+
+async function getBrowser() {
+  if (browserInstance && browserInstance.connected) {
+    return browserInstance;
+  }
+  if (browserLaunchPromise) {
+    return browserLaunchPromise;
+  }
+  browserLaunchPromise = puppeteer.launch({
+    headless: 'shell',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--window-size=1920,1080'
+    ]
+  }).then(b => {
+    browserInstance = b;
+    browserLaunchPromise = null;
+    console.log('[BROWSER] Launched persistent browser');
+    b.on('disconnected', () => {
+      console.log('[BROWSER] Disconnected — will relaunch on next request');
+      if (browserInstance === b) browserInstance = null;
+    });
+    return b;
+  }).catch(err => {
+    browserLaunchPromise = null;
+    throw err;
+  });
+  return browserLaunchPromise;
+}
+
 // Middleware de autenticación
 function authMiddleware(req, res, next) {
   const key = req.headers['x-api-key'];
@@ -28,22 +67,14 @@ function authMiddleware(req, res, next) {
 }
 
 async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
-  let browser;
+  let context;
+  let page;
 
   try {
-    browser = await puppeteer.launch({
-      headless: 'shell',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--window-size=1920,1080'
-      ]
-    });
-
-    const page = await browser.newPage();
+    const browser = await getBrowser();
+    // Contexto efímero por request: cookies / storage / fingerprint limpios.
+    context = await browser.createBrowserContext();
+    page = await context.newPage();
 
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -59,16 +90,15 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
 
     const url = `https://bid.cars/en/lot/${prefix}-${lotNumber}`;
     await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 60000
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
     });
 
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    await page.waitForSelector('body', { timeout: 10000 });
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const pageText = await page.evaluate(() => document.body.innerText.toLowerCase());
     if (pageText.includes('not found') || pageText.includes('404') || pageText.includes('does not exist')) {
-      await browser.close();
+      await context.close();
       return null;
     }
 
@@ -174,7 +204,7 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
       return { make, model, year, vin, location, imageUrl, auctionDate };
     });
 
-    await browser.close();
+    await context.close();
 
     if (!vehicleInfo.make && !vehicleInfo.model && !vehicleInfo.year && !vehicleInfo.vin) {
       return null;
@@ -190,8 +220,8 @@ async function scrapeSingleSource(lotNumber, prefix, sourceName, gatePass) {
 
   } catch (error) {
     console.error(`[${sourceName}] Error:`, error.message);
-    if (browser) {
-      try { await browser.close(); } catch (e) {}
+    if (context) {
+      try { await context.close(); } catch (e) {}
     }
     return null;
   }
@@ -219,6 +249,7 @@ app.post('/api/scrape', authMiddleware, async (req, res) => {
   }
 
   console.log(`[SCRAPE] Searching lot ${lotNumber} with gate pass ${gatePass}`);
+  const start = Date.now();
 
   try {
     const [iaa, copart] = await Promise.all([
@@ -227,13 +258,14 @@ app.post('/api/scrape', authMiddleware, async (req, res) => {
     ]);
 
     const result = iaa || copart;
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
     if (!result) {
-      console.log(`[SCRAPE] Not found: lot ${lotNumber}`);
+      console.log(`[SCRAPE] Not found: lot ${lotNumber} (${elapsed}s)`);
       return res.status(404).json({ error: 'Vehicle not found in IAA or Copart' });
     }
 
-    console.log(`[SCRAPE] Found: ${result.year} ${result.make} ${result.model} (${result.source})`);
+    console.log(`[SCRAPE] Found: ${result.year} ${result.make} ${result.model} (${result.source}) in ${elapsed}s`);
     return res.status(200).json({ vehicle: result, sources: { iaa: !!iaa, copart: !!copart } });
 
   } catch (error) {
@@ -242,7 +274,10 @@ app.post('/api/scrape', authMiddleware, async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Iniciar servidor y pre-lanzar browser
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`Scraper service running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
+  await getBrowser();
+  console.log('[BROWSER] Ready');
 });

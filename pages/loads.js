@@ -1,26 +1,79 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Head from "next/head";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useAuthContext } from "../context/auth";
 import { firestore } from "../firebase/firebaseIni";
 import {
     FaCar, FaUser, FaMapMarkerAlt, FaSearch,
     FaTruck, FaEye, FaTimes, FaLock,
     FaSignOutAlt, FaArrowLeft, FaChevronDown, FaChevronRight,
-    FaGavel, FaBarcode, FaKey, FaCalendarAlt, FaBuilding
+    FaGavel, FaBarcode, FaKey, FaCalendarAlt, FaBuilding,
+    FaMap, FaList, FaTrash, FaCheck, FaCheckCircle
 } from "react-icons/fa";
+
+// Coordenadas centrales de cada estado de USA [lng, lat]
+const STATE_COORDS = {
+    'Alabama': [-86.9023, 32.3182], 'Alaska': [-153.4937, 64.2008],
+    'Arizona': [-111.0937, 34.0489], 'Arkansas': [-92.3731, 34.7465],
+    'California': [-119.4179, 36.7783], 'Colorado': [-105.7821, 39.5501],
+    'Connecticut': [-72.7554, 41.6032], 'Delaware': [-75.5277, 38.9108],
+    'Florida': [-81.5158, 27.6648], 'Georgia': [-83.6431, 32.1656],
+    'Hawaii': [-155.6659, 19.8968], 'Idaho': [-114.742, 44.0682],
+    'Illinois': [-89.3985, 40.6331], 'Indiana': [-86.1349, 40.2672],
+    'Iowa': [-93.0977, 41.878], 'Kansas': [-98.4842, 39.0119],
+    'Kentucky': [-84.270, 37.8393], 'Louisiana': [-91.9623, 30.9843],
+    'Maine': [-69.4455, 45.2538], 'Maryland': [-76.6413, 39.0458],
+    'Massachusetts': [-71.3824, 42.4072], 'Michigan': [-84.5361, 44.3148],
+    'Minnesota': [-94.6859, 46.7296], 'Mississippi': [-89.3985, 32.3547],
+    'Missouri': [-91.8318, 37.9643], 'Montana': [-110.3626, 46.8797],
+    'Nebraska': [-99.9018, 41.4925], 'Nevada': [-116.4194, 38.8026],
+    'New Hampshire': [-71.5724, 43.1939], 'New Jersey': [-74.4057, 40.0583],
+    'New Mexico': [-105.8701, 34.5199], 'New York': [-74.2179, 43.2994],
+    'North Carolina': [-79.0193, 35.7596], 'North Dakota': [-101.002, 47.5515],
+    'Ohio': [-82.9071, 40.4173], 'Oklahoma': [-97.0929, 35.4676],
+    'Oregon': [-120.5542, 43.8041], 'Pennsylvania': [-77.1945, 41.2033],
+    'Rhode Island': [-71.4774, 41.5801], 'South Carolina': [-81.1637, 33.8361],
+    'South Dakota': [-99.9018, 43.9695], 'Tennessee': [-86.5804, 35.5175],
+    'Texas': [-99.9018, 31.9686], 'Utah': [-111.0937, 39.3210],
+    'Vermont': [-72.5778, 44.5588], 'Virginia': [-78.6569, 37.4316],
+    'Washington': [-120.7401, 47.7511], 'West Virginia': [-80.4549, 38.5976],
+    'Wisconsin': [-89.6165, 43.7844], 'Wyoming': [-107.2903, 42.756],
+    'Sin ubicación': [-98.5795, 39.8283], 'Otro': [-98.5795, 39.8283]
+};
+
+const US_STATES_MAP = {
+    'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+    'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+    'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+    'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+    'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+    'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+    'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+    'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+    'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+    'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+    'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+    'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+    'HI': 'Hawaii', 'AK': 'Alaska'
+};
+
+// Mapa cargado dinámicamente (SSR off — usa d3 internamente)
+const MapChart = dynamic(() => import("../components/features/solicitudes/MapaUSA"), { ssr: false });
 
 const LoadsPage = () => {
     const { user, loading, isAdmin, isEmpresa, isChofer, signIn, signOut } = useAuthContext();
 
     const [solicitudes, setSolicitudes] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
-    const [filtro, setFiltro] = useState("todas");
     const [busqueda, setBusqueda] = useState("");
     const [modalDetalle, setModalDetalle] = useState(null);
     const [imagenAmpliada, setImagenAmpliada] = useState(null);
     const [actualizando, setActualizando] = useState(null);
     const [estadosAbiertos, setEstadosAbiertos] = useState({});
+    const [vista, setVista] = useState("mapa"); // "mapa", "lista" o "completados"
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const mapaContainerRef = useRef(null);
 
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
@@ -28,39 +81,35 @@ const LoadsPage = () => {
 
     const tieneAcceso = isAdmin || isEmpresa || isChofer;
 
-    // Extraer estado de USA de la ubicación
-    const extraerEstadoUSA = (location) => {
-        if (!location) return "Sin ubicación";
-
-        const estados = {
-            'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
-            'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
-            'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
-            'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
-            'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
-            'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
-            'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
-            'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
-            'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
-            'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
-            'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
-            'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
-            'HI': 'Hawaii', 'AK': 'Alaska'
-        };
-
-        const match = location.match(/\b([A-Z]{2})\b/);
-        if (match && estados[match[1]]) {
-            return estados[match[1]];
+    // Fullscreen handler — vive en el padre para que no se pierda al re-render
+    const toggleFullscreen = useCallback(() => {
+        if (!mapaContainerRef.current) return;
+        if (!document.fullscreenElement) {
+            mapaContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+        } else {
+            document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
         }
+    }, []);
 
-        for (const [code, name] of Object.entries(estados)) {
+    useEffect(() => {
+        const handler = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener("fullscreenchange", handler);
+        return () => document.removeEventListener("fullscreenchange", handler);
+    }, []);
+
+    const extraerEstadoUSA = useCallback((location) => {
+        if (!location) return "Sin ubicación";
+        const match = location.match(/\b([A-Z]{2})\b/);
+        if (match && US_STATES_MAP[match[1]]) {
+            return US_STATES_MAP[match[1]];
+        }
+        for (const [code, name] of Object.entries(US_STATES_MAP)) {
             if (location.toLowerCase().includes(name.toLowerCase())) {
                 return name;
             }
         }
-
         return "Otro";
-    };
+    }, []);
 
     useEffect(() => {
         if (!user || !tieneAcceso) {
@@ -81,11 +130,13 @@ const LoadsPage = () => {
                 setLoadingSolicitudes(false);
 
                 const estadosUnicos = [...new Set(lista.map(s => extraerEstadoUSA(s.location)))];
-                const estadosIniciales = {};
-                estadosUnicos.forEach(estado => {
-                    estadosIniciales[estado] = true;
+                setEstadosAbiertos(prev => {
+                    const nuevos = {};
+                    estadosUnicos.forEach(estado => {
+                        nuevos[estado] = prev[estado] || false;
+                    });
+                    return nuevos;
                 });
-                setEstadosAbiertos(estadosIniciales);
             }, (error) => {
                 console.error("Error cargando solicitudes:", error);
                 setLoadingSolicitudes(false);
@@ -93,6 +144,16 @@ const LoadsPage = () => {
 
         return () => unsubscribe();
     }, [user, tieneAcceso]);
+
+    const eliminarSolicitud = async (id) => {
+        if (!confirm("¿Estás seguro de eliminar esta solicitud?")) return;
+        try {
+            await firestore().collection("solicitudesVehiculos").doc(id).delete();
+            if (modalDetalle?.id === id) setModalDetalle(null);
+        } catch (error) {
+            console.error("Error eliminando solicitud:", error);
+        }
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -129,8 +190,6 @@ const LoadsPage = () => {
     const getEstadoConfig = (estado) => {
         const config = {
             pendiente: { bg: "bg-amber-500", text: "text-amber-600", light: "bg-amber-50", label: "Pendiente" },
-            aprobado: { bg: "bg-blue-500", text: "text-blue-600", light: "bg-blue-50", label: "Aprobado" },
-            en_proceso: { bg: "bg-purple-500", text: "text-purple-600", light: "bg-purple-50", label: "En Proceso" },
             completado: { bg: "bg-green-500", text: "text-green-600", light: "bg-green-50", label: "Completado" }
         };
         return config[estado] || config.pendiente;
@@ -148,16 +207,18 @@ const LoadsPage = () => {
         });
     };
 
-    const solicitudesFiltradas = solicitudes.filter(s => {
-        const matchEstado = filtro === "todas" || s.estado === filtro;
-        const matchBusqueda = !busqueda ||
-            s.clienteNombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            s.lotNumber?.includes(busqueda) ||
-            s.make?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            s.model?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            s.location?.toLowerCase().includes(busqueda.toLowerCase());
-        return matchEstado && matchBusqueda;
-    });
+    const matchBusqueda = (s) => !busqueda ||
+        s.clienteNombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        s.lotNumber?.includes(busqueda) ||
+        s.make?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        s.model?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        s.location?.toLowerCase().includes(busqueda.toLowerCase());
+
+    // Pendientes: mapa y lista solo muestran pendientes
+    const solicitudesFiltradas = solicitudes.filter(s => s.estado !== "completado" && matchBusqueda(s));
+
+    // Completados: para la pestaña Completados
+    const solicitudesCompletadas = solicitudes.filter(s => s.estado === "completado" && matchBusqueda(s));
 
     const solicitudesPorEstado = useMemo(() => {
         const grupos = {};
@@ -173,11 +234,21 @@ const LoadsPage = () => {
         return ordenado;
     }, [solicitudesFiltradas]);
 
+    // Markers para el mapa
+    const markers = useMemo(() => {
+        const porEstado = {};
+        solicitudesFiltradas.forEach(sol => {
+            const estado = extraerEstadoUSA(sol.location);
+            if (!porEstado[estado]) {
+                porEstado[estado] = { estado, solicitudes: [], coords: STATE_COORDS[estado] || STATE_COORDS['Otro'] };
+            }
+            porEstado[estado].solicitudes.push(sol);
+        });
+        return Object.values(porEstado);
+    }, [solicitudesFiltradas]);
+
     const contadores = {
-        todas: solicitudes.length,
-        pendiente: solicitudes.filter(s => s.estado === "pendiente").length,
-        aprobado: solicitudes.filter(s => s.estado === "aprobado").length,
-        en_proceso: solicitudes.filter(s => s.estado === "en_proceso").length,
+        pendiente: solicitudes.filter(s => s.estado !== "completado").length,
         completado: solicitudes.filter(s => s.estado === "completado").length
     };
 
@@ -280,72 +351,160 @@ const LoadsPage = () => {
                                     Solicitudes de Vehículos
                                 </h1>
                                 <p className="text-gray-500 text-xs">
-                                    {solicitudesFiltradas.length} solicitudes en {solicitudesPorEstado.length} estados
+                                    {contadores.pendiente} pendientes · {contadores.completado} completados
                                 </p>
                             </div>
                         </div>
-                        <button
-                            onClick={() => signOut()}
-                            className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-white hover:bg-red-600 rounded-lg transition-colors text-sm font-medium border border-gray-300 hover:border-red-600"
-                        >
-                            <FaSignOutAlt /> Salir
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {/* Toggle vista */}
+                            <div className="flex bg-gray-100 rounded-lg border border-gray-300 p-0.5">
+                                <button
+                                    onClick={() => setVista("mapa")}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+                                        vista === "mapa"
+                                            ? "bg-red-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:text-gray-800"
+                                    }`}
+                                >
+                                    <FaMap /> Mapa
+                                </button>
+                                <button
+                                    onClick={() => setVista("lista")}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+                                        vista === "lista"
+                                            ? "bg-red-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:text-gray-800"
+                                    }`}
+                                >
+                                    <FaList /> Lista
+                                </button>
+                                <button
+                                    onClick={() => setVista("completados")}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-xs font-semibold transition-all ${
+                                        vista === "completados"
+                                            ? "bg-green-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:text-gray-800"
+                                    }`}
+                                >
+                                    <FaCheckCircle /> Completados
+                                    {contadores.completado > 0 && (
+                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                            vista === "completados" ? "bg-green-500" : "bg-gray-300 text-gray-600"
+                                        }`}>
+                                            {contadores.completado}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => signOut()}
+                                className="flex items-center gap-2 px-4 py-2.5 text-gray-600 hover:text-white hover:bg-red-600 rounded-lg transition-colors text-sm font-medium border border-gray-300 hover:border-red-600"
+                            >
+                                <FaSignOutAlt /> <span className="hidden sm:inline">Salir</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </header>
 
             <main className="container mx-auto px-4 py-6 max-w-6xl">
                 <div className="space-y-6">
-                    {/* Filtros */}
+                    {/* Búsqueda */}
                     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-4">
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="relative flex-1">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                                <input
-                                    type="text"
-                                    placeholder="Buscar por cliente, lote, marca, ubicación..."
-                                    value={busqueda}
-                                    onChange={(e) => setBusqueda(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white"
-                                />
-                            </div>
-                            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
-                                {["todas", "pendiente", "aprobado", "en_proceso", "completado"].map((estado) => {
-                                    const isActive = filtro === estado;
-                                    const config = estado !== "todas" ? getEstadoConfig(estado) : null;
-                                    return (
-                                        <button
-                                            key={estado}
-                                            onClick={() => setFiltro(estado)}
-                                            className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all shadow-sm ${
-                                                isActive
-                                                    ? "bg-red-600 text-white shadow-red-200"
-                                                    : "bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200 hover:border-gray-400"
-                                            }`}
-                                        >
-                                            {estado === "todas" ? "Todas" : config?.label} ({contadores[estado]})
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                        <div className="relative">
+                            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por cliente, lote, marca, ubicación..."
+                                value={busqueda}
+                                onChange={(e) => setBusqueda(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white"
+                            />
                         </div>
                     </div>
 
-                    {/* Grid de Cards agrupadas por estado */}
+                    {/* Contenido */}
                     {loadingSolicitudes ? (
                         <div className="flex justify-center py-20">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
                         </div>
+                    ) : vista === "completados" ? (
+                        /* ========== VISTA COMPLETADOS ========== */
+                        solicitudesCompletadas.length === 0 ? (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                                <FaCheckCircle className="text-4xl text-gray-300 mx-auto mb-4" />
+                                <p className="text-gray-500">No hay solicitudes completadas</p>
+                            </div>
+                        ) : (
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {solicitudesCompletadas.map((sol) => (
+                                    <div key={sol.id} className="bg-white border border-gray-300 rounded-xl overflow-hidden hover:shadow-lg hover:border-gray-400 transition-all shadow-sm">
+                                        <div
+                                            className="relative w-full h-44 bg-gradient-to-br from-gray-200 to-gray-300 cursor-pointer group"
+                                            onClick={() => sol.imageUrl && setImagenAmpliada(sol.imageUrl)}
+                                        >
+                                            {sol.imageUrl ? (
+                                                <img src={sol.imageUrl} alt={`${sol.year} ${sol.make} ${sol.model}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center"><FaCar className="text-4xl text-gray-400" /></div>
+                                            )}
+                                            <span className="absolute top-3 right-3 px-2 py-1 rounded-full text-[10px] font-bold text-white bg-green-500">Completado</span>
+                                        </div>
+                                        <div className="p-4">
+                                            <div className="flex items-start justify-between gap-2 mb-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-base font-bold text-gray-800 truncate">{sol.year} {sol.make} {sol.model}</h3>
+                                                    <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">{sol.source || 'N/A'}</span>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => setModalDetalle(sol)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><FaEye /></button>
+                                                    <button onClick={() => eliminarSolicitud(sol.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><FaTrash size={13} /></button>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                                    <FaBarcode className="text-gray-400" />
+                                                    <div><p className="text-gray-400 text-[10px]">Lote</p><p className="text-gray-700 font-mono font-medium">{sol.lotNumber || 'N/A'}</p></div>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
+                                                    <FaUser className="text-gray-400" />
+                                                    <div><p className="text-gray-400 text-[10px]">Cliente</p><p className="text-gray-700 font-medium truncate">{sol.clienteNombre || 'N/A'}</p></div>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded col-span-2">
+                                                    <FaMapMarkerAlt className="text-gray-400" />
+                                                    <div className="flex-1 min-w-0"><p className="text-gray-400 text-[10px]">Location</p><p className="text-gray-700 font-medium truncate">{sol.location || 'N/A'}</p></div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                <p className="text-xs text-gray-400">Completado: {formatDate(sol.fechaCompletado)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
                     ) : solicitudesFiltradas.length === 0 ? (
                         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
                             <FaTruck className="text-4xl text-gray-300 mx-auto mb-4" />
-                            <p className="text-gray-500">No hay solicitudes</p>
+                            <p className="text-gray-500">No hay solicitudes pendientes</p>
+                        </div>
+                    ) : vista === "mapa" ? (
+                        /* ========== VISTA MAPA ========== */
+                        <div ref={mapaContainerRef} className="rounded-xl shadow-md border overflow-hidden bg-gray-900 border-gray-700">
+                            <MapChart
+                                solicitudes={solicitudesFiltradas}
+                                onSelectSolicitud={(sol) => setModalDetalle(sol)}
+                                getEstadoConfig={getEstadoConfig}
+                                formatDate={formatDate}
+                                isFullscreen={isFullscreen}
+                                toggleFullscreen={toggleFullscreen}
+                            />
                         </div>
                     ) : (
+                        /* ========== VISTA LISTA ========== */
                         <div className="space-y-4">
                             {solicitudesPorEstado.map(([estadoUSA, solicitudesGrupo]) => (
                                 <div key={estadoUSA} className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                                    {/* Header del estado */}
                                     <button
                                         onClick={() => toggleEstado(estadoUSA)}
                                         className="w-full px-4 py-4 flex items-center justify-between bg-gray-50 border-b border-gray-200 hover:bg-gray-100 transition-all"
@@ -368,14 +527,12 @@ const LoadsPage = () => {
                                         </div>
                                     </button>
 
-                                    {/* Cards del estado */}
                                     {estadosAbiertos[estadoUSA] && (
                                         <div className="p-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3 bg-gray-100">
                                             {solicitudesGrupo.map((sol) => {
                                                 const estadoConfig = getEstadoConfig(sol.estado);
                                                 return (
                                                     <div key={sol.id} className="bg-white border border-gray-300 rounded-xl overflow-hidden hover:shadow-lg hover:border-gray-400 transition-all shadow-sm">
-                                                        {/* Imagen clickeable */}
                                                         <div
                                                             className="relative w-full h-44 bg-gradient-to-br from-gray-200 to-gray-300 cursor-pointer group"
                                                             onClick={() => sol.imageUrl && setImagenAmpliada(sol.imageUrl)}
@@ -391,11 +548,9 @@ const LoadsPage = () => {
                                                                     <FaCar className="text-4xl text-gray-400" />
                                                                 </div>
                                                             )}
-                                                            {/* Badge de estado */}
                                                             <span className={`absolute top-3 right-3 px-2 py-1 rounded-full text-[10px] font-bold text-white ${estadoConfig.bg}`}>
                                                                 {estadoConfig.label}
                                                             </span>
-                                                            {/* Overlay para ampliar */}
                                                             {sol.imageUrl && (
                                                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                                                     <span className="opacity-0 group-hover:opacity-100 bg-white/90 px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 transition-opacity">
@@ -405,7 +560,6 @@ const LoadsPage = () => {
                                                             )}
                                                         </div>
 
-                                                        {/* Content */}
                                                         <div className="p-4">
                                                             <div className="flex items-start justify-between gap-2 mb-3">
                                                                 <div className="flex-1 min-w-0">
@@ -418,15 +572,22 @@ const LoadsPage = () => {
                                                                         </span>
                                                                     </div>
                                                                 </div>
-                                                                <button
-                                                                    onClick={() => setModalDetalle(sol)}
-                                                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                >
-                                                                    <FaEye />
-                                                                </button>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        onClick={() => setModalDetalle(sol)}
+                                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    >
+                                                                        <FaEye />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => eliminarSolicitud(sol.id)}
+                                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    >
+                                                                        <FaTrash size={13} />
+                                                                    </button>
+                                                                </div>
                                                             </div>
 
-                                                            {/* Info del vehículo como en vehicle-search */}
                                                             <div className="grid grid-cols-2 gap-2 text-xs">
                                                                 <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
                                                                     <FaBarcode className="text-gray-400" />
@@ -465,7 +626,6 @@ const LoadsPage = () => {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Cliente */}
                                                             <div className="mt-3 pt-3 border-t border-gray-200">
                                                                 <div className="flex items-center gap-2">
                                                                     <FaUser className="text-red-500 text-xs" />
@@ -474,23 +634,19 @@ const LoadsPage = () => {
                                                                 <p className="text-xs text-gray-400 mt-1">Solicitado: {formatDate(sol.fechaSolicitud)}</p>
                                                             </div>
 
-                                                            {/* Cambiar Estado */}
-                                                            {sol.estado !== "completado" && (
-                                                                <div className="mt-3 pt-3 border-t border-gray-200">
-                                                                    <label className="text-xs text-gray-500 font-medium mb-1.5 block">Cambiar estado:</label>
-                                                                    <select
-                                                                        value={sol.estado}
-                                                                        onChange={(e) => cambiarEstado(sol.id, e.target.value)}
-                                                                        disabled={actualizando === sol.id}
-                                                                        className="w-full px-3 py-2.5 bg-gray-100 border-2 border-gray-300 rounded-lg text-gray-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 cursor-pointer hover:border-gray-400 transition-colors"
-                                                                    >
-                                                                        <option value="pendiente">Pendiente</option>
-                                                                        <option value="aprobado">Aprobado</option>
-                                                                        <option value="en_proceso">En Proceso</option>
-                                                                        <option value="completado">Completado</option>
-                                                                    </select>
-                                                                </div>
-                                                            )}
+                                                            <div className="mt-3 pt-3 border-t border-gray-200">
+                                                                <button
+                                                                    onClick={() => cambiarEstado(sol.id, "completado")}
+                                                                    disabled={actualizando === sol.id}
+                                                                    className="w-full py-2.5 bg-green-50 text-green-700 font-medium text-sm rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2 border border-green-200 hover:border-green-300"
+                                                                >
+                                                                    {actualizando === sol.id ? (
+                                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                                                    ) : (
+                                                                        <><FaCheck size={12} /> Marcar como completado</>
+                                                                    )}
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 );
@@ -594,30 +750,26 @@ const LoadsPage = () => {
                                 </div>
 
                                 {modalDetalle.estado !== "completado" && (
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {["pendiente", "aprobado", "en_proceso", "completado"].map((estado) => {
-                                            const config = getEstadoConfig(estado);
-                                            const isActive = modalDetalle.estado === estado;
-                                            return (
-                                                <button
-                                                    key={estado}
-                                                    onClick={() => {
-                                                        cambiarEstado(modalDetalle.id, estado);
-                                                        setModalDetalle({ ...modalDetalle, estado });
-                                                    }}
-                                                    disabled={isActive}
-                                                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                                                        isActive
-                                                            ? `${config.bg} text-white`
-                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                                    }`}
-                                                >
-                                                    {config.label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            cambiarEstado(modalDetalle.id, "completado");
+                                            setModalDetalle({ ...modalDetalle, estado: "completado" });
+                                        }}
+                                        className="w-full py-2.5 bg-green-600 text-white font-medium text-sm rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <FaCheck size={12} /> Marcar como completado
+                                    </button>
                                 )}
+                            </div>
+
+                            {/* Botón eliminar en modal */}
+                            <div className="pt-4 border-t border-gray-200">
+                                <button
+                                    onClick={() => eliminarSolicitud(modalDetalle.id)}
+                                    className="w-full py-2.5 bg-red-50 text-red-600 font-medium text-sm rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <FaTrash size={12} /> Eliminar solicitud
+                                </button>
                             </div>
                         </div>
                     </div>
