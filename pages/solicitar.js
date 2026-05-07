@@ -77,7 +77,7 @@ const SolicitarPage = () => {
         setVehicleResult(null);
 
         try {
-            const response = await fetch("http://159.89.93.222:4000/api/scrape", {
+            const response = await fetch("https://jorgeminnesota.duckdns.org/api/scrape", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
