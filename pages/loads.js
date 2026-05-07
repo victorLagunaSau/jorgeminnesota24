@@ -187,6 +187,15 @@ const LoadsPage = () => {
         }));
     };
 
+    const getAgeColor = (fechaSolicitud) => {
+        if (!fechaSolicitud) return { bg: "bg-green-500", text: "text-green-600", border: "border-green-400", light: "bg-green-50", days: 0 };
+        const date = fechaSolicitud.toDate ? fechaSolicitud.toDate() : new Date(fechaSolicitud);
+        const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+        if (days >= 7) return { bg: "bg-red-500", text: "text-red-600", border: "border-red-400", light: "bg-red-50", days };
+        if (days >= 3) return { bg: "bg-amber-500", text: "text-amber-600", border: "border-amber-400", light: "bg-amber-50", days };
+        return { bg: "bg-green-500", text: "text-green-600", border: "border-green-400", light: "bg-green-50", days };
+    };
+
     const getEstadoConfig = (estado) => {
         const config = {
             pendiente: { bg: "bg-amber-500", text: "text-amber-600", light: "bg-amber-50", label: "Pendiente" },
@@ -195,16 +204,20 @@ const LoadsPage = () => {
         return config[estado] || config.pendiente;
     };
 
-    const formatDate = (timestamp) => {
+    const formatDate = (timestamp, includeTime = false) => {
         if (!timestamp) return "-";
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-        return date.toLocaleDateString("es-MX", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit"
-        });
+        if (isNaN(date.getTime())) return String(timestamp);
+        const opts = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
+        if (includeTime) { opts.hour = "2-digit"; opts.minute = "2-digit"; }
+        return date.toLocaleDateString("es-MX", opts);
+    };
+
+    const formatAuctionDate = (dateStr) => {
+        if (!dateStr) return "Sin fecha";
+        const parsed = new Date(dateStr);
+        if (isNaN(parsed.getTime())) return dateStr;
+        return parsed.toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
     };
 
     const matchBusqueda = (s) => !busqueda ||
@@ -228,6 +241,15 @@ const LoadsPage = () => {
                 grupos[estado] = [];
             }
             grupos[estado].push(sol);
+        });
+
+        // Dentro de cada grupo, ordenar por fecha más antigua primero
+        Object.values(grupos).forEach(arr => {
+            arr.sort((a, b) => {
+                const fechaA = a.fechaSolicitud?.toDate?.() || new Date(0);
+                const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
+                return fechaA - fechaB;
+            });
         });
 
         const ordenado = Object.entries(grupos).sort((a, b) => b[1].length - a[1].length);
@@ -528,125 +550,72 @@ const LoadsPage = () => {
                                     </button>
 
                                     {estadosAbiertos[estadoUSA] && (
-                                        <div className="p-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3 bg-gray-100">
+                                        <div className="divide-y divide-gray-100">
                                             {solicitudesGrupo.map((sol) => {
-                                                const estadoConfig = getEstadoConfig(sol.estado);
+                                                const age = getAgeColor(sol.fechaSolicitud);
                                                 return (
-                                                    <div key={sol.id} className="bg-white border border-gray-300 rounded-xl overflow-hidden hover:shadow-lg hover:border-gray-400 transition-all shadow-sm">
-                                                        <div
-                                                            className="relative w-full h-44 bg-gradient-to-br from-gray-200 to-gray-300 cursor-pointer group"
-                                                            onClick={() => sol.imageUrl && setImagenAmpliada(sol.imageUrl)}
-                                                        >
+                                                    <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-l-4 ${age.border}`}>
+                                                        {/* Indicador de color + imagen */}
+                                                        <div className="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200">
                                                             {sol.imageUrl ? (
-                                                                <img
-                                                                    src={sol.imageUrl}
-                                                                    alt={`${sol.year} ${sol.make} ${sol.model}`}
-                                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                                                />
+                                                                <img src={sol.imageUrl} alt="" className="w-full h-full object-cover cursor-pointer" onClick={() => setImagenAmpliada(sol.imageUrl)} />
                                                             ) : (
-                                                                <div className="w-full h-full flex items-center justify-center">
-                                                                    <FaCar className="text-4xl text-gray-400" />
-                                                                </div>
-                                                            )}
-                                                            <span className={`absolute top-3 right-3 px-2 py-1 rounded-full text-[10px] font-bold text-white ${estadoConfig.bg}`}>
-                                                                {estadoConfig.label}
-                                                            </span>
-                                                            {sol.imageUrl && (
-                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                                    <span className="opacity-0 group-hover:opacity-100 bg-white/90 px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 transition-opacity">
-                                                                        Click para ampliar
-                                                                    </span>
-                                                                </div>
+                                                                <div className="w-full h-full flex items-center justify-center"><FaCar className="text-gray-400" /></div>
                                                             )}
                                                         </div>
 
-                                                        <div className="p-4">
-                                                            <div className="flex items-start justify-between gap-2 mb-3">
-                                                                <div className="flex-1 min-w-0">
-                                                                    <h3 className="text-base font-bold text-gray-800 truncate">
-                                                                        {sol.year} {sol.make} {sol.model}
-                                                                    </h3>
-                                                                    <div className="flex items-center gap-2 mt-1">
-                                                                        <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                                                                            {sol.source || 'N/A'}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex gap-1">
-                                                                    <button
-                                                                        onClick={() => setModalDetalle(sol)}
-                                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                    >
-                                                                        <FaEye />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => eliminarSolicitud(sol.id)}
-                                                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                    >
-                                                                        <FaTrash size={13} />
-                                                                    </button>
-                                                                </div>
+                                                        {/* Info principal */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-xs text-gray-400 font-bold mb-0.5 flex items-center gap-1">
+                                                                Cliente: <FaUser className="text-[10px]" /> {(sol.clienteNombre || 'Sin cliente').replace(/\b\w/g, c => c.toUpperCase())}
+                                                            </p>
+                                                            <div className="flex items-center gap-2">
+                                                                <h3 className="text-sm font-bold text-gray-800 truncate">{sol.year} {sol.make} {sol.model}</h3>
+                                                                <span className="bg-gray-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0">{sol.source || 'N/A'}</span>
+                                                                <span className={`${age.bg} text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0`}>{age.days}d</span>
                                                             </div>
+                                                            <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                                                                <span className="flex items-center gap-1">
+                                                                    <FaBarcode className="text-gray-400 text-[10px]" />
+                                                                    <span className="font-mono">{sol.lotNumber || 'N/A'}</span>
+                                                                </span>
+                                                                <span className="flex items-center gap-1 truncate">
+                                                                    <FaMapMarkerAlt className="text-gray-400 text-[10px] flex-shrink-0" />
+                                                                    <span className="truncate">{sol.location || 'N/A'}</span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex flex-col gap-0.5 mt-0.5 text-xs text-gray-400">
+                                                                <span className="flex items-center gap-1">
+                                                                    <FaGavel className="text-[10px]" />
+                                                                    Comprado: {formatAuctionDate(sol.auctionDate)}
+                                                                </span>
+                                                                <span className="flex items-center gap-1">
+                                                                    <FaCalendarAlt className="text-[10px]" />
+                                                                    Ordenado: {formatDate(sol.fechaSolicitud, true)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
 
-                                                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
-                                                                    <FaBarcode className="text-gray-400" />
-                                                                    <div>
-                                                                        <p className="text-gray-400 text-[10px]">Lote</p>
-                                                                        <p className="text-gray-700 font-mono font-medium">{sol.lotNumber || 'N/A'}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded">
-                                                                    <FaKey className="text-gray-400" />
-                                                                    <div>
-                                                                        <p className="text-gray-400 text-[10px]">Gate Pass</p>
-                                                                        <p className="text-gray-700 font-mono font-medium">{sol.gatePass || 'N/A'}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded col-span-2">
-                                                                    <FaBarcode className="text-gray-400" />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-gray-400 text-[10px]">VIN</p>
-                                                                        <p className="text-gray-700 font-mono font-medium truncate">{sol.vin || 'N/A'}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded col-span-2">
-                                                                    <FaMapMarkerAlt className="text-gray-400" />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-gray-400 text-[10px]">Location</p>
-                                                                        <p className="text-gray-700 font-medium truncate">{sol.location || 'N/A'}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded col-span-2">
-                                                                    <FaGavel className="text-gray-400" />
-                                                                    <div>
-                                                                        <p className="text-gray-400 text-[10px]">Fecha de Subasta</p>
-                                                                        <p className="text-gray-700 font-medium">{sol.auctionDate || 'No disponible'}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="mt-3 pt-3 border-t border-gray-200">
-                                                                <div className="flex items-center gap-2">
-                                                                    <FaUser className="text-red-500 text-xs" />
-                                                                    <span className="text-gray-700 font-medium text-sm">{sol.clienteNombre || 'Sin cliente'}</span>
-                                                                </div>
-                                                                <p className="text-xs text-gray-400 mt-1">Solicitado: {formatDate(sol.fechaSolicitud)}</p>
-                                                            </div>
-
-                                                            <div className="mt-3 pt-3 border-t border-gray-200">
-                                                                <button
-                                                                    onClick={() => cambiarEstado(sol.id, "completado")}
-                                                                    disabled={actualizando === sol.id}
-                                                                    className="w-full py-2.5 bg-green-50 text-green-700 font-medium text-sm rounded-lg hover:bg-green-100 transition-colors flex items-center justify-center gap-2 border border-green-200 hover:border-green-300"
-                                                                >
-                                                                    {actualizando === sol.id ? (
-                                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                                                                    ) : (
-                                                                        <><FaCheck size={12} /> Marcar como completado</>
-                                                                    )}
-                                                                </button>
-                                                            </div>
+                                                        {/* Acciones */}
+                                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                                            <button
+                                                                onClick={() => cambiarEstado(sol.id, "completado")}
+                                                                disabled={actualizando === sol.id}
+                                                                className="p-2 text-green-500 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors"
+                                                                title="Completar"
+                                                            >
+                                                                {actualizando === sol.id ? (
+                                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                                                ) : (
+                                                                    <FaCheck size={14} />
+                                                                )}
+                                                            </button>
+                                                            <button onClick={() => setModalDetalle(sol)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Ver detalle">
+                                                                <FaEye size={14} />
+                                                            </button>
+                                                            <button onClick={() => eliminarSolicitud(sol.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                                                <FaTrash size={13} />
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 );

@@ -278,12 +278,12 @@ function getLocationCoords(location) {
 }
 
 function getAgeColor(fechaSolicitud) {
-    if (!fechaSolicitud) return { fill: "#22c55e", fillHover: "#16a34a", pulse: "rgba(34, 197, 94, 0.2)", shadow: "rgba(34,197,94,0.6)", label: "Reciente" };
+    if (!fechaSolicitud) return { fill: "#22c55e", fillHover: "#16a34a", pulse: "rgba(34, 197, 94, 0.2)", shadow: "rgba(34,197,94,0.6)", days: 0 };
     const date = fechaSolicitud.toDate ? fechaSolicitud.toDate() : new Date(fechaSolicitud);
     const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-    if (days >= 7) return { fill: "#ef4444", fillHover: "#dc2626", pulse: "rgba(239, 68, 68, 0.2)", shadow: "rgba(239,68,68,0.6)", label: "7+ días", days };
-    if (days >= 3) return { fill: "#f59e0b", fillHover: "#d97706", pulse: "rgba(245, 158, 11, 0.2)", shadow: "rgba(245,158,11,0.6)", label: "3-6 días", days };
-    return { fill: "#22c55e", fillHover: "#16a34a", pulse: "rgba(34, 197, 94, 0.2)", shadow: "rgba(34,197,94,0.6)", label: "< 3 días", days };
+    if (days >= 7) return { fill: "#ef4444", fillHover: "#dc2626", pulse: "rgba(239, 68, 68, 0.2)", shadow: "rgba(239,68,68,0.6)", days };
+    if (days >= 3) return { fill: "#f59e0b", fillHover: "#d97706", pulse: "rgba(245, 158, 11, 0.2)", shadow: "rgba(245,158,11,0.6)", days };
+    return { fill: "#22c55e", fillHover: "#16a34a", pulse: "rgba(34, 197, 94, 0.2)", shadow: "rgba(34,197,94,0.6)", days };
 }
 
 function getGroupColor(solicitudes) {
@@ -301,6 +301,7 @@ const DEFAULT_ZOOM = 1;
 const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, isFullscreen, toggleFullscreen }) => {
     const [hoveredMarker, setHoveredMarker] = useState(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const [selectedMarker, setSelectedMarker] = useState(null);
     const [zoom, setZoom] = useState(DEFAULT_ZOOM);
     const [center, setCenter] = useState(DEFAULT_CENTER);
 
@@ -446,12 +447,11 @@ const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, 
                                 <Marker
                                     key={marker.coords.join(",")}
                                     coordinates={marker.coords}
-                                    onMouseEnter={() => setHoveredMarker(marker)}
-                                    onMouseLeave={() => setHoveredMarker(null)}
+                                    onMouseEnter={() => { if (!selectedMarker) setHoveredMarker(marker); }}
+                                    onMouseLeave={() => { if (!selectedMarker) setHoveredMarker(null); }}
                                     onClick={() => {
-                                        if (marker.solicitudes.length === 1) {
-                                            onSelectSolicitud(marker.solicitudes[0]);
-                                        }
+                                        setHoveredMarker(null);
+                                        setSelectedMarker(marker);
                                     }}
                                     style={{ cursor: "pointer" }}
                                 >
@@ -501,106 +501,115 @@ const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, 
                     {cityMarkers.reduce((acc, m) => acc + m.solicitudes.length, 0)} vehículos en {cityMarkers.length} ubicaciones
                 </p>
                 <div className="space-y-1.5">
-                    <div className={`flex items-center gap-2 text-xs ${"text-gray-400"}`}>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span className="w-3 h-3 bg-green-500 rounded-full inline-block flex-shrink-0"></span>
-                        <span>Menos de 3 días</span>
+                        <span>0-2 días</span>
                     </div>
-                    <div className={`flex items-center gap-2 text-xs ${"text-gray-400"}`}>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span className="w-3 h-3 bg-amber-500 rounded-full inline-block flex-shrink-0"></span>
-                        <span>3 a 6 días</span>
+                        <span>3-6 días</span>
                     </div>
-                    <div className={`flex items-center gap-2 text-xs ${"text-gray-400"}`}>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
                         <span className="w-3 h-3 bg-red-500 rounded-full inline-block flex-shrink-0"></span>
                         <span>7+ días</span>
                     </div>
                 </div>
             </div>
 
-            {/* Tooltip */}
-            {hoveredMarker && (
+            {/* Hover tooltip (mini) */}
+            {hoveredMarker && !selectedMarker && (
                 <div
                     className="fixed z-[100] pointer-events-none"
-                    style={{
-                        left: tooltipPos.x + 16,
-                        top: tooltipPos.y - 10,
-                        maxWidth: "360px",
-                    }}
+                    style={{ left: tooltipPos.x + 16, top: tooltipPos.y - 10 }}
                 >
-                    <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-                        <div className="bg-gray-800 px-4 py-2.5 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <FaMapMarkerAlt className="text-green-400 text-sm" />
-                                <span className="text-white font-bold text-sm">{hoveredMarker.label}</span>
+                    <div className="bg-gray-800 text-white rounded-lg shadow-xl px-3 py-2 text-xs font-medium flex items-center gap-2">
+                        <FaMapMarkerAlt className="text-green-400" />
+                        {hoveredMarker.label}
+                        <span className="bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            {hoveredMarker.solicitudes.length}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Popup fijo al hacer click */}
+            {selectedMarker && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={() => setSelectedMarker(null)}>
+                    <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden w-full max-w-md max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gray-800 px-5 py-3.5 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-2.5">
+                                <FaMapMarkerAlt className="text-green-400 text-base" />
+                                <span className="text-white font-bold text-base">{selectedMarker.label}</span>
                             </div>
-                            <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                {hoveredMarker.solicitudes.length}
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                    {selectedMarker.solicitudes.length} {selectedMarker.solicitudes.length === 1 ? 'vehículo' : 'vehículos'}
+                                </span>
+                                <button onClick={() => setSelectedMarker(null)} className="text-gray-400 hover:text-white transition-colors p-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="max-h-72 overflow-y-auto">
-                            {hoveredMarker.solicitudes.map((sol, i) => {
-                                const config = getEstadoConfig(sol.estado);
+                        {/* Lista de vehículos */}
+                        <div className="overflow-y-auto flex-1">
+                            {[...selectedMarker.solicitudes].sort((a, b) => {
+                                const fa = a.fechaSolicitud?.toDate?.() || new Date(0);
+                                const fb = b.fechaSolicitud?.toDate?.() || new Date(0);
+                                return fa - fb;
+                            }).map((sol, i) => {
                                 const ageColor = getAgeColor(sol.fechaSolicitud);
                                 return (
                                     <div
                                         key={sol.id}
-                                        className={`px-4 py-3 ${i > 0 ? "border-t border-gray-100" : ""} pointer-events-auto cursor-pointer hover:bg-gray-50`}
+                                        className={`px-5 py-4 ${i > 0 ? "border-t border-gray-100" : ""} hover:bg-gray-50 cursor-pointer transition-colors`}
                                         onClick={() => onSelectSolicitud(sol)}
                                     >
-                                        <div className="flex items-start gap-3">
+                                        <div className="flex items-start gap-4">
                                             {sol.imageUrl ? (
-                                                <img
-                                                    src={sol.imageUrl}
-                                                    alt=""
-                                                    className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-                                                />
+                                                <img src={sol.imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
                                             ) : (
-                                                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                                    <FaCar className="text-gray-400" />
+                                                <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                    <FaCar className="text-gray-400 text-xl" />
                                                 </div>
                                             )}
                                             <div className="flex-1 min-w-0">
+                                                <p className="text-xs text-gray-400 font-bold mb-0.5 flex items-center gap-1">
+                                                    Cliente: <FaUser className="text-[10px]" /> {(sol.clienteNombre || 'Sin cliente').replace(/\b\w/g, c => c.toUpperCase())}
+                                                </p>
                                                 <div className="flex items-center gap-2">
-                                                    <p className="text-sm font-bold text-gray-800 truncate flex-1">
+                                                    <p className="text-base font-bold text-gray-800 truncate flex-1">
                                                         {sol.year} {sol.make} {sol.model}
                                                     </p>
-                                                    <span
-                                                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                                                        style={{ backgroundColor: ageColor.fill }}
-                                                        title={ageColor.label}
-                                                    ></span>
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-1">
-                                                    <span className="bg-gray-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                                                    <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">
                                                         {sol.source}
                                                     </span>
-                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white ${config.bg}`}>
-                                                        {config.label}
-                                                    </span>
-                                                    {ageColor.days !== undefined && (
-                                                        <span className="text-[9px] font-medium" style={{ color: ageColor.fill }}>
-                                                            {ageColor.days}d
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-3 mt-1.5 text-[10px] text-gray-500">
-                                                    <span className="flex items-center gap-1">
-                                                        <FaBarcode className="text-[8px]" /> {sol.lotNumber}
-                                                    </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <FaUser className="text-[8px]" /> {sol.clienteNombre || "Sin cliente"}
+                                                    <span
+                                                        className="text-white text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                                        style={{ backgroundColor: ageColor.fill }}
+                                                    >
+                                                        {ageColor.days}d
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400">
-                                                    <span className="flex items-center gap-1">
-                                                        <FaMapMarkerAlt className="text-[8px]" /> {sol.location || "Sin ubicación"}
-                                                    </span>
-                                                </div>
-                                                {sol.auctionDate && (
-                                                    <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-400">
-                                                        <FaGavel className="text-[8px]" /> {sol.auctionDate}
+                                                <div className="mt-2 space-y-1 text-xs text-gray-500">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <FaBarcode className="text-gray-400 text-[10px]" />
+                                                        <span>Lote: <span className="font-mono font-medium">{sol.lotNumber}</span></span>
                                                     </div>
-                                                )}
+                                                    <div className="flex items-center gap-1.5">
+                                                        <FaMapMarkerAlt className="text-gray-400 text-[10px]" />
+                                                        <span className="truncate">{sol.location || 'Sin ubicación'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <FaGavel className="text-gray-400 text-[10px]" />
+                                                        <span>Comprado: {sol.auctionDate || 'Sin fecha'}</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
