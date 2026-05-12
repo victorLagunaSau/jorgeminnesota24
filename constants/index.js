@@ -17,6 +17,7 @@ export const COLLECTIONS = {
   SALIDAS_CAJA: "salidasCaja",
   SOLICITUDES_VEHICULOS: "solicitudesVehiculos",
   TOKENS_CHOFER: "tokensChofer",
+  TOKENS_CLIENTE: "tokensCliente",
   AUDIT_LOG: "auditLog",
   PAGOS_NOMINA: "pagosNomina",
 };

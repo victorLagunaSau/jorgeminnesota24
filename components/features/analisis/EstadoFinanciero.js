@@ -3,12 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
 import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaMoneyBillWave, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie } from 'react-icons/fa';
 
-const SEMANAS_OPTIONS = [
-    { value: 1, label: "Semana actual" },
-    { value: 2, label: "Últimas 2 semanas" },
-    { value: 3, label: "Últimas 3 semanas" },
-    { value: 4, label: "Últimas 4 semanas" },
-];
+const MESES_NOMBRES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 const getLunes = () => {
     const hoy = new Date();
@@ -18,6 +13,18 @@ const getLunes = () => {
     lunes.setDate(hoy.getDate() - diff);
     lunes.setHours(0, 0, 0, 0);
     return lunes;
+};
+
+// Generar meses disponibles (desde enero del año actual hasta el mes actual)
+const getMesesDisponibles = () => {
+    const hoy = new Date();
+    const anio = hoy.getFullYear();
+    const mesActual = hoy.getMonth();
+    const meses = [];
+    for (let i = 0; i <= mesActual; i++) {
+        meses.push({ value: i, label: MESES_NOMBRES[i], anio });
+    }
+    return meses;
 };
 
 const fmt = (n) => `$${Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
@@ -101,21 +108,42 @@ const SubItem = ({ label, monto, color = "text-gray-700", bg = "bg-gray-50", ite
 };
 
 const EstadoFinanciero = () => {
-    const [semanas, setSemanas] = useState(1);
+    const [modo, setModo] = useState("semana"); // "semana" | "meses"
+    const [mesesSeleccionados, setMesesSeleccionados] = useState([]);
     const [movimientos, setMovimientos] = useState([]);
     const [viajesPagados, setViajesPagados] = useState([]);
     const [pagosNomina, setPagosNomina] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalData, setModalData] = useState(null);
 
+    const mesesDisponibles = useMemo(() => getMesesDisponibles(), []);
+
+    const toggleMes = (mes) => {
+        setModo("meses");
+        setMesesSeleccionados(prev =>
+            prev.includes(mes) ? prev.filter(m => m !== mes) : [...prev, mes].sort((a, b) => a - b)
+        );
+    };
+
     const { fechaInicio, fechaFin } = useMemo(() => {
-        const lunes = getLunes();
-        const inicio = new Date(lunes);
-        inicio.setDate(inicio.getDate() - (semanas - 1) * 7);
-        const fin = new Date();
-        fin.setHours(23, 59, 59, 999);
+        if (modo === "semana") {
+            const lunes = getLunes();
+            const fin = new Date();
+            fin.setHours(23, 59, 59, 999);
+            return { fechaInicio: lunes, fechaFin: fin };
+        }
+        // Modo meses
+        if (mesesSeleccionados.length === 0) {
+            return { fechaInicio: new Date(), fechaFin: new Date() };
+        }
+        const anio = new Date().getFullYear();
+        const minMes = Math.min(...mesesSeleccionados);
+        const maxMes = Math.max(...mesesSeleccionados);
+        const inicio = new Date(anio, minMes, 1, 0, 0, 0, 0);
+        // Ultimo dia del mes mas alto
+        const fin = new Date(anio, maxMes + 1, 0, 23, 59, 59, 999);
         return { fechaInicio: inicio, fechaFin: fin };
-    }, [semanas]);
+    }, [modo, mesesSeleccionados]);
 
     useEffect(() => {
         setLoading(true);
@@ -303,16 +331,38 @@ const EstadoFinanciero = () => {
     return (
         <div className="w-full">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <div>
-                    <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Estado Financiero</h2>
-                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{formatFecha(fechaInicio)} — {formatFecha(fechaFin)}</p>
+            <div className="mb-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
+                    <div>
+                        <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Estado Financiero</h2>
+                        <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{formatFecha(fechaInicio)} — {formatFecha(fechaFin)}</p>
+                    </div>
+                    <button
+                        onClick={() => { setModo("semana"); setMesesSeleccionados([]); }}
+                        className={`btn btn-sm font-black uppercase gap-2 ${modo === "semana" ? "btn-error text-white" : "btn-outline"}`}
+                    >
+                        <FaCalendarWeek size={12} /> Semana Actual
+                    </button>
                 </div>
-                <div className="flex items-center gap-2">
-                    <FaCalendarWeek className="text-gray-400" />
-                    <select className="select select-sm bg-white border-2 border-gray-200 font-bold text-gray-700 rounded-xl" value={semanas} onChange={(e) => setSemanas(Number(e.target.value))}>
-                        {SEMANAS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
+                <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-[10px] font-black uppercase text-gray-400 mr-1">Meses:</span>
+                    {mesesDisponibles.map(m => (
+                        <button
+                            key={m.value}
+                            onClick={() => toggleMes(m.value)}
+                            className={`btn btn-xs font-black uppercase ${mesesSeleccionados.includes(m.value) ? "btn-error text-white" : "btn-outline btn-ghost"}`}
+                        >
+                            {m.label}
+                        </button>
+                    ))}
+                    {mesesSeleccionados.length > 0 && (
+                        <button
+                            onClick={() => { setMesesSeleccionados([]); setModo("semana"); }}
+                            className="btn btn-xs btn-ghost text-gray-400 font-bold uppercase"
+                        >
+                            <FaTimes size={10} /> Limpiar
+                        </button>
+                    )}
                 </div>
             </div>
 

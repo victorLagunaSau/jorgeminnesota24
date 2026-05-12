@@ -19,7 +19,9 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 **Stack:** Next.js 12.3.1, React 17, Tailwind CSS 3 + DaisyUI 4, Firebase v7 (Auth, Firestore, Storage, Functions), Puppeteer (auction scraping), Framer Motion (animations), moment.js (dates)
 
-**Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). No `next.config.js` — uses default Next.js 12 config. Additional server-side env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` (used in API routes only).
+**Deployment:** Main app on **Vercel**. Auction scraper on a **Digital Ocean VPS** (see `vps-scraper/`).
+
+**Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). `next.config.js` sets `images.unoptimized = true` for static export compatibility. Additional server-side env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` (used in API routes only), `SCRAPER_URL` + `SCRAPER_API_KEY` (VPS scraper connection), `FCM_SERVER_KEY` (push notifications).
 
 ### Key Architectural Patterns
 
@@ -65,7 +67,8 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `lotesEnTransito` — lot tracking
 - `auditLog` — audit trail entries
 - `config` — system configuration and sequential IDs
-- `tokensChofer` — FCM/push notification tokens for drivers
+- `tokensChofer` — temporary access tokens for drivers (6-char codes, not FCM)
+- `tokensCliente` — FCM push notification tokens for clients (saved from Capacitor app)
 - `pagosNomina` — payroll payments
 
 ### Pages and Routing
@@ -73,8 +76,20 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
 - **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `clients` + `solicitar` (cliente)
-- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging)
-- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF)
+- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients)
+- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF), `generarComisionesPDF.js` (commissions PDF)
+
+### VPS Scraper (`vps-scraper/`)
+
+Standalone Express + Puppeteer microservice deployed on a Digital Ocean VPS. Vercel can't run Puppeteer (serverless limits), so auction scraping is offloaded here.
+
+```
+Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars → response
+```
+
+- `vps-scraper/server.js` — Express server, persistent browser instance, ephemeral contexts per request
+- Requires `x-api-key` header matching `SCRAPER_API_KEY` env var
+- Has its own `CLAUDE.md` with setup/deployment instructions
 
 ### User Roles and Permissions
 
@@ -104,3 +119,49 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `firebase` is v7 (legacy namespace API, not modular v9+). All new Firebase code must use the `import firebase from "firebase/app"` + `firebase.firestore()` pattern — do not use v9 modular imports
 - Hardcoded name-based permission in `Sidebar.js`: `puedeVerAnticipos` checks if user name includes "olivia" or "cristela" to gate access to `historialAnticipos` and related sub-modules
 - `tailwind.config.js` defines `boxShadow` at top-level `theme` (not `theme.extend`), which replaces all default Tailwind shadows with a custom set — adding new shadow utilities requires updating this config
+
+## Mobile App (Capacitor)
+
+The client portal (`/clients`, `/solicitar`) is wrapped as a native iOS/Android app using **Capacitor 6** in the `mobile/` directory.
+
+### Mobile Commands
+
+```bash
+cd mobile
+bash build.sh           # Full pipeline: npm run export → copy to www/ → redirect index → cap sync
+npx cap sync ios        # Sync web assets + plugins to iOS
+npx cap open ios        # Open in Xcode
+```
+
+### Mobile Architecture
+
+- **Config:** `mobile/capacitor.config.json` — `CapacitorHttp.enabled: false` is critical (enabling it breaks Firestore WebChannel streaming)
+- **Build pipeline:** `mobile/build.sh` runs `npm run export` from root, copies `out/` to `mobile/www/`, replaces `index.html` with a redirect to `/clients.html`, then `cap sync`
+- **iOS project:** `mobile/ios/App/App.xcodeproj` (Swift Package Manager, NOT xcworkspace)
+- **Safe areas:** CSS classes `.safe-area-top` / `.safe-area-bottom` in `styles/tailwind.css` for Capacitor WebView notch handling. Applied to headers and page containers in `clients.js` and `solicitar.js`
+- **Viewport:** `_document.js` has `maximum-scale=1.0, user-scalable=no` to prevent iOS auto-zoom on inputs
+- **iOS auto-zoom fix:** `styles/tailwind.css` forces `font-size: 16px !important` on all inputs/selects/textareas
+
+### Push Notifications (code ready, pending external setup)
+
+All code is implemented and hooked up. Notifications fire when:
+- Vehicle status changes: `FormEditarVehiculo.js` (manual), `EntregadoVehiculo.js` (EN), `Vehiculo.js` (TR), `ModalLiquidacion.js` (EB), `TablaViajes.js` (EB)
+- Solicitud status changes: `SolicitudesVehiculos.js`
+
+Helper functions: `notificarCambioEstatus()` and `notificarCambioSolicitud()` in `utils/index.js` call `/api/send-push`.
+
+**Pending setup to activate push notifications:**
+1. Apple Developer Account ($99/year) — required for APNs
+2. In Apple Developer > Keys: create an APNs Authentication Key, download the `.p8` file
+3. In Firebase Console > Project Settings > Cloud Messaging > Apple app configuration: upload the APNs key
+4. In Firebase Console > Project Settings > Cloud Messaging: copy the **Server Key** and add it as `FCM_SERVER_KEY` in `.env.local`
+5. In Xcode > App target > Signing & Capabilities: add **Push Notifications** capability
+6. Push notifications only work on real devices, NOT on the iOS simulator
+
+Token flow: client logs in on the app → `clients.js` registers FCM token via `window.Capacitor.Plugins.PushNotifications` → token saved to Firestore `tokensCliente` collection → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.
+
+### Pending Mobile Tasks
+- Test push notifications on a real iPhone (requires Apple Developer Account + APNs setup above)
+- CORS for scraper API: with `CapacitorHttp.enabled: false`, the scraper fetch on `/solicitar` may be blocked by CORS from the Capacitor WebView origin (`capacitor://localhost`). If so, add CORS headers to the scraper server or re-enable CapacitorHttp only for that specific fetch
+- App Store submission: screenshots, privacy policy URL, Apple Developer account
+- Play Store submission: screenshots, feature graphic, Google Play account ($25)

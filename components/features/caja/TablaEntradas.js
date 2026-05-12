@@ -1,6 +1,33 @@
-import React from "react";
+import React, { useState } from "react";
+import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 
-const TablaEntradas = ({ entradasData, totalRecibido }) => {
+const TablaEntradas = ({ entradasData, totalRecibido, isAdminMaster, onDataChange }) => {
+  const [cambiando, setCambiando] = useState(null);
+
+  const cambiarASalida = async (entrada) => {
+    if (cambiando) return;
+    setCambiando(entrada.id);
+    try {
+      const docRef = firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(entrada.id);
+      await docRef.update({
+        estatus: "SE",
+        tipo: "Pago",
+        salidaCaja: entrada.cajaRecibo || 0,
+        salidaCajaReceptor: entrada.entradaCajaReceptor || "",
+        salidaCajaConceptoPago: entrada.entradaCajaConceptoPago || "",
+        salidaCajaMotivoPago: entrada.entradaCajaMotivoPago || "",
+        salidaCajaTipo: entrada.entradaCajaTipo || "",
+        cajaRecibo: 0,
+      });
+      if (onDataChange) onDataChange();
+    } catch (e) {
+      alert("Error al cambiar a salida: " + e.message);
+    } finally {
+      setCambiando(null);
+    }
+  };
+
   // Función para agrupar las entradas por fecha
   const groupByDate = () => {
     const grouped = {};
@@ -39,12 +66,13 @@ const TablaEntradas = ({ entradasData, totalRecibido }) => {
             <th className="px-2 py-1 border">Motivo</th>
             <th className="px-2 py-1 border">Tipo de Pago</th>
             <th className="px-2 py-1 border">Recibo</th>
+            {isAdminMaster && <th className="px-2 py-1 border">Cambiar</th>}
           </tr>
         </thead>
         <tbody>
           {Object.keys(groupedData).length === 0 ? (
             <tr>
-              <td colSpan="7" className="px-2 py-1 border text-center">No se encontraron entradas.</td>
+              <td colSpan={isAdminMaster ? 8 : 7} className="px-2 py-1 border text-center">No se encontraron entradas.</td>
             </tr>
           ) : (
             Object.entries(groupedData).map(([date, entradas]) => {
@@ -74,19 +102,30 @@ const TablaEntradas = ({ entradasData, totalRecibido }) => {
                         <td className="px-2 py-1 border text-right">
                           ${recibo.toFixed(2).toLocaleString('en-US')}
                         </td>
+                        {isAdminMaster && (
+                          <td className="px-2 py-1 border text-center">
+                            <button
+                              onClick={() => cambiarASalida(entrada)}
+                              disabled={cambiando === entrada.id}
+                              className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
+                            >
+                              {cambiando === entrada.id ? '...' : '→ Salida'}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
                   {/* Subtotal por día */}
                   <tr className="bg-gray-100 font-semibold">
-                    <td colSpan="6" className="px-2 py-1 border text-right">Subtotal del día:</td>
+                    <td colSpan={isAdminMaster ? 7 : 6} className="px-2 py-1 border text-right">Subtotal del día:</td>
                     <td className="px-2 py-1 border text-right">
                       ${subtotalRecibido.toFixed(2).toLocaleString('en-US')}
                     </td>
                   </tr>
                   {/* Espacio entre días */}
                   <tr>
-                    <td colSpan="7" className="py-2"></td>
+                    <td colSpan={isAdminMaster ? 8 : 7} className="py-2"></td>
                   </tr>
                 </React.Fragment>
               );
@@ -95,7 +134,7 @@ const TablaEntradas = ({ entradasData, totalRecibido }) => {
         </tbody>
         <tfoot>
           <tr>
-            <td colSpan="6" className="px-2 py-1 font-semibold text-right border">Total General Recibido</td>
+            <td colSpan={isAdminMaster ? 7 : 6} className="px-2 py-1 font-semibold text-right border">Total General Recibido</td>
             <td className="px-2 py-1 font-semibold border text-right">
               ${totalRecibido.toFixed(2).toLocaleString('en-US')}
             </td>

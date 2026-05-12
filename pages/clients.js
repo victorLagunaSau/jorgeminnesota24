@@ -50,6 +50,13 @@ const ClientsPage = () => {
         direccionCliente: data.direccionCliente || "",
     });
 
+    // Marcar body como app Capacitor para estilos móviles (font-size 16px en inputs)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
+            document.body.classList.add("capacitor-app");
+        }
+    }, []);
+
     // Sincronizar datosCliente del auth hook como estado inicial
     useEffect(() => {
         if (user?.datosCliente && !clienteData.id) {
@@ -77,6 +84,60 @@ const ClientsPage = () => {
 
         return () => unsubscribe();
     }, [user?.datosCliente?.id]);
+
+    // Push notifications — registrar token FCM en Capacitor
+    useEffect(() => {
+        if (!user?.id) return;
+        // window.Capacitor solo existe dentro del WebView nativo
+        if (typeof window === "undefined" || !window.Capacitor?.isNativePlatform?.()) return;
+
+        const registerPush = async () => {
+            try {
+                const PushNotifications = window.Capacitor.Plugins.PushNotifications;
+                if (!PushNotifications) return;
+
+                // Solicitar permiso
+                const permStatus = await PushNotifications.requestPermissions();
+                if (permStatus.receive !== "granted") return;
+
+                // Registrar para recibir push
+                await PushNotifications.register();
+
+                // Guardar token en Firestore
+                PushNotifications.addListener("registration", async (token) => {
+                    try {
+                        await firestore()
+                            .collection(COLLECTIONS.TOKENS_CLIENTE)
+                            .doc(user.id)
+                            .set({
+                                token: token.value,
+                                platform: window.Capacitor.getPlatform(),
+                                clienteId: user.datosCliente?.id || user.id,
+                                clienteNombre: user.datosCliente?.cliente || user.username || "",
+                                updatedAt: new Date()
+                            }, { merge: true });
+                    } catch (err) {
+                        console.error("Error guardando token push:", err);
+                    }
+                });
+
+                // Manejar notificación recibida con app abierta
+                PushNotifications.addListener("pushNotificationReceived", (notification) => {
+                    console.log("Push recibida:", notification);
+                });
+
+                // Manejar tap en notificación
+                PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
+                    console.log("Push tap:", notification);
+                });
+
+            } catch (e) {
+                // En web o si falla, simplemente ignorar
+            }
+        };
+
+        registerPush();
+    }, [user?.id]);
 
     // Cargar vehículos del cliente
     useEffect(() => {
@@ -273,7 +334,7 @@ const ClientsPage = () => {
     // ============================================================
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Portal Clientes | Jorge Minnesota INC</title></Head>
                 <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-6">
@@ -426,11 +487,11 @@ const ClientsPage = () => {
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 font-sans text-black">
+        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black">
             <Head><title>Portal | Jorge Minnesota INC</title></Head>
 
             {/* Header */}
-            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
+            <header className="bg-white p-4 safe-area-top flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
                 <div className="flex items-center gap-4">
                     {vista === "perfil" ? (
                         <button onClick={() => setVista("vehiculos")} className="text-blue-600 p-2">

@@ -281,12 +281,19 @@ const ReporteViajesPagados = ({ user }) => {
         setPeriodoSeleccionado(periodo);
         setLoading(true);
         try {
-            const { inicio, fin } = calcularFechas(periodo);
-            const snap = await firestore().collection("viajesPagados")
-                .where("fechaPago", ">=", firebase.firestore.Timestamp.fromDate(inicio))
-                .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
-                .orderBy("fechaPago", "desc")
-                .get();
+            let snap;
+            if (periodo === 'historico') {
+                snap = await firestore().collection("viajesPagados")
+                    .orderBy("fechaPago", "desc")
+                    .get();
+            } else {
+                const { inicio, fin } = calcularFechas(periodo);
+                snap = await firestore().collection("viajesPagados")
+                    .where("fechaPago", ">=", firebase.firestore.Timestamp.fromDate(inicio))
+                    .where("fechaPago", "<=", firebase.firestore.Timestamp.fromDate(fin))
+                    .orderBy("fechaPago", "desc")
+                    .get();
+            }
             const data = snap.docs
                 .map(doc => ({ docId: doc.id, ...doc.data() }))
                 .filter(v => !v.numViaje?.startsWith("H-") && v.metodo !== "IMPORTACION_HISTORIAL");
@@ -747,19 +754,19 @@ const ReporteViajesPagados = ({ user }) => {
                                     onClick={() => consultarViajes('semana')}
                                     className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'semana' ? 'btn-error text-white' : 'btn-outline'}`}
                                 >
-                                    1 Semana (Lun-Sáb)
-                                </button>
-                                <button
-                                    onClick={() => consultarViajes('quincena')}
-                                    className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'quincena' ? 'btn-error text-white' : 'btn-outline'}`}
-                                >
-                                    2 Semanas (Lun-Sáb)
+                                    1 Semana
                                 </button>
                                 <button
                                     onClick={() => consultarViajes('mensual')}
                                     className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'mensual' ? 'btn-error text-white' : 'btn-outline'}`}
                                 >
-                                    1 Mes (Lun-Sáb)
+                                    1 Mes
+                                </button>
+                                <button
+                                    onClick={() => consultarViajes('historico')}
+                                    className={`btn btn-sm font-black uppercase ${periodoSeleccionado === 'historico' ? 'btn-error text-white' : 'btn-outline'}`}
+                                >
+                                    Histórico
                                 </button>
                             </div>
                             <button onClick={exportarExcel} disabled={viajes.length === 0} className="btn btn-sm btn-success text-white font-black uppercase gap-2">

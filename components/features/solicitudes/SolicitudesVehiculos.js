@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { notificarCambioSolicitud } from "../../../utils";
 import {
     FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaCalendarAlt, FaSearch,
     FaCheck, FaTruck, FaSpinner, FaEye, FaTimes, FaBarcode, FaKey,
@@ -46,6 +47,12 @@ const SolicitudesVehiculos = ({ user }) => {
                 [`fecha${nuevoEstado.charAt(0).toUpperCase() + nuevoEstado.slice(1)}`]: new Date(),
                 actualizadoPor: user?.nombre || "Admin"
             });
+
+            // Push notification al cliente
+            const sol = solicitudes.find(s => s.id === id);
+            if (sol) {
+                notificarCambioSolicitud(sol.clienteNombre, nuevoEstado, `${sol.year} ${sol.make} ${sol.model}`);
+            }
         } catch (error) {
             console.error("Error actualizando estado:", error);
             alert("Error al actualizar el estado");

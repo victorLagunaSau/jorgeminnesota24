@@ -31,6 +31,13 @@ const SolicitarPage = () => {
     const [pass, setPass] = useState("");
     const [loginError, setLoginError] = useState("");
 
+    // Marcar body como app Capacitor para estilos móviles (font-size 16px en inputs)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
+            document.body.classList.add("capacitor-app");
+        }
+    }, []);
+
     // Cargar solicitudes del cliente
     useEffect(() => {
         const clienteId = user?.datosCliente?.id || user?.id;
@@ -219,7 +226,7 @@ const SolicitarPage = () => {
     // Login Form
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
                 <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-8">
@@ -258,8 +265,8 @@ const SolicitarPage = () => {
                         </button>
                     </form>
                     <div className="mt-4 text-center">
-                        <Link href="/">
-                            <a className="text-sm text-blue-600 hover:underline">← Volver al inicio</a>
+                        <Link href="/clients">
+                            <a className="text-sm text-blue-600 hover:underline">← Volver al login</a>
                         </Link>
                     </div>
                 </div>
@@ -271,72 +278,74 @@ const SolicitarPage = () => {
     const clienteData = user.datosCliente || {};
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 font-sans text-black">
+        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
 
             {/* Header */}
-            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
-                <div className="flex items-center gap-4">
-                    <Link href="/">
-                        <a className="btn btn-ghost btn-sm">
-                            <FaArrowLeft />
-                        </a>
-                    </Link>
-                    <img src="/assets/Logo.png" className="w-10 h-auto" alt="Logo"/>
-                    <div>
-                        <h1 className="text-lg font-black uppercase italic text-black leading-none tracking-tighter">
-                            Solicitar Vehículos
-                        </h1>
-                        <p className="text-[10px] text-gray-500">Busca y solicita vehículos de subasta</p>
+            <header className="bg-white safe-area-top border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
+                <div className="flex justify-between items-center px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Link href="/clients">
+                            <a className="text-blue-600 p-1 flex-shrink-0">
+                                <FaArrowLeft className="text-base"/>
+                            </a>
+                        </Link>
+                        <img src="/assets/Logo.png" className="w-7 h-auto flex-shrink-0" alt="Logo"/>
+                        <div className="min-w-0">
+                            <h1 className="text-xs font-black uppercase italic text-black leading-none tracking-tighter truncate">
+                                Solicitar Vehículos
+                            </h1>
+                            <p className="text-[8px] text-gray-400 truncate">Busca y solicita vehículos</p>
+                        </div>
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Link href="/clients">
-                        <a className="btn btn-ghost btn-sm text-blue-600">
-                            <FaCar className="mr-1"/> Mis Vehículos
-                        </a>
-                    </Link>
-                    <button
-                        onClick={() => signOut()}
-                        className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg hover:bg-red-50"
-                    >
-                        <FaSignOutAlt/> Salir
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <Link href="/clients">
+                            <a className="flex items-center gap-1 text-[9px] font-bold text-blue-600 uppercase border border-blue-200 px-2 py-1 rounded-lg bg-blue-50">
+                                <FaCar className="text-xs"/>
+                            </a>
+                        </Link>
+                        <button
+                            onClick={() => signOut()}
+                            className="flex items-center gap-1 text-[9px] font-bold text-red-600 uppercase border border-red-200 px-2 py-1 rounded-lg bg-red-50"
+                        >
+                            <FaSignOutAlt className="text-xs"/>
+                        </button>
+                    </div>
                 </div>
             </header>
 
             {/* User Info */}
-            <section className="bg-white px-6 py-3 border-b shadow-sm">
-                <div className="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <FaUser className="text-blue-600"/>
+            <section className="bg-white px-3 py-2 border-b border-gray-200">
+                <div className="flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <FaUser className="text-blue-600 text-[10px]"/>
                         </div>
-                        <div>
-                            <p className="font-bold text-gray-800">{clienteData.cliente || user.username}</p>
-                            <p className="text-[11px] text-gray-500">{user.email}</p>
+                        <div className="min-w-0">
+                            <p className="font-bold text-xs text-gray-800 truncate">{clienteData.cliente || user.username}</p>
+                            <p className="text-[9px] text-gray-400 truncate">{user.email}</p>
                         </div>
                     </div>
-                    <div className="bg-orange-50 px-4 py-2 rounded-lg">
-                        <span className="text-[10px] text-orange-600 font-bold uppercase">Solicitudes</span>
-                        <p className="text-2xl font-black text-orange-700">{solicitudes.length}</p>
+                    <div className="bg-orange-50 px-2 py-1 rounded-lg text-center flex-shrink-0">
+                        <span className="text-[8px] text-orange-600 font-bold uppercase">Solicitudes</span>
+                        <p className="text-base font-black text-orange-700 leading-tight">{solicitudes.length}</p>
                     </div>
                 </div>
             </section>
 
-            <main className="max-w-6xl mx-auto px-4 py-6">
-                <div className="grid gap-6 lg:grid-cols-2">
+            <main className="px-3 py-3">
+                <div className="grid gap-3 lg:grid-cols-2">
 
                     {/* Panel de Búsqueda */}
-                    <div className="space-y-4">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h2 className="text-lg font-black uppercase text-gray-800 mb-4 flex items-center gap-2">
-                                <FaSearch className="text-blue-600"/> Buscar Vehículo
+                    <div className="space-y-3">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+                            <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
+                                <FaSearch className="text-blue-600 text-xs"/> Buscar Vehículo
                             </h2>
-                            <form onSubmit={handleSearch} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={handleSearch} className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                                             Número de Lote *
                                         </label>
                                         <input
@@ -344,12 +353,12 @@ const SolicitarPage = () => {
                                             placeholder="Ej: 43874580"
                                             value={lotNumber}
                                             onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
-                                            className="input input-bordered w-full bg-white text-black"
+                                            className="input input-bordered input-sm w-full bg-white text-black"
                                             disabled={searching}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                                             Gate Pass *
                                         </label>
                                         <input
@@ -357,7 +366,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: A1B2"
                                             value={gatePass}
                                             onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
-                                            className="input input-bordered w-full bg-white text-black uppercase"
+                                            className="input input-bordered input-sm w-full bg-white text-black uppercase"
                                             disabled={searching}
                                             maxLength={5}
                                         />
@@ -366,7 +375,7 @@ const SolicitarPage = () => {
                                 <button
                                     type="submit"
                                     disabled={searching || !lotNumber.trim() || gatePass.length < 4}
-                                    className="btn btn-primary w-full text-white font-bold"
+                                    className="btn btn-primary btn-sm w-full text-white font-bold"
                                 >
                                     {searching ? (
                                         <>
@@ -436,7 +445,7 @@ const SolicitarPage = () => {
                         {vehicleResult && (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                 {vehicleResult.imageUrl && (
-                                    <div className="relative w-full h-48 bg-gray-100">
+                                    <div className="relative w-full h-40 bg-gray-100">
                                         <img
                                             src={vehicleResult.imageUrl}
                                             alt={`${vehicleResult.year} ${vehicleResult.make} ${vehicleResult.model}`}
@@ -501,54 +510,52 @@ const SolicitarPage = () => {
                     </div>
 
                     {/* Panel de Solicitudes */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h2 className="text-lg font-black uppercase text-gray-800 mb-4 flex items-center gap-2">
-                            <FaClock className="text-orange-600"/> Mis Solicitudes
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+                        <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
+                            <FaClock className="text-orange-600 text-xs"/> Mis Solicitudes
                         </h2>
 
                         {loadingSolicitudes ? (
-                            <div className="flex justify-center py-10">
-                                <span className="loading loading-spinner loading-lg text-blue-600"></span>
+                            <div className="flex justify-center py-8">
+                                <span className="loading loading-spinner loading-md text-blue-600"></span>
                             </div>
                         ) : solicitudes.length === 0 ? (
-                            <div className="text-center py-10">
-                                <FaCar className="text-5xl text-gray-300 mx-auto mb-4"/>
-                                <p className="text-gray-500">No tienes solicitudes aún</p>
-                                <p className="text-sm text-gray-400">Busca un vehículo para comenzar</p>
+                            <div className="text-center py-8">
+                                <FaCar className="text-4xl text-gray-300 mx-auto mb-3"/>
+                                <p className="text-sm text-gray-500">No tienes solicitudes aún</p>
+                                <p className="text-xs text-gray-400">Busca un vehículo para comenzar</p>
                             </div>
                         ) : (
-                            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                            <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                 {solicitudes.map((sol) => {
                                     const badge = getEstadoBadge(sol.estado);
                                     return (
-                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                                            <div className="flex gap-3">
+                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                            <div className="flex gap-2 items-start">
                                                 {sol.imageUrl && (
                                                     <img
                                                         src={sol.imageUrl}
                                                         alt={`${sol.year} ${sol.make}`}
-                                                        className="w-20 h-16 object-cover rounded bg-gray-100"
+                                                        className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
                                                     />
                                                 )}
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <p className="font-bold text-sm text-gray-800 uppercase truncate">
-                                                                {sol.year} {sol.make} {sol.model}
-                                                            </p>
-                                                            <p className="text-[10px] text-gray-500">
-                                                                Lote: {sol.lotNumber} • {sol.source}
-                                                            </p>
-                                                        </div>
-                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${badge.className}`}>
+                                                    <div className="flex items-start justify-between gap-1">
+                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
+                                                            {sol.year} {sol.make} {sol.model}
+                                                        </p>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 ${badge.className}`}>
                                                             {badge.label}
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
-                                                        <span className="flex items-center gap-1">
-                                                            <FaMapMarkerAlt/> {sol.location || 'N/A'}
+                                                    <p className="text-[9px] text-gray-500">
+                                                        Lote: {sol.lotNumber} • {sol.source}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                        <span className="flex items-center gap-0.5 truncate">
+                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
                                                         </span>
-                                                        <span className="flex items-center gap-1">
+                                                        <span className="flex items-center gap-0.5 flex-shrink-0">
                                                             <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
                                                         </span>
                                                     </div>
@@ -556,9 +563,9 @@ const SolicitarPage = () => {
                                                 {sol.estado === "pendiente" && (
                                                     <button
                                                         onClick={() => handleEliminarSolicitud(sol.id)}
-                                                        className="btn btn-ghost btn-xs text-red-500 hover:bg-red-50"
+                                                        className="text-red-400 p-1 flex-shrink-0"
                                                     >
-                                                        <FaTrash/>
+                                                        <FaTrash className="text-xs"/>
                                                     </button>
                                                 )}
                                             </div>
@@ -572,7 +579,7 @@ const SolicitarPage = () => {
             </main>
 
             {/* Footer */}
-            <footer className="mt-10 text-center text-[10px] text-gray-400 uppercase">
+            <footer className="mt-6 pb-4 text-center text-[10px] text-gray-400 uppercase">
                 Solicitar Vehículos - Jorge Minnesota Logistic LLC
             </footer>
         </div>

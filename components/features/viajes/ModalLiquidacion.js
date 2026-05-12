@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import {FaWallet, FaTimes, FaCar, FaPrint, FaCheckCircle, FaCheckDouble, FaTruck} from "react-icons/fa";
+import { notificarCambioEstatus } from "../../../utils";
 import ReactToPrint from "react-to-print";
 import ReciboPago from "./ReciboPago";
 
@@ -219,6 +220,13 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
 
             setPagoCompletado(true);
             setShowConfirm(false);
+
+            // Push notification a cada cliente del viaje
+            (viaje.vehiculos || []).forEach(v => {
+                if (v.clienteNombre) {
+                    notificarCambioEstatus(v.clienteNombre, "EB", `${v.marca} ${v.modelo}`);
+                }
+            });
 
             setTimeout(() => {
                 if (btnPrintRef.current) btnPrintRef.current.click();

@@ -10,6 +10,21 @@ html {
 body {
   @apply bg-white-500;
 }
+
+/* Prevent iOS WebView auto-zoom on inputs — only in Capacitor mobile app */
+body.capacitor-app input,
+body.capacitor-app select,
+body.capacitor-app textarea {
+  font-size: 16px !important;
+}
+
+/* Capacitor safe-area helpers */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 p {
   @apply text-black-500;
 }
