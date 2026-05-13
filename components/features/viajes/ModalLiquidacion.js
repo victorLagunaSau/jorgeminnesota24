@@ -166,7 +166,8 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                             storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
-                            titulo: v.titulo || "NO"
+                            titulo: v.titulo || "NO",
+                            ...(v.solicitudId ? { solicitudId: v.solicitudId } : {}),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)

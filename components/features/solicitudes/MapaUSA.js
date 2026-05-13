@@ -9,6 +9,7 @@ import {
 import { FaCar, FaUser, FaMapMarkerAlt, FaBarcode, FaGavel, FaExpand, FaCompress, FaPlus, FaMinus, FaCrosshairs } from "react-icons/fa";
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+const COUNTIES_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json";
 
 // Coordenadas de ciudades con subastas IAA/Copart en USA [lng, lat]
 const CITY_COORDS = {
@@ -389,25 +390,45 @@ const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, 
                     <ZoomableGroup
                         zoom={zoom}
                         center={center}
-                        onMoveEnd={({ coordinates, zoom: z }) => {
-                            setCenter(coordinates);
-                            setZoom(z);
+                        onMoveEnd={(pos) => {
+                            if (pos?.coordinates) setCenter(pos.coordinates);
+                            if (pos?.zoom) setZoom(pos.zoom);
                         }}
                         minZoom={1}
                         maxZoom={8}
                     >
+                        {/* Condados (fondo con delimitación fina) */}
+                        <Geographies geography={COUNTIES_URL}>
+                            {({ geographies }) =>
+                                geographies.map((geo) => (
+                                    <Geography
+                                        key={geo.rpiKey || geo.id}
+                                        geography={geo}
+                                        fill="#1f2937"
+                                        stroke="#2d3748"
+                                        strokeWidth={0.15}
+                                        style={{
+                                            default: { outline: "none" },
+                                            hover: { outline: "none" },
+                                            pressed: { outline: "none" },
+                                        }}
+                                    />
+                                ))
+                            }
+                        </Geographies>
+                        {/* Estados (solo bordes gruesos encima) */}
                         <Geographies geography={GEO_URL}>
                             {({ geographies }) =>
                                 geographies.map((geo) => (
                                     <Geography
                                         key={geo.rpiKey || geo.properties.name}
                                         geography={geo}
-                                        fill="#1f2937"
-                                        stroke="#374151"
-                                        strokeWidth={0.5}
+                                        fill="transparent"
+                                        stroke="#4b5563"
+                                        strokeWidth={0.6}
                                         style={{
                                             default: { outline: "none" },
-                                            hover: { fill: "#374151", outline: "none" },
+                                            hover: { outline: "none" },
                                             pressed: { outline: "none" },
                                         }}
                                     />
@@ -437,10 +458,12 @@ const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, 
 
                         {cityMarkers.map((marker) => {
                             const count = marker.solicitudes.length;
-                            const baseRadius = Math.min(4 + count * 1, 14);
+                            const baseRadius = Math.min(2.5 + count * 0.5, 7);
                             const radius = baseRadius / Math.sqrt(zoom);
                             const isHovered = hoveredMarker?.label === marker.label &&
                                 hoveredMarker?.coords[0] === marker.coords[0];
+                            const isSelected = selectedMarker?.coords[0] === marker.coords[0] &&
+                                selectedMarker?.coords[1] === marker.coords[1];
                             const color = getGroupColor(marker.solicitudes);
 
                             return (
@@ -455,37 +478,57 @@ const MapaUSA = ({ onSelectSolicitud, getEstadoConfig, formatDate, solicitudes, 
                                     }}
                                     style={{ cursor: "pointer" }}
                                 >
+                                    {/* Glow sutil */}
                                     <circle
-                                        r={radius + 5 / Math.sqrt(zoom)}
+                                        r={radius + 2 / Math.sqrt(zoom)}
                                         fill={color.pulse}
-                                        className="animate-ping"
-                                        style={{ animationDuration: "2.5s" }}
+                                        opacity={isHovered || isSelected ? 0.6 : 0.3}
                                     />
                                     <circle
                                         r={radius}
                                         fill={isHovered ? color.fillHover : color.fill}
                                         stroke="#fff"
-                                        strokeWidth={2 / Math.sqrt(zoom)}
+                                        strokeWidth={1 / Math.sqrt(zoom)}
                                         style={{
                                             transition: "all 0.2s",
                                             filter: isHovered
-                                                ? `drop-shadow(0 0 8px ${color.shadow})`
-                                                : "drop-shadow(0 2px 4px rgba(0,0,0,0.2))"
+                                                ? `drop-shadow(0 0 6px ${color.shadow})`
+                                                : "drop-shadow(0 1px 2px rgba(0,0,0,0.3))"
                                         }}
                                     />
-                                    <text
-                                        textAnchor="middle"
-                                        y={4 / Math.sqrt(zoom)}
-                                        style={{
-                                            fontFamily: "system-ui",
-                                            fontSize: `${(count > 9 ? 10 : 12) / Math.sqrt(zoom)}px`,
-                                            fontWeight: "bold",
-                                            fill: "#fff",
-                                            pointerEvents: "none",
-                                        }}
-                                    >
-                                        {count}
-                                    </text>
+                                    {/* Número solo si hay más de 1 */}
+                                    {count > 1 && (
+                                        <text
+                                            textAnchor="middle"
+                                            y={3 / Math.sqrt(zoom)}
+                                            style={{
+                                                fontFamily: "system-ui",
+                                                fontSize: `${(count > 9 ? 6 : 7) / Math.sqrt(zoom)}px`,
+                                                fontWeight: "bold",
+                                                fill: "#fff",
+                                                pointerEvents: "none",
+                                            }}
+                                        >
+                                            {count}
+                                        </text>
+                                    )}
+                                    {/* Label de ciudad visible al hacer zoom */}
+                                    {zoom >= 3 && (
+                                        <text
+                                            textAnchor="middle"
+                                            y={-(radius + 4 / Math.sqrt(zoom))}
+                                            style={{
+                                                fontFamily: "system-ui",
+                                                fontSize: `${7 / Math.sqrt(zoom)}px`,
+                                                fontWeight: "700",
+                                                fill: "#e5e7eb",
+                                                pointerEvents: "none",
+                                                textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+                                            }}
+                                        >
+                                            {marker.label}
+                                        </text>
+                                    )}
                                 </Marker>
                             );
                         })}

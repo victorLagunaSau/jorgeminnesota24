@@ -98,6 +98,26 @@ input[type="number"] {
   animation: glowPulseGreen 2s ease-in-out infinite;
 }
 
+/* Pull-to-refresh indicator */
+.ptr-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+  transition: all 0.3s ease;
+}
+.ptr-spinner .ptr-icon {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* purgecss end ignore */
 
 /* purgecss start ignore */

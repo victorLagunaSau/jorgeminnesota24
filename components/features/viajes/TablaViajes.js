@@ -494,6 +494,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
                             titulo: v.titulo || "NO",
+                            ...(v.solicitudId ? { solicitudId: v.solicitudId } : {}),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)

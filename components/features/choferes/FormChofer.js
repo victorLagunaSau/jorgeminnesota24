@@ -16,6 +16,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
         telefonoChofer: "",
         paisChofer: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
         licencia: "",
+        clave: "",
         empresaId: "",
         empresaNombre: "",
         empresaLiderId: "",
@@ -40,6 +41,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                 telefonoChofer: choferAEditar.telefonoChofer || "",
                 paisChofer: choferAEditar.paisChofer || PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
                 licencia: choferAEditar.licencia || "",
+                clave: choferAEditar.clave || "",
                 empresaId: choferAEditar.empresaId || "",
                 empresaNombre: choferAEditar.empresaNombre || "",
                 empresaLiderId: choferAEditar.empresaLiderId || "",
@@ -83,6 +85,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                     telefonoChofer: datos.telefonoChofer,
                     paisChofer: datos.paisChofer,
                     licencia: datos.licencia || "N/A",
+                    clave: datos.clave,
                     empresaId: datos.empresaId,
                     empresaNombre: datos.empresaNombre,
                     empresaLiderId: datos.empresaLiderId || "",
@@ -147,6 +150,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                     telefonoChofer: datos.telefonoChofer,
                     paisChofer: datos.paisChofer,
                     licencia: datos.licencia || "N/A",
+                    clave: datos.clave,
                     empresaId: datos.empresaId,
                     empresaNombre: datos.empresaNombre,
                     empresaLiderId: datos.empresaLiderId || "",
@@ -232,6 +236,11 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                     <input type="text" value={datos.licencia} onChange={handleLicenciaChange} maxLength={FIELD_LIMITS.LICENSE}
                         className="input input-bordered w-full input-sm bg-white text-black font-mono" placeholder="Alfanumérico" />
                 </div>
+                <div className="w-40 p-1">
+                    <label className="block text-[10px] font-bold text-green-700 uppercase italic">Clave Acceso:</label>
+                    <input type="text" value={datos.clave} onChange={(e) => setDatos({...datos, clave: e.target.value.replace(/[^a-zA-Z0-9]/g, "")})} maxLength={6}
+                        className="input input-bordered w-full input-sm bg-white text-black font-mono text-center tracking-widest" placeholder="Ej: 1234" />
+                </div>
                 <div className="flex-grow flex justify-end p-1">
                     <label htmlFor={listo && !loading ? modalId : ""}
                         className={`btn btn-sm px-10 ${listo && !loading ? (esEdicion ? 'btn-info text-white font-bold' : 'btn-error text-white font-bold') : 'btn-disabled opacity-40'}`}
@@ -253,6 +262,7 @@ const FormChofer = ({ user, choferAEditar, onSuccess }) => {
                         <p>Apodo: <span className="font-bold text-black">{datos.apodoChofer || '—'}</span></p>
                         <p>Teléfono: <span className="font-bold text-black">{datos.telefonoChofer}</span></p>
                         <p>Licencia: <span className="font-bold text-black">{datos.licencia || 'N/A'}</span></p>
+                        <p>Clave Acceso: <span className="font-bold text-green-700">{datos.clave || 'Sin asignar'}</span></p>
                         <p>Empresa Fiscal: <span className="font-bold text-red-600">{datos.empresaNombre}</span></p>
                         <p>Líder Asignado: <span className="font-bold text-blue-700">{datos.empresaLiderNombre || 'Ninguno'}</span></p>
                     </div>

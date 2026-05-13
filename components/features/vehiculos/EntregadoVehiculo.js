@@ -35,6 +35,18 @@ const EntregadoVehiculo = ({ user, vehiculo, onClose }) => {
             // Push notification al cliente
             notificarCambioEstatus(vehiculo.cliente, "EN", `${vehiculo.marca} ${vehiculo.modelo}`);
 
+            // Si viene de una solicitud, marcarla como completada
+            if (vehiculo.solicitudId) {
+                try {
+                    await firestore().collection("solicitudesVehiculos").doc(vehiculo.solicitudId).update({
+                        estado: "completado",
+                        fechaCompletado: new Date()
+                    });
+                } catch (solErr) {
+                    console.error("Error actualizando solicitud:", solErr);
+                }
+            }
+
             // Cerrar el modal y limpiar
             onClose();
         } catch (error) {

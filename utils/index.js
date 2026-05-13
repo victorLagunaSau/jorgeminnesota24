@@ -300,6 +300,29 @@ export const notificarCambioEstatus = async (clienteNombre, nuevoEstatus, vehicu
 };
 
 /**
+ * Send push notification to a driver when they get assigned a new trip
+ * @param {string} choferId - Driver's Firestore document ID
+ * @param {number} numVehiculos - Number of vehicles in the trip
+ * @param {string} empresaNombre - Carrier company name
+ */
+export const notificarViajeAsignado = async (choferId, numVehiculos, empresaNombre) => {
+  if (!choferId) return;
+
+  const titulo = "Nuevo viaje asignado";
+  const mensaje = `${empresaNombre} te asignó un viaje con ${numVehiculos} vehículo${numVehiculos > 1 ? 's' : ''}. Abre la app para ver los detalles.`;
+
+  try {
+    await fetch("/api/send-push-chofer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choferId, titulo, mensaje }),
+    });
+  } catch (err) {
+    console.error("Error enviando push al chofer:", err);
+  }
+};
+
+/**
  * Send push notification to a client when their solicitud status changes
  * @param {string} clienteNombre - Client name
  * @param {string} nuevoEstado - New solicitud state (pendiente, aprobado, en_proceso, completado)
@@ -311,14 +334,16 @@ export const notificarCambioSolicitud = async (clienteNombre, nuevoEstado, vehic
   const labels = {
     pendiente: "Pendiente",
     aprobado: "Aprobada",
-    en_proceso: "En Proceso",
+    asignado: "Asignada",
+    en_proceso: "En Camino",
     completado: "Completada",
   };
 
   const mensajes = {
     pendiente: "Tu solicitud está pendiente de revisión.",
     aprobado: "Tu solicitud fue aprobada.",
-    en_proceso: "Tu solicitud está siendo procesada.",
+    asignado: "Tu vehículo fue asignado a un transportista.",
+    en_proceso: "Tu vehículo está en camino.",
     completado: "Tu solicitud fue completada.",
   };
 

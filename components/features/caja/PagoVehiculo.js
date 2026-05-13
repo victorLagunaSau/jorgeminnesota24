@@ -196,6 +196,18 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 },
             ]);
 
+            // Si viene de una solicitud, marcarla como completada
+            if (vehiculo[0]?.solicitudId) {
+                try {
+                    await firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(vehiculo[0].solicitudId).update({
+                        estado: "completado",
+                        fechaCompletado: new Date()
+                    });
+                } catch (solErr) {
+                    console.error("Error actualizando solicitud:", solErr);
+                }
+            }
+
             setMovimientoGuardado(true);
             setMensajeError("");
             setPago(0);

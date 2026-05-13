@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useAuthContext } from "../context/auth";
@@ -6,7 +6,7 @@ import { firestore } from "../firebase/firebaseIni";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus, FaTrash,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
-    FaCheckCircle, FaClock, FaArrowLeft
+    FaClock, FaArrowLeft, FaCheckCircle
 } from "react-icons/fa";
 
 const SolicitarPage = () => {
@@ -16,8 +16,6 @@ const SolicitarPage = () => {
     const [lotNumber, setLotNumber] = useState("");
     const [gatePass, setGatePass] = useState("");
     const [searching, setSearching] = useState(false);
-    const [searchProgress, setSearchProgress] = useState(0);
-    const [searchStep, setSearchStep] = useState("");
     const [vehicleResult, setVehicleResult] = useState(null);
     const [searchError, setSearchError] = useState("");
 
@@ -31,12 +29,46 @@ const SolicitarPage = () => {
     const [pass, setPass] = useState("");
     const [loginError, setLoginError] = useState("");
 
+    // Pull-to-refresh
+    const [refreshing, setRefreshing] = useState(false);
+    const pullStartY = useRef(0);
+    const isPulling = useRef(false);
+
+    const handleRefresh = useCallback(() => {
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 800);
+    }, []);
+
     // Marcar body como app Capacitor para estilos móviles (font-size 16px en inputs)
     useEffect(() => {
-        if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
-            document.body.classList.add("capacitor-app");
-        }
-    }, []);
+        if (typeof window === "undefined" || !window.Capacitor?.isNativePlatform?.()) return;
+        document.body.classList.add("capacitor-app");
+
+        const onTouchStart = (e) => {
+            if (window.scrollY === 0) {
+                pullStartY.current = e.touches[0].clientY;
+                isPulling.current = true;
+            }
+        };
+        const onTouchMove = (e) => {
+            if (!isPulling.current) return;
+            const diff = e.touches[0].clientY - pullStartY.current;
+            if (diff > 80 && window.scrollY === 0) {
+                isPulling.current = false;
+                handleRefresh();
+            }
+        };
+        const onTouchEnd = () => { isPulling.current = false; };
+
+        document.addEventListener("touchstart", onTouchStart, { passive: true });
+        document.addEventListener("touchmove", onTouchMove, { passive: true });
+        document.addEventListener("touchend", onTouchEnd, { passive: true });
+        return () => {
+            document.removeEventListener("touchstart", onTouchStart);
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+        };
+    }, [handleRefresh]);
 
     // Cargar solicitudes del cliente
     useEffect(() => {
@@ -84,24 +116,6 @@ const SolicitarPage = () => {
         setSearching(true);
         setSearchError("");
         setVehicleResult(null);
-        setSearchProgress(0);
-        setSearchStep("Conectando con subastas...");
-
-        // Progreso simulado que avanza mientras espera la respuesta real
-        const steps = [
-            { at: 5, text: "Conectando...", pct: 10 },
-            { at: 1500, text: "Buscando vehículo...", pct: 25 },
-            { at: 3500, text: "Revisando subastas...", pct: 45 },
-            { at: 5500, text: "Analizando resultados...", pct: 65 },
-            { at: 7500, text: "Extrayendo datos del vehículo...", pct: 85 },
-        ];
-
-        const timers = steps.map(s =>
-            setTimeout(() => {
-                setSearchProgress(s.pct);
-                setSearchStep(s.text);
-            }, s.at)
-        );
 
         try {
             const response = await fetch("https://jorgeminnesota.duckdns.org/api/scrape", {
@@ -113,23 +127,15 @@ const SolicitarPage = () => {
                 body: JSON.stringify({ lotNumber: lotNumber.trim(), gatePass: gatePass.trim() })
             });
 
-            timers.forEach(t => clearTimeout(t));
-
             const data = await response.json();
 
             if (!response.ok) {
-                setSearchProgress(0);
                 setSearchError(data.error || "Error al buscar vehículo");
                 return;
             }
 
-            setSearchProgress(100);
-            setSearchStep("¡Vehículo encontrado!");
-            await new Promise(r => setTimeout(r, 500));
             setVehicleResult(data.vehicle);
         } catch (error) {
-            timers.forEach(t => clearTimeout(t));
-            setSearchProgress(0);
             setSearchError("Error de conexión. Intenta de nuevo.");
         } finally {
             setSearching(false);
@@ -153,7 +159,7 @@ const SolicitarPage = () => {
         try {
             await firestore().collection("solicitudesVehiculos").add({
                 clienteId: clienteId,
-                clienteNombre: user.datosCliente.cliente || user.username || "",
+                clienteNombre: (user.datosCliente.cliente || user.username || "").toUpperCase().trim(),
                 clienteTelefono: user.datosCliente.telefonoCliente || "",
                 // Datos del vehículo
                 lotNumber: vehicleResult.lotNumber,
@@ -199,13 +205,15 @@ const SolicitarPage = () => {
         const badges = {
             pendiente: "bg-yellow-100 text-yellow-800",
             aprobado: "bg-blue-100 text-blue-800",
+            asignado: "bg-indigo-100 text-indigo-800",
             en_proceso: "bg-purple-100 text-purple-800",
             completado: "bg-green-100 text-green-800"
         };
         const labels = {
             pendiente: "Pendiente",
             aprobado: "Aprobado",
-            en_proceso: "En Proceso",
+            asignado: "Asignado a transportista",
+            en_proceso: "En Camino",
             completado: "Completado"
         };
         return { className: badges[estado] || badges.pendiente, label: labels[estado] || estado };
@@ -222,6 +230,23 @@ const SolicitarPage = () => {
             <span className="loading loading-ring loading-lg text-blue-600"></span>
         </div>
     );
+
+    // Cuenta no aprobada
+    if (user && user.datosCliente?.aprobado === false) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+                <Head><title>Cuenta en Revisión | Jorge Minnesota</title></Head>
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 text-center">
+                    <FaClock className="text-4xl text-amber-500 mx-auto mb-3"/>
+                    <h2 className="text-lg font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
+                    <p className="text-sm text-gray-500 mb-4">Tu cuenta aún no ha sido aprobada. No puedes solicitar vehículos hasta que sea revisada.</p>
+                    <Link href="/clients">
+                        <a className="text-sm text-blue-600 font-bold underline">Volver</a>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
 
     // Login Form
     if (!user) {
@@ -280,6 +305,13 @@ const SolicitarPage = () => {
     return (
         <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
+
+            {/* Pull-to-refresh indicator */}
+            {refreshing && (
+                <div className="ptr-spinner">
+                    <div className="ptr-icon"></div>
+                </div>
+            )}
 
             {/* Header */}
             <header className="bg-white safe-area-top border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
@@ -389,48 +421,15 @@ const SolicitarPage = () => {
                                 </button>
                             </form>
 
-                            {/* Barra de progreso */}
+                            {/* Indicador de búsqueda */}
                             {searching && (
-                                <div className="mt-5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                            <span className="text-sm font-medium text-gray-700">{searchStep}</span>
-                                        </div>
-                                        <span className="text-xs font-bold text-blue-600">{searchProgress}%</span>
+                                <div className="mt-4 flex flex-col items-center gap-3 py-4">
+                                    <div className="relative">
+                                        <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"></div>
+                                        <FaSearch className="absolute inset-0 m-auto text-blue-600 text-sm" />
                                     </div>
-                                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-600 to-blue-500 transition-all duration-700 ease-out"
-                                            style={{ width: `${searchProgress}%`, backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }}
-                                        ></div>
-                                    </div>
-                                    <style jsx>{`
-                                        @keyframes shimmer {
-                                            0% { background-position: 200% 0; }
-                                            100% { background-position: -200% 0; }
-                                        }
-                                    `}</style>
-                                    <div className="flex items-center justify-center gap-6 pt-1">
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 25 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 25 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 45 ? <FaCheckCircle /> : "1"}
-                                            </div>
-                                            Conexión
-                                        </div>
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 45 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 45 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 65 ? <FaCheckCircle /> : "2"}
-                                            </div>
-                                            Búsqueda
-                                        </div>
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 80 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 80 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 100 ? <FaCheckCircle /> : "3"}
-                                            </div>
-                                            Datos
-                                        </div>
-                                    </div>
+                                    <p className="text-sm font-medium text-gray-600">Buscando en subastas...</p>
+                                    <p className="text-[10px] text-gray-400">Esto puede tomar unos segundos</p>
                                 </div>
                             )}
 
@@ -559,6 +558,12 @@ const SolicitarPage = () => {
                                                             <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
                                                         </span>
                                                     </div>
+                                                    {sol.estado === "completado" && sol.fechaCompletado && (
+                                                        <p className="text-[9px] text-green-600 font-bold mt-1">
+                                                            <FaCheckCircle className="inline mr-0.5 text-[8px]"/>
+                                                            Completado: {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 {sol.estado === "pendiente" && (
                                                     <button

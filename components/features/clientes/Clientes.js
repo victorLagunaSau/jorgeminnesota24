@@ -6,8 +6,9 @@ import { firestore } from "../../../firebase/firebaseIni";
 import FormCliente from "./FormCliente";
 import {
     FaTimes, FaSearch, FaChevronLeft, FaChevronRight,
-    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus, FaPrint
+    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus, FaPrint, FaClock
 } from "react-icons/fa";
+import ClientesNuevos from "./ClientesNuevos";
 
 const Clientes = ({ user }) => {
     const { clientes: clientesRaw, loading } = useAdminData();
@@ -20,6 +21,8 @@ const Clientes = ({ user }) => {
     const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
     const [vehiculosCliente, setVehiculosCliente] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(false);
+    const [vistaActual, setVistaActual] = useState("lista"); // "lista" | "nuevos"
+    const [pendientesCount, setPendientesCount] = useState(0);
 
     // Vehículos no entregados + entregados con fiado pendiente (nuevo o legacy)
     const [todosVehiculos, setTodosVehiculos] = useState([]);
@@ -28,6 +31,15 @@ const Clientes = ({ user }) => {
     const printRef = useRef();
 
     const xPagina = 15;
+
+    // Contador de clientes pendientes de aprobación
+    useEffect(() => {
+        const unsub = firestore()
+            .collection("clientes")
+            .where("aprobado", "==", false)
+            .onSnapshot((snap) => setPendientesCount(snap.size));
+        return () => unsub();
+    }, []);
 
     // Vehículos aún no entregados (adeudan precio completo)
     useEffect(() => {
@@ -207,6 +219,23 @@ const Clientes = ({ user }) => {
             <div className="flex justify-center items-center h-64">
                 <span className="loading loading-spinner loading-lg text-red-600"></span>
             </div>
+        );
+    }
+
+    // VISTA CLIENTES NUEVOS
+    if (vistaActual === "nuevos") {
+        return (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
+                <div className="mb-4">
+                    <button
+                        onClick={() => setVistaActual("lista")}
+                        className="btn btn-sm bg-gray-100 hover:bg-gray-200 text-gray-700 border-none font-bold gap-2"
+                    >
+                        <FaChevronLeft /> Volver a Clientes
+                    </button>
+                </div>
+                <ClientesNuevos user={user} />
+            </motion.div>
         );
     }
 
@@ -501,12 +530,25 @@ const Clientes = ({ user }) => {
                         onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
                     />
                 </div>
-                <button
-                    onClick={handleNuevoCliente}
-                    className="btn bg-red-600 hover:bg-red-700 text-white border-none font-black uppercase gap-2 rounded-xl"
-                >
-                    <FaUserPlus /> Agregar Cliente
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setVistaActual("nuevos")}
+                        className="btn bg-amber-500 hover:bg-amber-600 text-white border-none font-black uppercase gap-2 rounded-xl relative"
+                    >
+                        <FaClock /> Clientes Nuevos
+                        {pendientesCount > 0 && (
+                            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                                {pendientesCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={handleNuevoCliente}
+                        className="btn bg-red-600 hover:bg-red-700 text-white border-none font-black uppercase gap-2 rounded-xl"
+                    >
+                        <FaUserPlus /> Agregar Cliente
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">

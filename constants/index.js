@@ -56,6 +56,16 @@ export const TRIP_STATUS = {
 };
 
 // ===========================================
+// SOLICITUD STATUS
+// ===========================================
+export const SOLICITUD_STATUS = {
+  PENDIENTE: "pendiente",
+  ASIGNADO: "asignado",
+  EN_PROCESO: "en_proceso",
+  COMPLETADO: "completado",
+};
+
+// ===========================================
 // PAYMENT METHODS
 // ===========================================
 export const PAYMENT_METHODS = {
