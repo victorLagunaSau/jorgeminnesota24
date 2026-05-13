@@ -7,11 +7,28 @@ import { FaArrowLeft, FaExpand, FaCompress } from "react-icons/fa";
 
 const MapChart = dynamic(() => import("../components/features/solicitudes/MapaUSA"), { ssr: false });
 
+const US_STATES_MAP = {
+    'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+    'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+    'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+    'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+    'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+    'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+    'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+    'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+    'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+    'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+    'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+    'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+    'HI': 'Hawaii', 'AK': 'Alaska'
+};
+
 const CarrierMapaPage = () => {
     const { user, loading, isEmpresa } = useAuthContext();
     const [solicitudes, setSolicitudes] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [estadosAutorizados, setEstadosAutorizados] = useState(null);
     const mapaContainerRef = useRef(null);
 
     const toggleFullscreen = useCallback(() => {
@@ -29,14 +46,38 @@ const CarrierMapaPage = () => {
         return () => document.removeEventListener("fullscreenchange", handler);
     }, []);
 
+    // Cargar estados autorizados de la empresa
     useEffect(() => {
-        if (!user) { setLoadingData(false); return; }
+        if (!user) return;
+        const unsubscribe = firestore()
+            .collection("empresas")
+            .doc(user.id)
+            .onSnapshot((doc) => {
+                setEstadosAutorizados(doc.exists ? (doc.data().estadosAutorizados || []) : []);
+            });
+        return () => unsubscribe();
+    }, [user]);
+
+    const locationEnEstadoAutorizado = useCallback((location) => {
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return true;
+        if (!location) return false;
+        const match = location.match(/\b([A-Z]{2})\b/);
+        if (match && US_STATES_MAP[match[1]]) return estadosAutorizados.includes(match[1]);
+        for (const code of estadosAutorizados) {
+            if (US_STATES_MAP[code] && location.toLowerCase().includes(US_STATES_MAP[code].toLowerCase())) return true;
+        }
+        return false;
+    }, [estadosAutorizados]);
+
+    useEffect(() => {
+        if (!user || estadosAutorizados === null) { setLoadingData(estadosAutorizados === null); return; }
         const unsubscribe = firestore()
             .collection("solicitudesVehiculos")
             .onSnapshot((snap) => {
                 const lista = snap.docs
                     .map(doc => ({ id: doc.id, ...doc.data() }))
-                    .filter(s => s.estado !== "completado" && s.estado !== "asignado" && s.estado !== "en_proceso");
+                    .filter(s => s.estado !== "completado" && s.estado !== "asignado" && s.estado !== "en_proceso")
+                    .filter(s => locationEnEstadoAutorizado(s.location));
                 lista.sort((a, b) => {
                     const fechaA = a.fechaSolicitud?.toDate?.() || new Date(0);
                     const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
@@ -46,7 +87,7 @@ const CarrierMapaPage = () => {
                 setLoadingData(false);
             }, () => setLoadingData(false));
         return () => unsubscribe();
-    }, [user]);
+    }, [user, locationEnEstadoAutorizado]);
 
     const getEstadoConfig = (estado) => {
         const config = {

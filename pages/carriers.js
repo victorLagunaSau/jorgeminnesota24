@@ -22,6 +22,7 @@ const CarriersPage = () => {
     const [solicitudesPrecargadas, setSolicitudesPrecargadas] = useState(null);
     const [solicitudesUrgentes, setSolicitudesUrgentes] = useState(0);
     const [totalPendientes, setTotalPendientes] = useState(0);
+    const [estadosAutorizados, setEstadosAutorizados] = useState(null); // null = cargando, [] = sin filtro
 
     useEffect(() => {
         try {
@@ -30,15 +31,65 @@ const CarriersPage = () => {
         } catch (_) { setBorradores([]); }
     }, [view]);
 
+    // Cargar estados autorizados de la empresa
+    useEffect(() => {
+        if (!user) return;
+        const unsubscribe = firestore()
+            .collection("empresas")
+            .doc(user.id)
+            .onSnapshot((doc) => {
+                if (doc.exists) {
+                    setEstadosAutorizados(doc.data().estadosAutorizados || []);
+                } else {
+                    setEstadosAutorizados([]);
+                }
+            });
+        return () => unsubscribe();
+    }, [user]);
+
+    // Helper para verificar si una location pertenece a un estado autorizado
+    const locationEnEstadoAutorizado = (location) => {
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return true; // sin filtro = ver todo
+        if (!location) return false;
+        const US_STATES_MAP = {
+            'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+            'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+            'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+            'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+            'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+            'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+            'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+            'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+            'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+            'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+            'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+            'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+            'HI': 'Hawaii', 'AK': 'Alaska'
+        };
+        // Buscar código de estado en la location
+        const match = location.match(/\b([A-Z]{2})\b/);
+        if (match && US_STATES_MAP[match[1]]) {
+            return estadosAutorizados.includes(match[1]);
+        }
+        // Buscar nombre completo
+        for (const code of estadosAutorizados) {
+            if (US_STATES_MAP[code] && location.toLowerCase().includes(US_STATES_MAP[code].toLowerCase())) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     // Listener para contar solicitudes pendientes y urgentes (>3 días)
     useEffect(() => {
         if (!user) return;
         const unsubscribe = firestore()
             .collection("solicitudesVehiculos")
             .onSnapshot((snap) => {
-                const pendientes = snap.docs
+                const todas = snap.docs
                     .map(doc => doc.data())
                     .filter(s => s.estado !== "completado" && s.estado !== "asignado" && s.estado !== "en_proceso");
+                const pendientes = todas.filter(s => locationEnEstadoAutorizado(s.location));
                 setTotalPendientes(pendientes.length);
                 const tresDias = 3 * 24 * 60 * 60 * 1000;
                 const urgentes = pendientes.filter(s => {
@@ -48,7 +99,7 @@ const CarriersPage = () => {
                 setSolicitudesUrgentes(urgentes.length);
             });
         return () => unsubscribe();
-    }, [user]);
+    }, [user, estadosAutorizados]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -182,7 +233,7 @@ const CarriersPage = () => {
                     ) : view === "historial" ? (
                         <HistorialViajesCarrier user={user} />
                     ) : view === "solicitudes" ? (
-                        <SolicitudesCarrier user={user} onCrearViaje={handleCrearViajeDesde} />
+                        <SolicitudesCarrier user={user} onCrearViaje={handleCrearViajeDesde} estadosAutorizados={estadosAutorizados} />
                     ) : (
                         <TablaViajes
                             user={user}

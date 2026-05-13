@@ -22,7 +22,7 @@ const US_STATES_MAP = {
     'HI': 'Hawaii', 'AK': 'Alaska'
 };
 
-const SolicitudesCarrier = ({ user, onCrearViaje }) => {
+const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
     const [solicitudes, setSolicitudes] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [busqueda, setBusqueda] = useState("");
@@ -218,14 +218,25 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
         s.model?.toLowerCase().includes(busqueda.toLowerCase()) ||
         s.location?.toLowerCase().includes(busqueda.toLowerCase());
 
+    const enEstadoAutorizado = (sol) => {
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return true;
+        if (!sol.location) return false;
+        const match = sol.location.match(/\b([A-Z]{2})\b/);
+        if (match && US_STATES_MAP[match[1]]) return estadosAutorizados.includes(match[1]);
+        for (const code of estadosAutorizados) {
+            if (US_STATES_MAP[code] && sol.location.toLowerCase().includes(US_STATES_MAP[code].toLowerCase())) return true;
+        }
+        return false;
+    };
+
     const solicitudesPendientes = solicitudes.filter(s =>
-        s.estado !== "completado" && s.estado !== "asignado" && s.estado !== "en_proceso" && matchBusqueda(s)
+        s.estado !== "completado" && s.estado !== "asignado" && s.estado !== "en_proceso" && enEstadoAutorizado(s) && matchBusqueda(s)
     );
     const solicitudesAsignadas = solicitudes.filter(s =>
-        (s.estado === "asignado" || s.estado === "en_proceso") && matchBusqueda(s)
+        (s.estado === "asignado" || s.estado === "en_proceso") && enEstadoAutorizado(s) && matchBusqueda(s)
     );
     const solicitudesCompletadas = solicitudes
-        .filter(s => s.estado === "completado" && matchBusqueda(s))
+        .filter(s => s.estado === "completado" && enEstadoAutorizado(s) && matchBusqueda(s))
         .sort((a, b) => {
             const fa = a.fechaCompletado?.toDate?.() || a.fechaSolicitud?.toDate?.() || new Date(0);
             const fb = b.fechaCompletado?.toDate?.() || b.fechaSolicitud?.toDate?.() || new Date(0);
