@@ -3,7 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import {
     FaCar, FaUser, FaMapMarkerAlt, FaSearch,
     FaTruck, FaEye, FaTimes, FaChevronDown, FaChevronRight,
-    FaGavel, FaBarcode, FaCalendarAlt, FaCheck, FaCheckCircle, FaPlus, FaTrash
+    FaGavel, FaBarcode, FaCalendarAlt, FaCheck, FaCheckCircle, FaPlus, FaTrash, FaIdCard
 } from "react-icons/fa";
 
 const US_STATES_MAP = {
@@ -177,12 +177,12 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
     };
 
     const getAgeColor = (fechaSolicitud) => {
-        if (!fechaSolicitud) return { bg: "bg-green-500", text: "text-green-600", border: "border-green-400", days: 0 };
+        if (!fechaSolicitud) return { fill: "#22c55e", bg: "bg-green-500", text: "text-green-600", border: "border-green-400", days: 0 };
         const date = fechaSolicitud.toDate ? fechaSolicitud.toDate() : new Date(fechaSolicitud);
         const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-        if (days >= 7) return { bg: "bg-red-500", text: "text-red-600", border: "border-red-400", days };
-        if (days >= 3) return { bg: "bg-amber-500", text: "text-amber-600", border: "border-amber-400", days };
-        return { bg: "bg-green-500", text: "text-green-600", border: "border-green-400", days };
+        if (days >= 7) return { fill: "#ef4444", bg: "bg-red-500", text: "text-red-600", border: "border-red-400", days };
+        if (days >= 3) return { fill: "#f59e0b", bg: "bg-amber-500", text: "text-amber-600", border: "border-amber-400", days };
+        return { fill: "#22c55e", bg: "bg-green-500", text: "text-green-600", border: "border-green-400", days };
     };
 
     const getEstadoConfig = (estado) => {
@@ -269,88 +269,91 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
         return (
             <div
                 key={sol.id}
-                onClick={() => esPendiente && toggleSeleccion(sol.id)}
-                className={`flex items-center gap-3 px-4 py-3 transition-all ${
-                    esPendiente ? "cursor-pointer hover:bg-gray-50" : ""
-                } ${estaSeleccionado ? "bg-red-50" : ""}`}
+                onClick={() => esPendiente ? toggleSeleccion(sol.id) : setModalDetalle(sol)}
+                className={`bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition-all ${estaSeleccionado ? "ring-2 ring-red-400 bg-red-50/30" : ""}`}
             >
-                {/* Checkbox (solo pendientes) */}
-                {esPendiente && (
-                    <input
-                        type="checkbox"
-                        checked={estaSeleccionado}
-                        onChange={() => toggleSeleccion(sol.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="checkbox checkbox-sm checkbox-error flex-shrink-0"
-                    />
-                )}
-
                 {/* Imagen */}
-                <div className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-gray-100 border border-gray-200">
+                <div className="relative w-full h-48 bg-gray-100">
                     {sol.imageUrl ? (
-                        <img
-                            src={sol.imageUrl}
-                            alt=""
-                            className="w-full h-full object-cover cursor-pointer"
-                            onClick={(e) => { e.stopPropagation(); setImagenAmpliada(sol.imageUrl); }}
-                        />
+                        <img src={sol.imageUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                            <FaCar className="text-gray-300" />
+                            <FaCar className="text-gray-300 text-xl" />
                         </div>
                     )}
+                    {/* Checkbox overlay */}
+                    {esPendiente && (
+                        <div className="absolute top-2 left-2">
+                            <input
+                                type="checkbox"
+                                checked={estaSeleccionado}
+                                onChange={() => toggleSeleccion(sol.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="checkbox checkbox-sm checkbox-error bg-white"
+                            />
+                        </div>
+                    )}
+                    {/* Badges overlay */}
+                    <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                        <span className="bg-gray-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">{sol.source}</span>
+                        <span className="text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: age.fill }}>{age.days}d</span>
+                    </div>
+                    {/* Estado badge */}
+                    <span className={`absolute top-2 right-2 px-1.5 py-0.5 rounded-full text-[8px] font-bold text-white ${estadoConf.bg}`}>
+                        {estadoConf.label}
+                    </span>
                 </div>
 
                 {/* Info */}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                        <p className="text-sm font-bold text-gray-800 truncate">
-                            {sol.year} {sol.make} {sol.model}
-                        </p>
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${age.bg}`} title={`${age.days} días`} />
-                    </div>
-                    <p className="text-[11px] text-gray-500 truncate">
-                        <FaUser className="inline mr-1 text-red-400" />{sol.clienteNombre}
+                <div className="p-3">
+                    <p className="text-[10px] text-gray-400 font-bold truncate flex items-center gap-1">
+                        <FaUser className="text-[8px]" /> {(sol.clienteNombre || 'Sin cliente').replace(/\b\w/g, c => c.toUpperCase())}
                     </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] font-mono text-gray-400">
-                            <FaBarcode className="inline mr-0.5" />#{sol.lotNumber}
-                        </span>
-                        {sol.location && (
-                            <span className="text-[10px] text-gray-400 truncate">
-                                <FaMapMarkerAlt className="inline mr-0.5" />{sol.location}
-                            </span>
+                    <p className="text-sm font-bold text-gray-800 truncate mt-0.5">
+                        {sol.year} {sol.make} {sol.model}
+                    </p>
+                    <div className="mt-1.5 space-y-0.5 text-[11px] text-gray-500">
+                        <div className="flex items-center gap-1">
+                            <FaBarcode className="text-gray-400 text-[9px]" />
+                            <span className="font-mono truncate">{sol.lotNumber}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <FaMapMarkerAlt className="text-gray-400 text-[9px]" />
+                            <span className="truncate">{sol.location || '-'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <FaGavel className="text-gray-400 text-[9px]" />
+                            <span className="truncate">{sol.auctionDate || 'Sin fecha'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <FaCalendarAlt className="text-gray-400 text-[9px]" />
+                            <span className="truncate">Ordenado: {formatDate(sol.fechaSolicitud)}</span>
+                        </div>
+                        {tab === "completados" && sol.fechaCompletado && (
+                            <div className="flex items-center gap-1">
+                                <FaCheckCircle className="text-green-600 text-[9px]" />
+                                <span className="text-green-600 font-bold truncate">{formatDate(sol.fechaCompletado)}</span>
+                            </div>
                         )}
                     </div>
-                    {tab === "completados" && sol.fechaCompletado && (
-                        <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            <FaCheckCircle className="inline mr-0.5 text-[9px]" />
-                            Completado: {formatDate(sol.fechaCompletado)}
-                        </p>
-                    )}
-                </div>
 
-                {/* Estado badge */}
-                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold text-white flex-shrink-0 ${estadoConf.bg}`}>
-                    {estadoConf.label}
-                </span>
-
-                {/* Botones de acción */}
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setModalDetalle(sol); }}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                        title="Ver detalle"
-                    >
-                        <FaEye size={13} />
-                    </button>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); eliminarSolicitud(sol.id); }}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Eliminar"
-                    >
-                        <FaTrash size={11} />
-                    </button>
+                    {/* Acciones */}
+                    <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-gray-100">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setModalDetalle(sol); }}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                            title="Ver detalle"
+                        >
+                            <FaEye size={12} />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); eliminarSolicitud(sol.id); }}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Eliminar"
+                        >
+                            <FaTrash size={11} />
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -434,10 +437,12 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
                 </div>
             ) : (busqueda || tab === "completados") ? (
                 /* ===== LISTA PLANA (búsqueda o completados) ===== */
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden divide-y divide-gray-100">
-                    {listaActual.map((sol) => renderFila(sol))}
+                <div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
+                        {listaActual.map((sol) => renderFila(sol))}
+                    </div>
                     {tab === "completados" && !busqueda && contadores.completados > 40 && (
-                        <div className="px-4 py-3 text-center text-xs text-gray-400">
+                        <div className="px-4 py-3 text-center text-xs text-gray-400 mt-2">
                             Mostrando los últimos 40 de {contadores.completados}
                         </div>
                     )}
@@ -464,7 +469,7 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
                             </button>
 
                             {estadosAbiertos[estadoUSA] && (
-                                <div className="divide-y divide-gray-100">
+                                <div className="p-3 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2.5">
                                     {solicitudesGrupo.map((sol) => renderFila(sol))}
                                 </div>
                             )}
@@ -492,58 +497,81 @@ const SolicitudesCarrier = ({ user, onCrearViaje }) => {
             )}
 
             {/* Modal Detalle */}
-            {modalDetalle && (
+            {modalDetalle && (() => {
+                const ageD = getAgeColor(modalDetalle.fechaSolicitud);
+                return (
                 <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setModalDetalle(null)}>
-                    <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                        <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center">
-                            <h3 className="font-bold text-gray-800">Detalle de Solicitud</h3>
-                            <button onClick={() => setModalDetalle(null)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                                <FaTimes />
-                            </button>
-                        </div>
-                        <div className="p-4 space-y-4">
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Header con imagen */}
+                        <div className="relative">
                             {modalDetalle.imageUrl ? (
-                                <img src={modalDetalle.imageUrl} alt="" className="w-full h-48 object-contain bg-gray-100 rounded-xl cursor-pointer" onClick={() => setImagenAmpliada(modalDetalle.imageUrl)} />
+                                <img src={modalDetalle.imageUrl} alt="" className="w-full h-44 object-cover rounded-t-2xl cursor-pointer" onClick={() => setImagenAmpliada(modalDetalle.imageUrl)} />
                             ) : (
-                                <div className="w-full h-48 bg-gray-100 rounded-xl flex items-center justify-center"><FaCar className="text-4xl text-gray-300" /></div>
+                                <div className="w-full h-44 bg-gray-100 rounded-t-2xl flex items-center justify-center"><FaCar className="text-4xl text-gray-300" /></div>
                             )}
-                            <div>
-                                <h4 className="text-xl font-bold text-gray-800">{modalDetalle.year} {modalDetalle.make} {modalDetalle.model}</h4>
-                                <span className="inline-block bg-gray-800 text-white text-xs font-bold px-2 py-1 rounded mt-1">{modalDetalle.source}</span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 text-sm">
-                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <p className="text-gray-400 text-xs mb-1">Lote</p>
-                                    <p className="text-gray-800 font-mono font-bold">{modalDetalle.lotNumber}</p>
-                                </div>
-                                <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <p className="text-gray-400 text-xs mb-1">Gate Pass</p>
-                                    <p className="text-gray-800 font-mono font-bold">{modalDetalle.gatePass || 'N/A'}</p>
-                                </div>
-                                <div className="col-span-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <p className="text-gray-400 text-xs mb-1">VIN</p>
-                                    <p className="text-gray-800 font-mono text-sm">{modalDetalle.vin || 'N/A'}</p>
-                                </div>
-                                <div className="col-span-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                    <p className="text-gray-400 text-xs mb-1">Location</p>
-                                    <p className="text-gray-800 font-medium">{modalDetalle.location || 'N/A'}</p>
-                                </div>
-                            </div>
-                            <div className="pt-3 border-t border-gray-200">
-                                <p className="text-[11px] text-gray-400 flex items-center gap-1"><FaUser className="text-red-500" /> Cliente</p>
-                                <p className="text-gray-800 font-semibold">{modalDetalle.clienteNombre}</p>
-                                <p className="text-xs text-gray-400 mt-1">Solicitado: {formatDate(modalDetalle.fechaSolicitud, true)}</p>
-                            </div>
-                            <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                                <span className="text-sm text-gray-500">Estado</span>
-                                <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${getEstadoConfig(modalDetalle.estado).bg}`}>
+                            <button onClick={() => setModalDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/60 rounded-full text-white">
+                                <FaTimes size={12} />
+                            </button>
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">{modalDetalle.source}</span>
+                                <span className="text-white text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: ageD.fill }}>{ageD.days}d</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${getEstadoConfig(modalDetalle.estado).bg}`}>
                                     {getEstadoConfig(modalDetalle.estado).label}
                                 </span>
                             </div>
                         </div>
+
+                        <div className="p-4">
+                            {/* Título */}
+                            <h4 className="text-lg font-bold text-gray-800">{modalDetalle.year} {modalDetalle.make} {modalDetalle.model}</h4>
+
+                            {/* Datos en lista compacta */}
+                            <div className="mt-3 space-y-2 text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                    <FaBarcode className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Lote</span>
+                                    <span className="font-mono font-medium text-gray-800">{modalDetalle.lotNumber}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FaIdCard className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Gate Pass</span>
+                                    <span className="font-mono font-medium text-gray-800">{modalDetalle.gatePass || '-'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FaBarcode className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">VIN</span>
+                                    <span className="font-mono text-gray-800 text-xs">{modalDetalle.vin || '-'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FaMapMarkerAlt className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Location</span>
+                                    <span className="text-gray-800">{modalDetalle.location || '-'}</span>
+                                </div>
+                            </div>
+
+                            {/* Separador + Cliente */}
+                            <div className="mt-3 pt-3 border-t border-gray-100 space-y-2 text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                    <FaUser className="text-red-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Cliente</span>
+                                    <span className="font-medium text-gray-800">{modalDetalle.clienteNombre}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FaGavel className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Comprado</span>
+                                    <span className="text-gray-800">{modalDetalle.auctionDate || '-'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0" />
+                                    <span className="text-gray-400 text-xs w-16">Ordenado</span>
+                                    <span className="text-gray-800">{formatDate(modalDetalle.fechaSolicitud, true)}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Lightbox */}
             {imagenAmpliada && (
