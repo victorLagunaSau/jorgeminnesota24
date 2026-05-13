@@ -275,36 +275,7 @@ const ClientsPage = () => {
 
         setLoadingAuth(true);
         try {
-            // Obtener siguiente folio
-            const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
-            const docCon = await conRef.get();
-            const nuevoFolio = (docCon.data().clientes || 0) + 1;
-
-            // Intentar crear usuario en Auth, o reutilizar si ya existe (fue borrado de Firestore)
-            let uid;
-            try {
-                const result = await auth().createUserWithEmailAndPassword(email.toLowerCase(), pass);
-                uid = result.user.uid;
-            } catch (authErr) {
-                if (authErr.code === "auth/email-already-in-use") {
-                    // El email existe en Auth pero pudo haber sido borrado de Firestore
-                    // Intentar sign in con la contraseña proporcionada
-                    try {
-                        const loginResult = await auth().signInWithEmailAndPassword(email.toLowerCase(), pass);
-                        uid = loginResult.user.uid;
-                        // Actualizar contraseña si es diferente
-                        await loginResult.user.updatePassword(pass);
-                    } catch (loginErr) {
-                        setError("Este email ya está registrado con otra contraseña. Intenta iniciar sesión o usa otro email.");
-                        setLoadingAuth(false);
-                        return;
-                    }
-                } else {
-                    throw authErr;
-                }
-            }
-
-            // Convertir foto de licencia a base64 (se guarda directo en Firestore)
+            // Procesar licencia primero (antes de tocar Auth)
             let licenciaBase64 = "";
             try {
                 let archivoFinal = regLicenciaFile;
@@ -320,7 +291,16 @@ const ClientsPage = () => {
                 console.error("Error procesando licencia:", err);
             }
 
-            // Crear documento en users
+            // Obtener siguiente folio
+            const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+            const docCon = await conRef.get();
+            const nuevoFolio = (docCon.data().clientes || 0) + 1;
+
+            // Crear usuario en Auth
+            const result = await auth().createUserWithEmailAndPassword(email.toLowerCase(), pass);
+            const uid = result.user.uid;
+
+            // Escribir todos los docs en Firestore
             await firestore().collection(COLLECTIONS.USERS).doc(uid).set({
                 email: email.toLowerCase(),
                 username: regNombre.trim(),
@@ -330,7 +310,6 @@ const ClientsPage = () => {
                 createdAt: new Date()
             });
 
-            // Crear documento en clientes con el mismo UID
             await firestore().collection(COLLECTIONS.CLIENTES).doc(uid).set({
                 cliente: regNombre.trim().toUpperCase(),
                 telefonoCliente: regPrefijo + " " + regTelefono.trim(),
@@ -339,7 +318,7 @@ const ClientsPage = () => {
                 passwordAcceso: pass,
                 ciudadCliente: regCiudad.trim(),
                 estadoCliente: regEstado.trim().toUpperCase(),
-                paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
+                paisCliente: regPrefijo === "+52" ? "México" : "United States",
                 rfcCliente: "",
                 direccionCliente: regDireccion.trim(),
                 apodoCliente: "",
@@ -353,7 +332,6 @@ const ClientsPage = () => {
                 }
             });
 
-            // Actualizar consecutivo
             await conRef.update({ clientes: nuevoFolio });
 
             // Mostrar pantalla de revisión directamente
@@ -361,7 +339,11 @@ const ClientsPage = () => {
 
         } catch (err) {
             console.error("Error en registro:", err);
-            setError("Error al crear cuenta: " + err.message);
+            if (err.code === "auth/email-already-in-use") {
+                setError("Este email ya está registrado. Intenta iniciar sesión.");
+            } else {
+                setError("Error al crear cuenta: " + err.message);
+            }
         } finally {
             setLoadingAuth(false);
         }
@@ -472,16 +454,17 @@ const ClientsPage = () => {
         );
     }
 
-    if (user && !isCliente) {
-        signOut();
-        return null;
-    }
-
     if (loading || loadingAuth) return (
         <div className="h-screen flex flex-col justify-center items-center bg-white">
             <span className="loading loading-ring loading-lg text-blue-600"></span>
         </div>
     );
+
+    if (user && (!isCliente || !user.datosCliente)) {
+        if (!error) setError("Esta cuenta no existe o fue eliminada. Crea una nueva cuenta.");
+        signOut();
+        return null;
+    }
 
     // ============================================================
     // LOGIN / REGISTRO
@@ -848,6 +831,7 @@ const ClientsPage = () => {
                                 { icon: <FaPhone className="text-gray-400 text-sm"/>, label: "Teléfono", value: clienteData.telefonoCliente },
                                 { icon: <FaMapMarkerAlt className="text-gray-400 text-sm"/>, label: "Dirección", value: clienteData.direccionCliente },
                                 { icon: <FaCity className="text-gray-400 text-sm"/>, label: "Ciudad", value: [clienteData.ciudadCliente, clienteData.estadoCliente].filter(Boolean).join(", ") },
+                                { icon: <FaGlobe className="text-gray-400 text-sm"/>, label: "País", value: clienteData.paisCliente },
                             ].map((campo, i) => (
                                 <div key={i}>
                                     <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">{campo.label}</label>

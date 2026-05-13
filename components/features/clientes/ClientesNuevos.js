@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import firebase from "firebase/app";
 import { COLLECTIONS } from "../../../constants";
 import {
     FaUser, FaPhone, FaMapMarkerAlt, FaEnvelope, FaIdCard,
@@ -52,11 +53,29 @@ const ClientesNuevos = ({ user }) => {
     const rechazarCliente = async (clienteId) => {
         if (!confirm("Rechazar este cliente? Se eliminará su cuenta.")) return;
         setAprobando(clienteId);
+        let secondaryApp = null;
         try {
+            // Obtener datos del cliente para borrar Auth
+            const clienteDoc = await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteId).get();
+            const data = clienteDoc.data();
+            if (data?.emailAcceso && data?.passwordAcceso) {
+                try {
+                    const config = firebase.app().options;
+                    secondaryApp = firebase.apps.find(a => a.name === "deleteApp") || firebase.initializeApp(config, "deleteApp");
+                    const cred = await secondaryApp.auth().signInWithEmailAndPassword(data.emailAcceso, data.passwordAcceso);
+                    await cred.user.delete();
+                } catch (authErr) {
+                    console.warn("No se pudo eliminar Auth user:", authErr.message);
+                }
+            }
             await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteId).delete();
             await firestore().collection(COLLECTIONS.USERS).doc(clienteId).delete();
         } catch (err) {
             console.error("Error rechazando cliente:", err);
+        } finally {
+            if (secondaryApp) {
+                try { await secondaryApp.delete(); } catch (_) {}
+            }
         }
         setAprobando(null);
     };
