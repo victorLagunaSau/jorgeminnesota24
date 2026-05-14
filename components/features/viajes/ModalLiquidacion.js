@@ -1,6 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import {FaWallet, FaTimes, FaCar, FaPrint, FaCheckCircle, FaCheckDouble, FaTruck} from "react-icons/fa";
+import { notificarCambioEstatus } from "../../../utils";
 import ReactToPrint from "react-to-print";
 import ReciboPago from "./ReciboPago";
 
@@ -165,7 +166,8 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                             storage: v.preciosClienteEditados ? parseFloat(v.storageCliente || 0) : parseFloat(v.storage || 0),
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
-                            titulo: v.titulo || "NO"
+                            titulo: v.titulo || "NO",
+                            ...(v.solicitudId ? { solicitudId: v.solicitudId } : {}),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)
@@ -219,6 +221,13 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
 
             setPagoCompletado(true);
             setShowConfirm(false);
+
+            // Push notification a cada cliente del viaje
+            (viaje.vehiculos || []).forEach(v => {
+                if (v.clienteNombre) {
+                    notificarCambioEstatus(v.clienteNombre, "EB", `${v.marca} ${v.modelo}`);
+                }
+            });
 
             setTimeout(() => {
                 if (btnPrintRef.current) btnPrintRef.current.click();

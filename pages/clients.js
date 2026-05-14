@@ -1,24 +1,28 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import firebase from "firebase/app";
 import { useAuthContext } from "../context/auth";
 import { auth, firestore } from "../firebase/firebaseIni";
 import { COLLECTIONS, PHONE_CONFIG, FIELD_LIMITS } from "../constants";
+import imageCompression from "browser-image-compression";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaTruck, FaMapMarkerAlt, FaPhone,
     FaSearch, FaCalendarAlt, FaWarehouse, FaPlus, FaUserCircle, FaArrowLeft,
     FaEnvelope, FaIdCard, FaGlobe, FaCity, FaCheckCircle, FaLockOpen,
-    FaUserPlus, FaEye, FaEyeSlash
+    FaUserPlus, FaEye, FaEyeSlash, FaCamera, FaClock, FaTimes, FaBarcode, FaKey
 } from "react-icons/fa";
 
 const ClientsPage = () => {
     const { user, loading, isCliente, signIn, signOut } = useAuthContext();
     const [vehiculos, setVehiculos] = useState([]);
+    const [solicitudes, setSolicitudes] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(true);
     const [busqueda, setBusqueda] = useState("");
 
     const [vista, setVista] = useState("vehiculos"); // "vehiculos" | "perfil"
+    const [vehiculoDetalle, setVehiculoDetalle] = useState(null);
+    const [solicitudDetalle, setSolicitudDetalle] = useState(null);
 
     // Login state
     const [modoAuth, setModoAuth] = useState("login"); // "login" | "registro"
@@ -27,11 +31,18 @@ const ClientsPage = () => {
     const [error, setError] = useState("");
     const [loadingAuth, setLoadingAuth] = useState(false);
     const [mostrarPass, setMostrarPass] = useState(false);
+    const [registroExitoso, setRegistroExitoso] = useState(false);
 
     // Registro state
     const [regNombre, setRegNombre] = useState("");
     const [regTelefono, setRegTelefono] = useState("");
+    const [regPrefijo, setRegPrefijo] = useState("+1");
+    const [regDireccion, setRegDireccion] = useState("");
+    const [regCiudad, setRegCiudad] = useState("");
+    const [regEstado, setRegEstado] = useState("");
     const [regConfirmPass, setRegConfirmPass] = useState("");
+    const [regLicenciaFile, setRegLicenciaFile] = useState(null);
+    const [regLicenciaPreview, setRegLicenciaPreview] = useState(null);
 
     // Perfil state — inicializar con datosCliente del auth hook (snapshot estático)
     const [clienteData, setClienteData] = useState(user?.datosCliente || {});
@@ -49,6 +60,13 @@ const ClientsPage = () => {
         rfcCliente: data.rfcCliente || "",
         direccionCliente: data.direccionCliente || "",
     });
+
+    // Marcar body como app Capacitor para estilos móviles (font-size 16px en inputs)
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) {
+            document.body.classList.add("capacitor-app");
+        }
+    }, []);
 
     // Sincronizar datosCliente del auth hook como estado inicial
     useEffect(() => {
@@ -78,6 +96,100 @@ const ClientsPage = () => {
         return () => unsubscribe();
     }, [user?.datosCliente?.id]);
 
+    // Push notifications — registrar token FCM en Capacitor
+    useEffect(() => {
+        if (!user?.id) return;
+        // window.Capacitor solo existe dentro del WebView nativo
+        if (typeof window === "undefined" || !window.Capacitor?.isNativePlatform?.()) return;
+
+        const registerPush = async () => {
+            try {
+                const PushNotifications = window.Capacitor.Plugins.PushNotifications;
+                if (!PushNotifications) return;
+
+                // Solicitar permiso
+                const permStatus = await PushNotifications.requestPermissions();
+                if (permStatus.receive !== "granted") return;
+
+                // Registrar para recibir push
+                await PushNotifications.register();
+
+                // Guardar token en Firestore
+                PushNotifications.addListener("registration", async (token) => {
+                    try {
+                        await firestore()
+                            .collection(COLLECTIONS.TOKENS_CLIENTE)
+                            .doc(user.id)
+                            .set({
+                                token: token.value,
+                                platform: window.Capacitor.getPlatform(),
+                                clienteId: user.datosCliente?.id || user.id,
+                                clienteNombre: user.datosCliente?.cliente || user.username || "",
+                                updatedAt: new Date()
+                            }, { merge: true });
+                    } catch (err) {
+                        console.error("Error guardando token push:", err);
+                    }
+                });
+
+                // Manejar notificación recibida con app abierta
+                PushNotifications.addListener("pushNotificationReceived", (notification) => {
+                    console.log("Push recibida:", notification);
+                });
+
+                // Manejar tap en notificación
+                PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
+                    console.log("Push tap:", notification);
+                });
+
+            } catch (e) {
+                // En web o si falla, simplemente ignorar
+            }
+        };
+
+        registerPush();
+    }, [user?.id]);
+
+    // Pull-to-refresh
+    const [refreshing, setRefreshing] = useState(false);
+    const pullStartY = useRef(0);
+    const isPulling = useRef(false);
+
+    const handleRefresh = useCallback(() => {
+        setRefreshing(true);
+        // Firestore onSnapshot ya mantiene datos frescos, solo forzar un re-render visual
+        setTimeout(() => setRefreshing(false), 800);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !window.Capacitor?.isNativePlatform?.()) return;
+
+        const onTouchStart = (e) => {
+            if (window.scrollY === 0) {
+                pullStartY.current = e.touches[0].clientY;
+                isPulling.current = true;
+            }
+        };
+        const onTouchMove = (e) => {
+            if (!isPulling.current) return;
+            const diff = e.touches[0].clientY - pullStartY.current;
+            if (diff > 80 && window.scrollY === 0) {
+                isPulling.current = false;
+                handleRefresh();
+            }
+        };
+        const onTouchEnd = () => { isPulling.current = false; };
+
+        document.addEventListener("touchstart", onTouchStart, { passive: true });
+        document.addEventListener("touchmove", onTouchMove, { passive: true });
+        document.addEventListener("touchend", onTouchEnd, { passive: true });
+        return () => {
+            document.removeEventListener("touchstart", onTouchStart);
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+        };
+    }, [handleRefresh]);
+
     // Cargar vehículos del cliente
     useEffect(() => {
         if (!clienteData.cliente) {
@@ -105,6 +217,29 @@ const ClientsPage = () => {
         return () => unsubscribe();
     }, [clienteData.cliente]);
 
+    // Cargar solicitudes del cliente
+    useEffect(() => {
+        const clienteId = user?.datosCliente?.id || user?.id;
+        if (!clienteId) return;
+
+        const unsubscribe = firestore()
+            .collection("solicitudesVehiculos")
+            .where("clienteId", "==", clienteId)
+            .onSnapshot((snap) => {
+                const lista = snap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => s.estado !== "completado")
+                    .sort((a, b) => {
+                        const fa = a.fechaSolicitud?.toDate?.() || new Date(0);
+                        const fb = b.fechaSolicitud?.toDate?.() || new Date(0);
+                        return fb - fa;
+                    });
+                setSolicitudes(lista);
+            });
+
+        return () => unsubscribe();
+    }, [user?.datosCliente?.id, user?.id]);
+
     // === Auth handlers ===
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -123,8 +258,12 @@ const ClientsPage = () => {
         e.preventDefault();
         setError("");
 
-        if (!regNombre.trim()) {
-            setError("El nombre es obligatorio.");
+        if (!regNombre.trim() || !regTelefono.trim() || !regDireccion.trim() || !regCiudad.trim() || !regEstado.trim()) {
+            setError("Todos los campos son obligatorios.");
+            return;
+        }
+        if (!regLicenciaFile) {
+            setError("La foto de tu licencia es obligatoria.");
             return;
         }
         if (pass.length < FIELD_LIMITS.MIN_PASSWORD) {
@@ -138,6 +277,22 @@ const ClientsPage = () => {
 
         setLoadingAuth(true);
         try {
+            // Procesar licencia primero (antes de tocar Auth)
+            let licenciaBase64 = "";
+            try {
+                let archivoFinal = regLicenciaFile;
+                try {
+                    archivoFinal = await imageCompression(regLicenciaFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1200, useWebWorker: true, fileType: "image/webp" });
+                } catch (_) {}
+                licenciaBase64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(archivoFinal);
+                });
+            } catch (err) {
+                console.error("Error procesando licencia:", err);
+            }
+
             // Obtener siguiente folio
             const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
             const docCon = await conRef.get();
@@ -147,29 +302,30 @@ const ClientsPage = () => {
             const result = await auth().createUserWithEmailAndPassword(email.toLowerCase(), pass);
             const uid = result.user.uid;
 
-            // Crear documento en users
+            // Escribir todos los docs en Firestore
             await firestore().collection(COLLECTIONS.USERS).doc(uid).set({
                 email: email.toLowerCase(),
                 username: regNombre.trim(),
-                telefono: regTelefono,
+                telefono: regPrefijo + " " + regTelefono.trim(),
                 tipo: "cliente",
                 activo: true,
                 createdAt: new Date()
             });
 
-            // Crear documento en clientes con el mismo UID
             await firestore().collection(COLLECTIONS.CLIENTES).doc(uid).set({
                 cliente: regNombre.trim().toUpperCase(),
-                telefonoCliente: regTelefono,
+                telefonoCliente: regPrefijo + " " + regTelefono.trim(),
                 emailCliente: email.toLowerCase(),
                 emailAcceso: email.toLowerCase(),
                 passwordAcceso: pass,
-                ciudadCliente: "",
-                estadoCliente: "",
-                paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
+                ciudadCliente: regCiudad.trim(),
+                estadoCliente: regEstado.trim().toUpperCase(),
+                paisCliente: regPrefijo === "+52" ? "México" : "United States",
                 rfcCliente: "",
-                direccionCliente: "",
+                direccionCliente: regDireccion.trim(),
                 apodoCliente: "",
+                licenciaBase64,
+                aprobado: false,
                 folio: nuevoFolio,
                 registro: {
                     usuario: "Auto-registro",
@@ -178,8 +334,10 @@ const ClientsPage = () => {
                 }
             });
 
-            // Actualizar consecutivo
             await conRef.update({ clientes: nuevoFolio });
+
+            // Mostrar pantalla de revisión directamente
+            setRegistroExitoso(true);
 
         } catch (err) {
             console.error("Error en registro:", err);
@@ -226,6 +384,15 @@ const ClientsPage = () => {
     };
 
     // === Helpers ===
+    const getSolicitudBadge = (estado) => {
+        const config = {
+            pendiente: { className: "bg-amber-100 text-amber-800", label: "En Progreso" },
+            asignado: { className: "bg-indigo-100 text-indigo-800", label: "Asignado" },
+            en_proceso: { className: "bg-blue-100 text-blue-800", label: "En Camino" },
+        };
+        return config[estado] || config.pendiente;
+    };
+
     const getStatusColor = (status) => {
         const colors = {
             'PR': 'bg-gray-200 text-gray-700',
@@ -257,23 +424,56 @@ const ClientsPage = () => {
     };
 
     // === Guards ===
-    if (user && !isCliente) {
-        signOut();
-        return null;
+    // Registro exitoso — mostrar directo sin esperar reload
+    if (registroExitoso) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+                <Head><title>Cuenta en Revisión | Jorge Minnesota INC</title></Head>
+                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 text-center">
+                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <FaClock className="text-3xl text-amber-600"/>
+                    </div>
+                    <h2 className="text-xl font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                        Tu cuenta fue creada exitosamente. Nuestro equipo la revisará y te notificará cuando sea aprobada.
+                    </p>
+                    <button
+                        onClick={() => {
+                            setRegistroExitoso(false);
+                            setRegNombre(""); setRegTelefono(""); setRegPrefijo("+1");
+                            setRegDireccion(""); setRegCiudad(""); setRegEstado("");
+                            setRegLicenciaFile(null); setRegLicenciaPreview(null);
+                            setRegConfirmPass(""); setEmail(""); setPass("");
+                            setModoAuth("login");
+                            signOut();
+                        }}
+                        className="btn btn-outline btn-sm text-gray-500 font-bold uppercase"
+                    >
+                        <FaSignOutAlt className="mr-1"/> Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        );
     }
 
-    if (loading) return (
+    if (loading || loadingAuth) return (
         <div className="h-screen flex flex-col justify-center items-center bg-white">
             <span className="loading loading-ring loading-lg text-blue-600"></span>
         </div>
     );
+
+    if (user && (!isCliente || !user.datosCliente)) {
+        if (!error) setError("Esta cuenta no existe o fue eliminada. Crea una nueva cuenta.");
+        signOut();
+        return null;
+    }
 
     // ============================================================
     // LOGIN / REGISTRO
     // ============================================================
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Portal Clientes | Jorge Minnesota INC</title></Head>
                 <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-6">
@@ -354,15 +554,89 @@ const ClientsPage = () => {
                                     required
                                 />
                             </div>
-                            <div className="relative">
-                                <FaPhone className="absolute left-4 top-4 text-gray-300"/>
+                            <div className="flex gap-2 w-full overflow-hidden">
+                                <select
+                                    value={regPrefijo}
+                                    onChange={(e) => setRegPrefijo(e.target.value)}
+                                    className="select select-bordered bg-gray-50 border-none text-black font-bold flex-shrink-0"
+                                    style={{fontSize: '16px', width: '90px', minWidth: '90px', paddingRight: '8px'}}
+                                >
+                                    <option value="+1">🇺🇸+1</option>
+                                    <option value="+52">🇲🇽+52</option>
+                                </select>
                                 <input
                                     type="tel"
-                                    placeholder="Teléfono (opcional)"
+                                    placeholder="Teléfono"
                                     value={regTelefono}
                                     onChange={(e) => setRegTelefono(e.target.value)}
-                                    className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black"
+                                    className="input input-bordered bg-gray-50 border-none text-black min-w-0 flex-1"
+                                    required
+                                    style={{fontSize: '16px'}}
                                 />
+                            </div>
+                            <div className="relative">
+                                <FaMapMarkerAlt className="absolute left-4 top-4 text-gray-300"/>
+                                <input
+                                    type="text"
+                                    placeholder="Dirección"
+                                    value={regDireccion}
+                                    onChange={(e) => setRegDireccion(e.target.value)}
+                                    className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black"
+                                    required
+                                    style={{fontSize: '16px'}}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="relative">
+                                    <FaCity className="absolute left-4 top-4 text-gray-300"/>
+                                    <input
+                                        type="text"
+                                        placeholder="Ciudad"
+                                        value={regCiudad}
+                                        onChange={(e) => setRegCiudad(e.target.value)}
+                                        className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black"
+                                        required
+                                        style={{fontSize: '16px'}}
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <FaMapMarkerAlt className="absolute left-4 top-4 text-gray-300"/>
+                                    <input
+                                        type="text"
+                                        placeholder="Estado (ej: TX)"
+                                        value={regEstado}
+                                        onChange={(e) => setRegEstado(e.target.value)}
+                                        className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            {/* Foto de licencia */}
+                            <div>
+                                <label className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border-2 border-dashed border-gray-300">
+                                    <FaCamera className="text-gray-400 text-lg flex-shrink-0"/>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-gray-600">
+                                            {regLicenciaFile ? regLicenciaFile.name : "Foto de tu Licencia"}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">Toma una foto o sube una imagen</p>
+                                    </div>
+                                    {regLicenciaPreview && (
+                                        <img src={regLicenciaPreview} alt="Licencia" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200"/>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                setRegLicenciaFile(file);
+                                                setRegLicenciaPreview(URL.createObjectURL(file));
+                                            }
+                                        }}
+                                    />
+                                </label>
                             </div>
                             <div className="relative">
                                 <FaEnvelope className="absolute left-4 top-4 text-gray-300"/>
@@ -411,26 +685,74 @@ const ClientsPage = () => {
                             </button>
                         </form>
                     )}
+                    <div className="mt-6 text-center">
+                        <Link href="/driver">
+                            <a className="text-sm text-gray-500 hover:text-red-600 transition-colors font-medium">
+                                ← Soy Chofer
+                            </a>
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
     }
 
     // ============================================================
-    // PORTAL (usuario autenticado)
+    // CUENTA EN REVISIÓN (no aprobado)
+    // ============================================================
+    if (clienteData.aprobado === false || user?.datosCliente?.aprobado === false) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+                <Head><title>Cuenta en Revisión | Jorge Minnesota INC</title></Head>
+                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 text-center">
+                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                        <FaClock className="text-3xl text-amber-600"/>
+                    </div>
+                    <h2 className="text-xl font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
+                    <p className="text-sm text-gray-500 mb-6">
+                        Tu cuenta está siendo revisada por nuestro equipo. Te notificaremos cuando sea aprobada.
+                    </p>
+                    <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 mb-6">
+                        <p className="text-xs text-gray-600"><span className="font-bold">Nombre:</span> {clienteData.cliente}</p>
+                        <p className="text-xs text-gray-600"><span className="font-bold">Email:</span> {clienteData.emailAcceso || user.email}</p>
+                        <p className="text-xs text-gray-600"><span className="font-bold">Teléfono:</span> {clienteData.telefonoCliente}</p>
+                        <p className="text-xs text-gray-600"><span className="font-bold">Ubicación:</span> {clienteData.ciudadCliente}, {clienteData.estadoCliente}</p>
+                    </div>
+                    <button
+                        onClick={() => signOut()}
+                        className="btn btn-outline btn-sm text-gray-500 font-bold uppercase"
+                    >
+                        <FaSignOutAlt className="mr-1"/> Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ============================================================
+    // PORTAL (usuario autenticado y aprobado)
     // ============================================================
     const vehiculosFiltrados = vehiculos.filter(v =>
-        v.binNip?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        v.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        v.modelo?.toLowerCase().includes(busqueda.toLowerCase())
+        v.estatus !== "EN" && (
+            v.binNip?.toLowerCase().includes(busqueda.toLowerCase()) ||
+            v.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
+            v.modelo?.toLowerCase().includes(busqueda.toLowerCase())
+        )
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 font-sans text-black">
+        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black">
             <Head><title>Portal | Jorge Minnesota INC</title></Head>
 
+            {/* Pull-to-refresh indicator */}
+            {refreshing && (
+                <div className="ptr-spinner">
+                    <div className="ptr-icon"></div>
+                </div>
+            )}
+
             {/* Header */}
-            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
+            <header className="bg-white p-4 safe-area-top flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
                 <div className="flex items-center gap-4">
                     {vista === "perfil" ? (
                         <button onClick={() => setVista("vehiculos")} className="text-blue-600 p-2">
@@ -475,7 +797,7 @@ const ClientsPage = () => {
             </header>
 
             {vista === "perfil" ? (
-                /* ============ VISTA PERFIL ============ */
+                /* ============ VISTA PERFIL (READ-ONLY) ============ */
                 <main className="max-w-2xl mx-auto px-4 py-6">
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                         {/* Cabecera perfil */}
@@ -500,161 +822,36 @@ const ClientsPage = () => {
                             </div>
                         </div>
 
-                        {/* Estado de la info */}
-                        <div className={`px-6 py-3 flex items-center gap-2 text-xs font-bold ${infoConfirmada ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                            {infoConfirmada ? (
-                                <>
-                                    <FaCheckCircle/>
-                                    <span>Información confirmada. Para cambios, contacta a la oficina.</span>
-                                </>
-                            ) : (
-                                <>
-                                    <FaLockOpen/>
-                                    <span>Completa tu información. Una vez guardada, no podrás modificarla.</span>
-                                </>
-                            )}
+                        <div className="px-6 py-3 flex items-center gap-2 text-xs font-bold bg-blue-50 text-blue-700">
+                            <FaCheckCircle/>
+                            <span>Para cambios en tu información, contacta a la oficina.</span>
                         </div>
 
-                        {/* Formulario */}
-                        <div className="p-6 space-y-4">
-                            {/* Nombre - siempre readonly */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Nombre / Razón Social</label>
-                                <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-                                    <FaUser className="text-gray-400 text-sm"/>
-                                    <span className="text-sm font-medium text-gray-700">{clienteData.cliente || "-"}</span>
-                                </div>
-                            </div>
-
-                            {/* Email */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Email</label>
-                                <div className="relative">
-                                    <FaEnvelope className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                    <input
-                                        type="email"
-                                        value={formPerfil.emailCliente || ""}
-                                        onChange={(e) => handlePerfilChange("emailCliente", e.target.value)}
-                                        disabled={infoConfirmada}
-                                        placeholder="correo@ejemplo.com"
-                                        className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Teléfono */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Teléfono</label>
-                                <div className="relative">
-                                    <FaPhone className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                    <input
-                                        type="tel"
-                                        value={formPerfil.telefonoCliente || ""}
-                                        onChange={(e) => handlePerfilChange("telefonoCliente", e.target.value)}
-                                        disabled={infoConfirmada}
-                                        placeholder="(123) 456-7890"
-                                        className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Dirección */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Dirección</label>
-                                <div className="relative">
-                                    <FaMapMarkerAlt className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                    <input
-                                        type="text"
-                                        value={formPerfil.direccionCliente || ""}
-                                        onChange={(e) => handlePerfilChange("direccionCliente", e.target.value)}
-                                        disabled={infoConfirmada}
-                                        placeholder="Calle, Número, Colonia..."
-                                        className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Ciudad y Estado */}
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Ciudad</label>
-                                    <div className="relative">
-                                        <FaCity className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                        <input
-                                            type="text"
-                                            value={formPerfil.ciudadCliente || ""}
-                                            onChange={(e) => handlePerfilChange("ciudadCliente", e.target.value)}
-                                            disabled={infoConfirmada}
-                                            placeholder="Ciudad"
-                                            className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                        />
+                        {/* Info read-only */}
+                        <div className="p-6 space-y-3">
+                            {[
+                                { icon: <FaUser className="text-gray-400 text-sm"/>, label: "Nombre", value: clienteData.cliente },
+                                { icon: <FaEnvelope className="text-gray-400 text-sm"/>, label: "Email", value: clienteData.emailAcceso || clienteData.emailCliente || user.email },
+                                { icon: <FaPhone className="text-gray-400 text-sm"/>, label: "Teléfono", value: clienteData.telefonoCliente },
+                                { icon: <FaMapMarkerAlt className="text-gray-400 text-sm"/>, label: "Dirección", value: clienteData.direccionCliente },
+                                { icon: <FaCity className="text-gray-400 text-sm"/>, label: "Ciudad", value: [clienteData.ciudadCliente, clienteData.estadoCliente].filter(Boolean).join(", ") },
+                                { icon: <FaGlobe className="text-gray-400 text-sm"/>, label: "País", value: clienteData.paisCliente },
+                            ].map((campo, i) => (
+                                <div key={i}>
+                                    <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">{campo.label}</label>
+                                    <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                                        {campo.icon}
+                                        <span className="text-sm font-medium text-gray-700">{campo.value || "-"}</span>
                                     </div>
                                 </div>
+                            ))}
+
+                            {/* Foto de licencia */}
+                            {(clienteData.licenciaBase64 || clienteData.licenciaUrl) && (
                                 <div>
-                                    <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Estado</label>
-                                    <input
-                                        type="text"
-                                        value={formPerfil.estadoCliente || ""}
-                                        onChange={(e) => handlePerfilChange("estadoCliente", e.target.value)}
-                                        disabled={infoConfirmada}
-                                        placeholder="Ej: TX"
-                                        className={`input input-bordered w-full text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
+                                    <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Licencia</label>
+                                    <img src={clienteData.licenciaBase64 || clienteData.licenciaUrl} alt="Licencia" className="w-full max-w-xs rounded-lg border border-gray-200 shadow-sm"/>
                                 </div>
-                            </div>
-
-                            {/* País */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">País</label>
-                                <div className="relative">
-                                    <FaGlobe className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                    <input
-                                        type="text"
-                                        value={formPerfil.paisCliente || ""}
-                                        onChange={(e) => handlePerfilChange("paisCliente", e.target.value)}
-                                        disabled={infoConfirmada}
-                                        placeholder="País"
-                                        className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* RFC */}
-                            <div>
-                                <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">RFC / Tax ID</label>
-                                <div className="relative">
-                                    <FaIdCard className="absolute left-4 top-3.5 text-gray-400 text-sm"/>
-                                    <input
-                                        type="text"
-                                        value={formPerfil.rfcCliente || ""}
-                                        onChange={(e) => handlePerfilChange("rfcCliente", e.target.value.toUpperCase())}
-                                        disabled={infoConfirmada}
-                                        placeholder="RFC o Tax ID"
-                                        className={`input input-bordered w-full pl-12 text-sm ${infoConfirmada ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : 'bg-white text-black'}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Mensaje */}
-                            {mensajePerfil && (
-                                <p className={`text-center text-sm font-bold ${mensajePerfil.includes("Error") ? 'text-red-500' : 'text-green-600'}`}>
-                                    {mensajePerfil}
-                                </p>
-                            )}
-
-                            {/* Botón guardar */}
-                            {!infoConfirmada && (
-                                <button
-                                    onClick={handleGuardarPerfil}
-                                    disabled={guardando}
-                                    className="btn btn-primary w-full text-white font-black uppercase shadow-lg mt-2"
-                                >
-                                    {guardando ? (
-                                        <span className="loading loading-spinner loading-sm"></span>
-                                    ) : (
-                                        "Guardar Información"
-                                    )}
-                                </button>
                             )}
                         </div>
                     </div>
@@ -703,6 +900,51 @@ const ClientsPage = () => {
                         </div>
                     </div>
 
+                    {/* Solicitudes activas */}
+                    {solicitudes.length > 0 && (
+                        <div className="max-w-6xl mx-auto px-4 mb-4">
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+                                    <div className="flex items-center gap-2">
+                                        <FaTruck className="text-amber-600" />
+                                        <span className="text-sm font-black text-amber-800 uppercase">Mis Solicitudes</span>
+                                        <span className="bg-amber-200 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{solicitudes.length}</span>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-gray-100">
+                                    {solicitudes.map(sol => {
+                                        const badge = getSolicitudBadge(sol.estado);
+                                        return (
+                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-amber-50/50 transition-colors">
+                                                {sol.imageUrl ? (
+                                                    <img src={sol.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                        <FaCar className="text-gray-300" />
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold text-gray-800 uppercase truncate">
+                                                        {sol.year} {sol.make} {sol.model}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500">
+                                                        Lote: {sol.lotNumber} • {sol.source}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                        <FaMapMarkerAlt className="text-[8px]" /> {sol.location || 'N/A'}
+                                                    </p>
+                                                </div>
+                                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold flex-shrink-0 ${badge.className}`}>
+                                                    {badge.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Vehicles List */}
                     <main className="max-w-6xl mx-auto px-4">
                         {loadingVehiculos ? (
@@ -710,12 +952,14 @@ const ClientsPage = () => {
                                 <span className="loading loading-spinner loading-lg text-blue-600"></span>
                             </div>
                         ) : vehiculosFiltrados.length === 0 ? (
-                            <div className="text-center py-20">
-                                <FaCar className="text-6xl text-gray-300 mx-auto mb-4"/>
-                                <p className="text-gray-500">
-                                    {busqueda ? "No se encontraron vehículos con esa búsqueda" : "No tienes vehículos registrados"}
-                                </p>
-                            </div>
+                            solicitudes.length === 0 && (
+                                <div className="text-center py-20">
+                                    <FaCar className="text-6xl text-gray-300 mx-auto mb-4"/>
+                                    <p className="text-gray-500">
+                                        {busqueda ? "No se encontraron vehículos con esa búsqueda" : "No tienes vehículos registrados"}
+                                    </p>
+                                </div>
+                            )
                         ) : (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                 {/* Header de la tabla */}
@@ -732,7 +976,8 @@ const ClientsPage = () => {
                                     {vehiculosFiltrados.map((v, index) => (
                                         <div
                                             key={v.id}
-                                            className={`p-4 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                            onClick={() => setVehiculoDetalle(v)}
+                                            className={`p-4 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                                         >
                                             {/* Vista móvil */}
                                             <div className="md:hidden space-y-3">
@@ -801,6 +1046,170 @@ const ClientsPage = () => {
                         )}
                     </main>
                 </>
+            )}
+
+            {/* Modal Detalle Vehículo */}
+            {vehiculoDetalle && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setVehiculoDetalle(null)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Header con status */}
+                        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl p-5">
+                            <button onClick={() => setVehiculoDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white">
+                                <FaTimes size={12} />
+                            </button>
+                            <p className="text-gray-400 text-xs font-bold uppercase">Vehículo</p>
+                            <h3 className="text-white text-xl font-black uppercase mt-1">{vehiculoDetalle.binNip}</h3>
+                            <p className="text-gray-300 text-sm">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</p>
+                            <div className="flex items-center gap-2 mt-3">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${getStatusColor(vehiculoDetalle.estatus)}`}>
+                                    {getStatusLabel(vehiculoDetalle.estatus)}
+                                </span>
+                                {vehiculoDetalle.estatus === 'TR' && (
+                                    <span className="flex items-center gap-1 text-blue-300 text-[10px] font-bold">
+                                        <FaTruck className="animate-pulse"/> En tránsito
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Status Steps */}
+                        <div className="px-5 py-4 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                {['PR', 'IN', 'TR', 'EB', 'DS', 'EN'].map((step, i) => {
+                                    const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
+                                    const currentIndex = statusOrder.indexOf(vehiculoDetalle.estatus);
+                                    const isActive = i <= currentIndex;
+                                    const isCurrent = step === vehiculoDetalle.estatus;
+                                    return (
+                                        <div key={step} className="flex flex-col items-center gap-1 flex-1">
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                isCurrent ? "bg-blue-600 text-white ring-2 ring-blue-200" :
+                                                isActive ? "bg-green-500 text-white" :
+                                                "bg-gray-200 text-gray-400"
+                                            }`}>
+                                                {isActive && i < currentIndex ? <FaCheckCircle className="text-[10px]"/> : step}
+                                            </div>
+                                            <span className={`text-[7px] font-bold uppercase ${isCurrent ? "text-blue-600" : isActive ? "text-green-600" : "text-gray-300"}`}>
+                                                {getStatusLabel(step)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Datos */}
+                        <div className="p-5 space-y-2.5 text-sm text-gray-600">
+                            <div className="flex items-center gap-2.5">
+                                <FaBarcode className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Lote</span>
+                                <span className="font-mono font-bold text-gray-800">{vehiculoDetalle.binNip}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaCar className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Vehículo</span>
+                                <span className="font-medium text-gray-800">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaMapMarkerAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Origen</span>
+                                <span className="text-gray-800">{vehiculoDetalle.ciudad || '-'}, {vehiculoDetalle.estado || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaWarehouse className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Almacén</span>
+                                <span className="text-gray-800">{vehiculoDetalle.almacen || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Registro</span>
+                                <span className="text-gray-800">{formatDate(vehiculoDetalle.registro?.timestamp)}</span>
+                            </div>
+                            {vehiculoDetalle.cliente && (
+                                <div className="flex items-center gap-2.5">
+                                    <FaUser className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Cliente</span>
+                                    <span className="font-medium text-gray-800">{vehiculoDetalle.cliente}</span>
+                                </div>
+                            )}
+                            {vehiculoDetalle.referencia && (
+                                <div className="flex items-center gap-2.5">
+                                    <FaIdCard className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Referencia</span>
+                                    <span className="text-gray-800">{vehiculoDetalle.referencia}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle Solicitud */}
+            {solicitudDetalle && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setSolicitudDetalle(null)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Imagen */}
+                        <div className="relative">
+                            {solicitudDetalle.imageUrl ? (
+                                <img src={solicitudDetalle.imageUrl} alt="" className="w-full h-44 object-cover rounded-t-2xl"/>
+                            ) : (
+                                <div className="w-full h-32 bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl flex items-center justify-center">
+                                    <FaCar className="text-4xl text-gray-600"/>
+                                </div>
+                            )}
+                            <button onClick={() => setSolicitudDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/60 rounded-full text-white">
+                                <FaTimes size={12}/>
+                            </button>
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">{solicitudDetalle.source}</span>
+                                {(() => {
+                                    const badge = getSolicitudBadge(solicitudDetalle.estado);
+                                    return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>{badge.label}</span>;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="p-4">
+                            <h4 className="text-lg font-bold text-gray-800">
+                                {solicitudDetalle.year} {solicitudDetalle.make} {solicitudDetalle.model}
+                            </h4>
+
+                            <div className="mt-3 space-y-2 text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                    <FaBarcode className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Lote</span>
+                                    <span className="font-mono font-medium text-gray-800">{solicitudDetalle.lotNumber}</span>
+                                </div>
+                                {solicitudDetalle.vin && (
+                                    <div className="flex items-center gap-2">
+                                        <FaKey className="text-gray-400 text-xs flex-shrink-0"/>
+                                        <span className="text-gray-400 text-xs w-20">VIN</span>
+                                        <span className="font-mono text-gray-800 text-xs">{solicitudDetalle.vin}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <FaMapMarkerAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Ubicación</span>
+                                    <span className="text-gray-800">{solicitudDetalle.location || '-'}</span>
+                                </div>
+                                {solicitudDetalle.auctionDate && (
+                                    <div className="flex items-center gap-2">
+                                        <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                        <span className="text-gray-400 text-xs w-20">Comprado</span>
+                                        <span className="text-gray-800">{solicitudDetalle.auctionDate}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Solicitado</span>
+                                    <span className="text-gray-800">
+                                        {solicitudDetalle.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || '-'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Footer */}

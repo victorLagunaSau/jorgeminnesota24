@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Head from "next/head";
 import Link from "next/link";
 import { useAuthContext } from "../context/auth";
 import { firestore } from "../firebase/firebaseIni";
+import { COLLECTIONS } from "../constants";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus, FaTrash,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
-    FaCheckCircle, FaClock, FaArrowLeft
+    FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse
 } from "react-icons/fa";
 
 const SolicitarPage = () => {
@@ -16,20 +17,61 @@ const SolicitarPage = () => {
     const [lotNumber, setLotNumber] = useState("");
     const [gatePass, setGatePass] = useState("");
     const [searching, setSearching] = useState(false);
-    const [searchProgress, setSearchProgress] = useState(0);
-    const [searchStep, setSearchStep] = useState("");
     const [vehicleResult, setVehicleResult] = useState(null);
     const [searchError, setSearchError] = useState("");
 
     // Estados para lista de solicitudes
     const [solicitudes, setSolicitudes] = useState([]);
+    const [solicitudesCompletadas, setSolicitudesCompletadas] = useState([]);
+    const [vehiculosEntregados, setVehiculosEntregados] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
-
+    const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
     // Login form
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
     const [loginError, setLoginError] = useState("");
+
+    // Pull-to-refresh
+    const [refreshing, setRefreshing] = useState(false);
+    const pullStartY = useRef(0);
+    const isPulling = useRef(false);
+
+    const handleRefresh = useCallback(() => {
+        setRefreshing(true);
+        setTimeout(() => setRefreshing(false), 800);
+    }, []);
+
+    // Marcar body como app Capacitor para estilos móviles (font-size 16px en inputs)
+    useEffect(() => {
+        if (typeof window === "undefined" || !window.Capacitor?.isNativePlatform?.()) return;
+        document.body.classList.add("capacitor-app");
+
+        const onTouchStart = (e) => {
+            if (window.scrollY === 0) {
+                pullStartY.current = e.touches[0].clientY;
+                isPulling.current = true;
+            }
+        };
+        const onTouchMove = (e) => {
+            if (!isPulling.current) return;
+            const diff = e.touches[0].clientY - pullStartY.current;
+            if (diff > 80 && window.scrollY === 0) {
+                isPulling.current = false;
+                handleRefresh();
+            }
+        };
+        const onTouchEnd = () => { isPulling.current = false; };
+
+        document.addEventListener("touchstart", onTouchStart, { passive: true });
+        document.addEventListener("touchmove", onTouchMove, { passive: true });
+        document.addEventListener("touchend", onTouchEnd, { passive: true });
+        return () => {
+            document.removeEventListener("touchstart", onTouchStart);
+            document.removeEventListener("touchmove", onTouchMove);
+            document.removeEventListener("touchend", onTouchEnd);
+        };
+    }, [handleRefresh]);
 
     // Cargar solicitudes del cliente
     useEffect(() => {
@@ -50,7 +92,8 @@ const SolicitarPage = () => {
                     const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
                     return fechaB - fechaA;
                 });
-                setSolicitudes(lista);
+                setSolicitudes(lista.filter(s => s.estado !== "completado"));
+                setSolicitudesCompletadas(lista.filter(s => s.estado === "completado"));
                 setLoadingSolicitudes(false);
             }, (error) => {
                 console.error("Error cargando solicitudes:", error);
@@ -59,6 +102,28 @@ const SolicitarPage = () => {
 
         return () => unsubscribe();
     }, [user]);
+
+    // Cargar vehículos entregados del cliente
+    useEffect(() => {
+        const clienteNombre = user?.datosCliente?.cliente;
+        if (!clienteNombre) return;
+
+        const unsubscribe = firestore()
+            .collection(COLLECTIONS.VEHICULOS)
+            .where("cliente", "==", clienteNombre)
+            .where("estatus", "==", "EN")
+            .onSnapshot((snap) => {
+                const lista = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                lista.sort((a, b) => {
+                    const fechaA = a.registro?.timestamp?.toDate?.() || new Date(0);
+                    const fechaB = b.registro?.timestamp?.toDate?.() || new Date(0);
+                    return fechaB - fechaA;
+                });
+                setVehiculosEntregados(lista);
+            });
+
+        return () => unsubscribe();
+    }, [user?.datosCliente?.cliente]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -77,24 +142,6 @@ const SolicitarPage = () => {
         setSearching(true);
         setSearchError("");
         setVehicleResult(null);
-        setSearchProgress(0);
-        setSearchStep("Conectando con subastas...");
-
-        // Progreso simulado que avanza mientras espera la respuesta real
-        const steps = [
-            { at: 5, text: "Conectando...", pct: 10 },
-            { at: 1500, text: "Buscando vehículo...", pct: 25 },
-            { at: 3500, text: "Revisando subastas...", pct: 45 },
-            { at: 5500, text: "Analizando resultados...", pct: 65 },
-            { at: 7500, text: "Extrayendo datos del vehículo...", pct: 85 },
-        ];
-
-        const timers = steps.map(s =>
-            setTimeout(() => {
-                setSearchProgress(s.pct);
-                setSearchStep(s.text);
-            }, s.at)
-        );
 
         try {
             const response = await fetch("https://jorgeminnesota.duckdns.org/api/scrape", {
@@ -106,23 +153,15 @@ const SolicitarPage = () => {
                 body: JSON.stringify({ lotNumber: lotNumber.trim(), gatePass: gatePass.trim() })
             });
 
-            timers.forEach(t => clearTimeout(t));
-
             const data = await response.json();
 
             if (!response.ok) {
-                setSearchProgress(0);
                 setSearchError(data.error || "Error al buscar vehículo");
                 return;
             }
 
-            setSearchProgress(100);
-            setSearchStep("¡Vehículo encontrado!");
-            await new Promise(r => setTimeout(r, 500));
             setVehicleResult(data.vehicle);
         } catch (error) {
-            timers.forEach(t => clearTimeout(t));
-            setSearchProgress(0);
             setSearchError("Error de conexión. Intenta de nuevo.");
         } finally {
             setSearching(false);
@@ -146,7 +185,7 @@ const SolicitarPage = () => {
         try {
             await firestore().collection("solicitudesVehiculos").add({
                 clienteId: clienteId,
-                clienteNombre: user.datosCliente.cliente || user.username || "",
+                clienteNombre: (user.datosCliente.cliente || user.username || "").toUpperCase().trim(),
                 clienteTelefono: user.datosCliente.telefonoCliente || "",
                 // Datos del vehículo
                 lotNumber: vehicleResult.lotNumber,
@@ -192,13 +231,15 @@ const SolicitarPage = () => {
         const badges = {
             pendiente: "bg-yellow-100 text-yellow-800",
             aprobado: "bg-blue-100 text-blue-800",
+            asignado: "bg-indigo-100 text-indigo-800",
             en_proceso: "bg-purple-100 text-purple-800",
             completado: "bg-green-100 text-green-800"
         };
         const labels = {
             pendiente: "Pendiente",
             aprobado: "Aprobado",
-            en_proceso: "En Proceso",
+            asignado: "Asignado a transportista",
+            en_proceso: "En Camino",
             completado: "Completado"
         };
         return { className: badges[estado] || badges.pendiente, label: labels[estado] || estado };
@@ -216,10 +257,27 @@ const SolicitarPage = () => {
         </div>
     );
 
+    // Cuenta no aprobada
+    if (user && user.datosCliente?.aprobado === false) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+                <Head><title>Cuenta en Revisión | Jorge Minnesota</title></Head>
+                <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 text-center">
+                    <FaClock className="text-4xl text-amber-500 mx-auto mb-3"/>
+                    <h2 className="text-lg font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
+                    <p className="text-sm text-gray-500 mb-4">Tu cuenta aún no ha sido aprobada. No puedes solicitar vehículos hasta que sea revisada.</p>
+                    <Link href="/clients">
+                        <a className="text-sm text-blue-600 font-bold underline">Volver</a>
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
     // Login Form
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
                 <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
                     <div className="text-center mb-8">
@@ -258,8 +316,8 @@ const SolicitarPage = () => {
                         </button>
                     </form>
                     <div className="mt-4 text-center">
-                        <Link href="/">
-                            <a className="text-sm text-blue-600 hover:underline">← Volver al inicio</a>
+                        <Link href="/clients">
+                            <a className="text-sm text-blue-600 hover:underline">← Volver al login</a>
                         </Link>
                     </div>
                 </div>
@@ -271,72 +329,81 @@ const SolicitarPage = () => {
     const clienteData = user.datosCliente || {};
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 font-sans text-black">
+        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
 
-            {/* Header */}
-            <header className="bg-white p-4 flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
-                <div className="flex items-center gap-4">
-                    <Link href="/">
-                        <a className="btn btn-ghost btn-sm">
-                            <FaArrowLeft />
-                        </a>
-                    </Link>
-                    <img src="/assets/Logo.png" className="w-10 h-auto" alt="Logo"/>
-                    <div>
-                        <h1 className="text-lg font-black uppercase italic text-black leading-none tracking-tighter">
-                            Solicitar Vehículos
-                        </h1>
-                        <p className="text-[10px] text-gray-500">Busca y solicita vehículos de subasta</p>
-                    </div>
+            {/* Pull-to-refresh indicator */}
+            {refreshing && (
+                <div className="ptr-spinner">
+                    <div className="ptr-icon"></div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Link href="/clients">
-                        <a className="btn btn-ghost btn-sm text-blue-600">
-                            <FaCar className="mr-1"/> Mis Vehículos
-                        </a>
-                    </Link>
-                    <button
-                        onClick={() => signOut()}
-                        className="flex items-center gap-2 text-[10px] font-black text-red-600 uppercase border border-red-600 px-3 py-1 rounded-lg hover:bg-red-50"
-                    >
-                        <FaSignOutAlt/> Salir
-                    </button>
+            )}
+
+            {/* Header */}
+            <header className="bg-white safe-area-top border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
+                <div className="flex justify-between items-center px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Link href="/clients">
+                            <a className="text-blue-600 p-1 flex-shrink-0">
+                                <FaArrowLeft className="text-base"/>
+                            </a>
+                        </Link>
+                        <img src="/assets/Logo.png" className="w-7 h-auto flex-shrink-0" alt="Logo"/>
+                        <div className="min-w-0">
+                            <h1 className="text-xs font-black uppercase italic text-black leading-none tracking-tighter truncate">
+                                Solicitar Vehículos
+                            </h1>
+                            <p className="text-[8px] text-gray-400 truncate">Busca y solicita vehículos</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <Link href="/clients">
+                            <a className="flex items-center gap-1 text-[9px] font-bold text-blue-600 uppercase border border-blue-200 px-2 py-1 rounded-lg bg-blue-50">
+                                <FaCar className="text-xs"/>
+                            </a>
+                        </Link>
+                        <button
+                            onClick={() => signOut()}
+                            className="flex items-center gap-1 text-[9px] font-bold text-red-600 uppercase border border-red-200 px-2 py-1 rounded-lg bg-red-50"
+                        >
+                            <FaSignOutAlt className="text-xs"/>
+                        </button>
+                    </div>
                 </div>
             </header>
 
             {/* User Info */}
-            <section className="bg-white px-6 py-3 border-b shadow-sm">
-                <div className="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-2">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <FaUser className="text-blue-600"/>
+            <section className="bg-white px-3 py-2 border-b border-gray-200">
+                <div className="flex justify-between items-center gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <FaUser className="text-blue-600 text-[10px]"/>
                         </div>
-                        <div>
-                            <p className="font-bold text-gray-800">{clienteData.cliente || user.username}</p>
-                            <p className="text-[11px] text-gray-500">{user.email}</p>
+                        <div className="min-w-0">
+                            <p className="font-bold text-xs text-gray-800 truncate">{clienteData.cliente || user.username}</p>
+                            <p className="text-[9px] text-gray-400 truncate">{user.email}</p>
                         </div>
                     </div>
-                    <div className="bg-orange-50 px-4 py-2 rounded-lg">
-                        <span className="text-[10px] text-orange-600 font-bold uppercase">Solicitudes</span>
-                        <p className="text-2xl font-black text-orange-700">{solicitudes.length}</p>
+                    <div className="bg-orange-50 px-2 py-1 rounded-lg text-center flex-shrink-0">
+                        <span className="text-[8px] text-orange-600 font-bold uppercase">Solicitudes</span>
+                        <p className="text-base font-black text-orange-700 leading-tight">{solicitudes.length}</p>
                     </div>
                 </div>
             </section>
 
-            <main className="max-w-6xl mx-auto px-4 py-6">
-                <div className="grid gap-6 lg:grid-cols-2">
+            <main className="px-3 py-3">
+                <div className="grid gap-3 lg:grid-cols-2">
 
                     {/* Panel de Búsqueda */}
-                    <div className="space-y-4">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h2 className="text-lg font-black uppercase text-gray-800 mb-4 flex items-center gap-2">
-                                <FaSearch className="text-blue-600"/> Buscar Vehículo
+                    <div className="space-y-3">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+                            <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
+                                <FaSearch className="text-blue-600 text-xs"/> Buscar Vehículo
                             </h2>
-                            <form onSubmit={handleSearch} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                            <form onSubmit={handleSearch} className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                                             Número de Lote *
                                         </label>
                                         <input
@@ -344,12 +411,12 @@ const SolicitarPage = () => {
                                             placeholder="Ej: 43874580"
                                             value={lotNumber}
                                             onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
-                                            className="input input-bordered w-full bg-white text-black"
+                                            className="input input-bordered input-sm w-full bg-white text-black"
                                             disabled={searching}
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-[11px] font-bold text-gray-600 uppercase mb-1">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
                                             Gate Pass *
                                         </label>
                                         <input
@@ -357,7 +424,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: A1B2"
                                             value={gatePass}
                                             onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
-                                            className="input input-bordered w-full bg-white text-black uppercase"
+                                            className="input input-bordered input-sm w-full bg-white text-black uppercase"
                                             disabled={searching}
                                             maxLength={5}
                                         />
@@ -366,7 +433,7 @@ const SolicitarPage = () => {
                                 <button
                                     type="submit"
                                     disabled={searching || !lotNumber.trim() || gatePass.length < 4}
-                                    className="btn btn-primary w-full text-white font-bold"
+                                    className="btn btn-primary btn-sm w-full text-white font-bold"
                                 >
                                     {searching ? (
                                         <>
@@ -380,48 +447,15 @@ const SolicitarPage = () => {
                                 </button>
                             </form>
 
-                            {/* Barra de progreso */}
+                            {/* Indicador de búsqueda */}
                             {searching && (
-                                <div className="mt-5 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                                            <span className="text-sm font-medium text-gray-700">{searchStep}</span>
-                                        </div>
-                                        <span className="text-xs font-bold text-blue-600">{searchProgress}%</span>
+                                <div className="mt-4 flex flex-col items-center gap-3 py-4">
+                                    <div className="relative">
+                                        <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"></div>
+                                        <FaSearch className="absolute inset-0 m-auto text-blue-600 text-sm" />
                                     </div>
-                                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-blue-600 to-blue-500 transition-all duration-700 ease-out"
-                                            style={{ width: `${searchProgress}%`, backgroundSize: "200% 100%", animation: "shimmer 1.5s infinite" }}
-                                        ></div>
-                                    </div>
-                                    <style jsx>{`
-                                        @keyframes shimmer {
-                                            0% { background-position: 200% 0; }
-                                            100% { background-position: -200% 0; }
-                                        }
-                                    `}</style>
-                                    <div className="flex items-center justify-center gap-6 pt-1">
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 25 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 25 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 45 ? <FaCheckCircle /> : "1"}
-                                            </div>
-                                            Conexión
-                                        </div>
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 45 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 45 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 65 ? <FaCheckCircle /> : "2"}
-                                            </div>
-                                            Búsqueda
-                                        </div>
-                                        <div className={`flex items-center gap-1.5 text-xs ${searchProgress >= 80 ? "text-blue-600" : "text-gray-400"}`}>
-                                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${searchProgress >= 80 ? "bg-blue-100 text-blue-600" : "bg-gray-100 text-gray-400"}`}>
-                                                {searchProgress >= 100 ? <FaCheckCircle /> : "3"}
-                                            </div>
-                                            Datos
-                                        </div>
-                                    </div>
+                                    <p className="text-sm font-medium text-gray-600">Buscando en subastas...</p>
+                                    <p className="text-[10px] text-gray-400">Esto puede tomar unos segundos</p>
                                 </div>
                             )}
 
@@ -436,7 +470,7 @@ const SolicitarPage = () => {
                         {vehicleResult && (
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                 {vehicleResult.imageUrl && (
-                                    <div className="relative w-full h-48 bg-gray-100">
+                                    <div className="relative w-full h-40 bg-gray-100">
                                         <img
                                             src={vehicleResult.imageUrl}
                                             alt={`${vehicleResult.year} ${vehicleResult.make} ${vehicleResult.model}`}
@@ -500,79 +534,189 @@ const SolicitarPage = () => {
                         )}
                     </div>
 
-                    {/* Panel de Solicitudes */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h2 className="text-lg font-black uppercase text-gray-800 mb-4 flex items-center gap-2">
-                            <FaClock className="text-orange-600"/> Mis Solicitudes
-                        </h2>
+                    {/* Panel de Solicitudes / Historial */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-200">
+                            <button
+                                onClick={() => setTabSolicitudes("solicitudes")}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
+                                    tabSolicitudes === "solicitudes"
+                                        ? "text-orange-700 border-b-2 border-orange-600 bg-orange-50/50"
+                                        : "text-gray-400 hover:text-gray-600"
+                                }`}
+                            >
+                                <FaClock className="text-[10px]"/> Solicitudes
+                                {solicitudes.length > 0 && (
+                                    <span className="bg-orange-200 text-orange-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setTabSolicitudes("historial")}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
+                                    tabSolicitudes === "historial"
+                                        ? "text-green-700 border-b-2 border-green-600 bg-green-50/50"
+                                        : "text-gray-400 hover:text-gray-600"
+                                }`}
+                            >
+                                <FaHistory className="text-[10px]"/> Historial
+                                {(solicitudesCompletadas.length + vehiculosEntregados.length) > 0 && (
+                                    <span className="bg-green-200 text-green-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
+                                )}
+                            </button>
+                        </div>
 
-                        {loadingSolicitudes ? (
-                            <div className="flex justify-center py-10">
-                                <span className="loading loading-spinner loading-lg text-blue-600"></span>
-                            </div>
-                        ) : solicitudes.length === 0 ? (
-                            <div className="text-center py-10">
-                                <FaCar className="text-5xl text-gray-300 mx-auto mb-4"/>
-                                <p className="text-gray-500">No tienes solicitudes aún</p>
-                                <p className="text-sm text-gray-400">Busca un vehículo para comenzar</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                                {solicitudes.map((sol) => {
-                                    const badge = getEstadoBadge(sol.estado);
-                                    return (
-                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-3 hover:bg-gray-50 transition-colors">
-                                            <div className="flex gap-3">
-                                                {sol.imageUrl && (
-                                                    <img
-                                                        src={sol.imageUrl}
-                                                        alt={`${sol.year} ${sol.make}`}
-                                                        className="w-20 h-16 object-cover rounded bg-gray-100"
-                                                    />
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <p className="font-bold text-sm text-gray-800 uppercase truncate">
+                        <div className="p-3">
+                        {tabSolicitudes === "solicitudes" ? (
+                            /* === Solicitudes activas === */
+                            loadingSolicitudes ? (
+                                <div className="flex justify-center py-8">
+                                    <span className="loading loading-spinner loading-md text-blue-600"></span>
+                                </div>
+                            ) : solicitudes.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <FaCar className="text-4xl text-gray-300 mx-auto mb-3"/>
+                                    <p className="text-sm text-gray-500">No tienes solicitudes aún</p>
+                                    <p className="text-xs text-gray-400">Busca un vehículo para comenzar</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {solicitudes.map((sol) => {
+                                        const badge = getEstadoBadge(sol.estado);
+                                        return (
+                                            <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                                <div className="flex gap-2 items-start">
+                                                    {sol.imageUrl && (
+                                                        <img
+                                                            src={sol.imageUrl}
+                                                            alt={`${sol.year} ${sol.make}`}
+                                                            className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
+                                                        />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-start justify-between gap-1">
+                                                            <p className="font-bold text-xs text-gray-800 uppercase truncate">
                                                                 {sol.year} {sol.make} {sol.model}
                                                             </p>
-                                                            <p className="text-[10px] text-gray-500">
-                                                                Lote: {sol.lotNumber} • {sol.source}
-                                                            </p>
+                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 ${badge.className}`}>
+                                                                {badge.label}
+                                                            </span>
                                                         </div>
-                                                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${badge.className}`}>
-                                                            {badge.label}
+                                                        <p className="text-[9px] text-gray-500">
+                                                            Lote: {sol.lotNumber} • {sol.source}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                            <span className="flex items-center gap-0.5 truncate">
+                                                                <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
+                                                            </span>
+                                                            <span className="flex items-center gap-0.5 flex-shrink-0">
+                                                                <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {sol.estado === "pendiente" && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleEliminarSolicitud(sol.id); }}
+                                                            className="text-red-400 p-1 flex-shrink-0"
+                                                        >
+                                                            <FaTrash className="text-xs"/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
+                        ) : (
+                            /* === Historial === */
+                            (solicitudesCompletadas.length + vehiculosEntregados.length) === 0 ? (
+                                <div className="text-center py-8">
+                                    <FaHistory className="text-4xl text-gray-300 mx-auto mb-3"/>
+                                    <p className="text-sm text-gray-500">No tienes historial aún</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {/* Vehículos entregados */}
+                                    {vehiculosEntregados.map((v) => (
+                                        <div key={v.id} className="border border-green-100 rounded-lg p-2 bg-green-50/30">
+                                            <div className="flex gap-2 items-start">
+                                                <div className="w-14 h-12 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                    <FaCheckCircle className="text-green-500 text-lg"/>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-1">
+                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
+                                                            {v.marca} {v.modelo}
+                                                        </p>
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-200 text-green-800">
+                                                            Entregado
                                                         </span>
                                                     </div>
-                                                    <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
-                                                        <span className="flex items-center gap-1">
-                                                            <FaMapMarkerAlt/> {sol.location || 'N/A'}
-                                                        </span>
-                                                        <span className="flex items-center gap-1">
-                                                            <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
+                                                    <p className="text-[9px] text-gray-500">
+                                                        Lote: {v.binNip} • {v.almacen || '-'}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                        <span className="flex items-center gap-0.5 truncate">
+                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {v.ciudad}, {v.estado}
                                                         </span>
                                                     </div>
                                                 </div>
-                                                {sol.estado === "pendiente" && (
-                                                    <button
-                                                        onClick={() => handleEliminarSolicitud(sol.id)}
-                                                        className="btn btn-ghost btn-xs text-red-500 hover:bg-red-50"
-                                                    >
-                                                        <FaTrash/>
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    ))}
+                                    {/* Solicitudes completadas */}
+                                    {solicitudesCompletadas.map((sol) => (
+                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                            <div className="flex gap-2 items-start">
+                                                {sol.imageUrl ? (
+                                                    <img
+                                                        src={sol.imageUrl}
+                                                        alt={`${sol.year} ${sol.make}`}
+                                                        className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
+                                                    />
+                                                ) : (
+                                                    <div className="w-14 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                        <FaCar className="text-gray-300"/>
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-1">
+                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
+                                                            {sol.year} {sol.make} {sol.model}
+                                                        </p>
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-100 text-green-800">
+                                                            Completado
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-500">
+                                                        Lote: {sol.lotNumber} • {sol.source}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                        <span className="flex items-center gap-0.5 truncate">
+                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
+                                                        </span>
+                                                    </div>
+                                                    {sol.fechaCompletado && (
+                                                        <p className="text-[9px] text-green-600 font-bold mt-1">
+                                                            <FaCheckCircle className="inline mr-0.5 text-[8px]"/>
+                                                            {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
                         )}
+                        </div>
                     </div>
                 </div>
             </main>
 
             {/* Footer */}
-            <footer className="mt-10 text-center text-[10px] text-gray-400 uppercase">
+            <footer className="mt-6 pb-4 text-center text-[10px] text-gray-400 uppercase">
                 Solicitar Vehículos - Jorge Minnesota Logistic LLC
             </footer>
         </div>

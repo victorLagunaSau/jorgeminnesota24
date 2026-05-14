@@ -17,6 +17,7 @@ export const COLLECTIONS = {
   SALIDAS_CAJA: "salidasCaja",
   SOLICITUDES_VEHICULOS: "solicitudesVehiculos",
   TOKENS_CHOFER: "tokensChofer",
+  TOKENS_CLIENTE: "tokensCliente",
   AUDIT_LOG: "auditLog",
   PAGOS_NOMINA: "pagosNomina",
 };
@@ -52,6 +53,16 @@ export const TRIP_STATUS = {
   PENDIENTE: "PENDIENTE",
   VERIFICADO: "VERIFICADO",
   PAGADO: "PAGADO",
+};
+
+// ===========================================
+// SOLICITUD STATUS
+// ===========================================
+export const SOLICITUD_STATUS = {
+  PENDIENTE: "pendiente",
+  ASIGNADO: "asignado",
+  EN_PROCESO: "en_proceso",
+  COMPLETADO: "completado",
 };
 
 // ===========================================

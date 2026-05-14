@@ -9,11 +9,12 @@ import {
 } from "react-icons/fa";
 import HojaVerificacion from "./HojaVerificacion";
 import { COLLECTIONS, FIELD_LIMITS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
+import { notificarViajeAsignado } from "../../../utils";
 import Alert from "../../ui/Alert";
 
 const DRAFTS_KEY = "formViaje_borradores";
 
-const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) => {
+const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
@@ -147,6 +148,83 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
             }
         } catch (_) {}
     }, [restaurarDraft]);
+
+    // --- CARGAR SOLICITUDES PRE-LLENADAS DESDE /loads ---
+    useEffect(() => {
+        if (!solicitudesPrecargadas || solicitudesPrecargadas.length === 0) return;
+        if (borradorCargado.current) return; // no sobreescribir borrador
+        if (provincias.length === 0) return; // esperar a que carguen las provincias
+
+        const US_STATES_MAP = {
+            'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+            'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+            'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+            'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+            'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+            'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+            'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+            'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+            'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+            'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+            'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+            'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+            'HI': 'Hawaii', 'AK': 'Alaska'
+        };
+
+        const extraerEstado = (location) => {
+            if (!location) return "";
+            const match = location.match(/\b([A-Z]{2})\b/);
+            if (match && US_STATES_MAP[match[1]]) return US_STATES_MAP[match[1]];
+            for (const [, name] of Object.entries(US_STATES_MAP)) {
+                if (location.toLowerCase().includes(name.toLowerCase())) return name;
+            }
+            return "";
+        };
+
+        const vehiculosFromSolicitudes = solicitudesPrecargadas.slice(0, 13).map((sol, i) => {
+            const estadoNombre = extraerEstado(sol.location);
+
+            // Buscar precio automáticamente de provincias
+            const estadoData = provincias.find(p => p.state === estadoNombre);
+            let ciudad = "";
+            let flete = "0";
+            let precioVenta = 0;
+
+            if (estadoData && estadoData.regions?.length > 0) {
+                ciudad = estadoData.regions[0].city;
+                flete = (estadoData.regions[0].cost || 0).toString();
+                precioVenta = parseFloat(estadoData.regions[0].precioPagina || estadoData.regions[0].price || 0);
+            }
+
+            return {
+                id: Date.now() + i,
+                lote: (sol.lotNumber || "").toUpperCase().trim(),
+                marca: sol.make || "",
+                modelo: sol.model || "",
+                clienteAlt: (sol.clienteNombre || "").toUpperCase().trim(),
+                clienteId: sol.clienteId || "",
+                clienteNombre: (sol.clienteNombre || "").toUpperCase().trim(),
+                clienteTelefono: sol.clienteTelefono || "",
+                clienteConfirmado: !!sol.clienteId,
+                almacen: sol.source || "Copart",
+                estado: estadoNombre,
+                ciudad,
+                flete,
+                precioVenta,
+                storage: "0", sPeso: "0", gExtra: "0",
+                preciosClienteEditados: false,
+                storageCliente: "0", sPesoCliente: "0", gExtraCliente: "0",
+                titulo: "NO",
+                comentarioRegistro: "",
+                yaPagado: false,
+                solicitudId: sol.id
+            };
+        });
+
+        setVehiculos(vehiculosFromSolicitudes);
+        setViajeIniciado(true);
+        borradorCargado.current = true;
+    }, [solicitudesPrecargadas, provincias]);
 
     // --- AUTO-GUARDADO CON DEBOUNCE ---
     const autoSaveTimer = useRef(null);
@@ -480,6 +558,15 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
     const validarLoteUnico = async (id, loteValue) => {
         if (!loteValue?.trim()) return;
         const loteLimpio = loteValue.toUpperCase().trim();
+
+        // Validar duplicado dentro del mismo viaje
+        const duplicadoEnViaje = vehiculos.find(v => v.id !== id && v.lote.toUpperCase().trim() === loteLimpio);
+        if (duplicadoEnViaje) {
+            setAlertMessage({ msg: `Lote ${loteLimpio} ya está agregado en este viaje`, tipo: 'error' });
+            setVehiculos(vehiculos.map(v => v.id === id ? { ...v, lote: "" } : v));
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 4000);
+            return;
+        }
         try {
             const [docV, docT] = await Promise.all([
                 firestore().collection(COLLECTIONS.VEHICULOS).doc(loteLimpio).get(),
@@ -618,6 +705,17 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                     choferNombre: choferData?.nombre || encabezado.choferManual,
                     fechaBloqueo: new Date()
                 });
+
+                // Si el vehículo viene de una solicitud, actualizar la solicitud a "asignado"
+                if (v.solicitudId) {
+                    batch.update(firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(v.solicitudId), {
+                        estado: "asignado",
+                        viajeId: docId,
+                        fechaAsignado: new Date(),
+                        asignadoPor: user?.nombre || user?.username || "Usuario",
+                        empresaAsignada: user?.datosEmpresa?.nombreEmpresa || user?.username || ""
+                    });
+                }
             });
 
             await Promise.race([
@@ -626,6 +724,15 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
             ]);
             setViajeReciente(viajeData);
             limpiarBorrador();
+
+            // Notificar al chofer por push
+            if (choferData?.id && !esChoferTemporal) {
+                notificarViajeAsignado(
+                    choferData.id,
+                    vehiculos.length,
+                    user?.datosEmpresa?.nombreEmpresa || user?.nombre || "Empresa"
+                );
+            }
 
             // Si hay callback de redirección (modo administrativo), redirigir automáticamente
             if (onViajeCreado) {
@@ -1016,7 +1123,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                disabled={viajeIniciado || encabezado.choferId}
+                                disabled={viajeIniciado && encabezado.choferId}
                                 placeholder="Nombre del chofer..."
                                 className="input input-bordered input-md md:input-sm flex-1 text-black font-bold uppercase text-[16px] md:text-[14px] bg-blue-50 border-blue-300"
                                 value={choferManual}
@@ -1037,7 +1144,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                         <div className="relative">
                             <input
                                 type="text"
-                                disabled={viajeIniciado}
+                                disabled={viajeIniciado && encabezado.choferId}
                                 placeholder={loading ? "Cargando..." : "Escribe para buscar chofer..."}
                                 className="input input-bordered input-md md:input-sm w-full bg-white text-black font-bold uppercase pr-8 text-[16px] md:text-[14px]"
                                 value={busquedaChofer}
@@ -1048,7 +1155,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                                 }}
                                 style={{fontSize: '16px'}}
                             />
-                            {busquedaChofer && !viajeIniciado && (
+                            {busquedaChofer && (!viajeIniciado || !encabezado.choferId) && (
                                 <button
                                     className="absolute right-2 top-2 text-gray-400"
                                     onClick={() => {
@@ -1061,7 +1168,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp}) 
                             )}
 
                             {/* LISTA DESPLEGABLE FILTRADA */}
-                            {mostrarLista && !viajeIniciado && (
+                            {mostrarLista && (!viajeIniciado || !encabezado.choferId) && (
                                 <div className="absolute z-[100] w-full bg-white border shadow-2xl rounded-md max-h-60 overflow-y-auto mt-1 border-red-200">
                                     {choferes
                                         .filter(c => c.nombre.toLowerCase().includes(busquedaChofer.toLowerCase()))

@@ -10,6 +10,21 @@ html {
 body {
   @apply bg-white-500;
 }
+
+/* Prevent iOS WebView auto-zoom on inputs — only in Capacitor mobile app */
+body.capacitor-app input,
+body.capacitor-app select,
+body.capacitor-app textarea {
+  font-size: 16px !important;
+}
+
+/* Capacitor safe-area helpers */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 p {
   @apply text-black-500;
 }
@@ -81,6 +96,26 @@ input[type="number"] {
 .input-neon {
   border: 1.5px solid #10b981 !important;
   animation: glowPulseGreen 2s ease-in-out infinite;
+}
+
+/* Pull-to-refresh indicator */
+.ptr-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px 0;
+  transition: all 0.3s ease;
+}
+.ptr-spinner .ptr-icon {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #dc2626;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* purgecss end ignore */

@@ -8,3 +8,10 @@
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Mobile app (Capacitor)
+/out/
+/mobile/www/
+/mobile/ios/
+/mobile/android/
+/mobile/node_modules/

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
-import { FaUserLock, FaEye, FaEyeSlash, FaTrash } from "react-icons/fa";
+import { FaUserLock, FaEye, FaEyeSlash, FaTrash, FaIdCard } from "react-icons/fa";
 import { PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS } from "../../../constants";
 import Alert from "../../ui/Alert";
 
@@ -16,22 +16,23 @@ const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
         cliente: "",
         telefonoCliente: "",
         apodoCliente: "",
+        direccionCliente: "",
         ciudadCliente: "",
         estadoCliente: "",
         paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
         rfcCliente: "",
         emailCliente: "",
-        // Nuevos campos para acceso
         emailAcceso: "",
         passwordAcceso: ""
     });
+    const [imagenAmpliada, setImagenAmpliada] = useState(null);
 
     useEffect(() => {
         if (clienteAEditar) {
             setDatos({ ...clienteAEditar, passwordAcceso: clienteAEditar.passwordAcceso || "" });
         } else {
             setDatos({
-                cliente: "", telefonoCliente: "", apodoCliente: "",
+                cliente: "", telefonoCliente: "", apodoCliente: "", direccionCliente: "",
                 ciudadCliente: "", estadoCliente: "", paisCliente: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
                 rfcCliente: "", emailCliente: "",
                 emailAcceso: "", passwordAcceso: ""
@@ -234,13 +235,26 @@ const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
     const ejecutarEliminacion = async () => {
         if (!clienteAEditar?.id) return;
         setEliminando(true);
+        let secondaryApp = null;
         try {
-            // Si tiene credenciales de auth, eliminar el doc de users
-            if (clienteAEditar.authUid) {
-                const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(clienteAEditar.authUid).get();
-                if (userDoc.exists) {
-                    await firestore().collection(COLLECTIONS.USERS).doc(clienteAEditar.authUid).delete();
+            // Eliminar Auth user via secondary app si tiene credenciales
+            const emailAuth = clienteAEditar.emailAcceso || clienteAEditar.emailCliente;
+            const passAuth = clienteAEditar.passwordAcceso;
+            if (emailAuth && passAuth) {
+                try {
+                    const config = firebase.app().options;
+                    secondaryApp = firebase.apps.find(a => a.name === "deleteApp") || firebase.initializeApp(config, "deleteApp");
+                    const cred = await secondaryApp.auth().signInWithEmailAndPassword(emailAuth, passAuth);
+                    await cred.user.delete();
+                } catch (authErr) {
+                    console.warn("No se pudo eliminar Auth user:", authErr.message);
                 }
+            }
+            // Eliminar doc de users
+            const uidToDelete = clienteAEditar.authUid || clienteAEditar.id;
+            const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(uidToDelete).get();
+            if (userDoc.exists) {
+                await firestore().collection(COLLECTIONS.USERS).doc(uidToDelete).delete();
             }
             await firestore().collection(COLLECTIONS.CLIENTES).doc(clienteAEditar.id).delete();
             setMostrarConfirmEliminar(false);
@@ -250,6 +264,10 @@ const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
             console.error("Error al eliminar cliente:", error);
             mostrarAviso("Error al eliminar: " + error.message, "error");
             setEliminando(false);
+        } finally {
+            if (secondaryApp) {
+                try { await secondaryApp.delete(); } catch (_) {}
+            }
         }
     };
 
@@ -263,55 +281,70 @@ const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative">
             <Alert mostrar={alerta.mostrar} mensaje={alerta.mensaje} tipo={alerta.tipo === 'success' ? 'success' : 'error'} />
 
-            {/* Fila 1: Datos básicos */}
-            <div className="flex flex-row flex-wrap gap-2 items-end w-full mb-4">
-                <div className="flex-grow min-w-[200px] p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Nombre / Razón Social: *</label>
+            {/* Datos del cliente */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Nombre / Razón Social *</label>
                     <input
                         type="text" name="cliente" value={datos.cliente} onChange={handleChange}
-                        className="input input-bordered w-full input-sm bg-white text-black focus:border-red-500 uppercase font-bold"
+                        className="input input-bordered w-full input-sm bg-white text-black focus:border-red-500 uppercase"
                     />
                 </div>
-
-                <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Teléfono:</label>
+                <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Teléfono</label>
                     <input
-                        type="text"
-                        name="telefonoCliente"
-                        value={datos.telefonoCliente}
-                        onChange={handleChange}
-                        placeholder="+52 1 868 241 1355"
-                        className="input input-bordered w-full text-black input-sm bg-white font-bold"
+                        type="text" name="telefonoCliente" value={datos.telefonoCliente} onChange={handleChange}
+                        placeholder="+1 555 123 4567"
+                        className="input input-bordered w-full text-black input-sm bg-white"
                     />
                 </div>
-
-                <div className="w-48 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Ciudad:</label>
+                <div className="md:col-span-2">
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Dirección</label>
+                    <input
+                        type="text" name="direccionCliente" value={datos.direccionCliente || ""} onChange={handleChange}
+                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
+                    />
+                </div>
+                <div>
+                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Ciudad</label>
                     <input
                         type="text" name="ciudadCliente" value={datos.ciudadCliente} onChange={handleChange}
                         className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
                     />
                 </div>
-
-                <div className="w-20 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Edo:</label>
-                    <input
-                        type="text" name="estadoCliente" value={datos.estadoCliente} onChange={handleChange}
-                        maxLength={4} className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase text-center font-bold"
-                    />
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Estado</label>
+                        <input
+                            type="text" name="estadoCliente" value={datos.estadoCliente} onChange={handleChange}
+                            maxLength={4} className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-600 uppercase italic mb-1">Referencia</label>
+                        <input
+                            type="text" name="apodoCliente" value={datos.apodoCliente} onChange={handleChange}
+                            className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
+                        />
+                    </div>
                 </div>
             </div>
 
-            {/* Fila 2: Referencia */}
-            <div className="flex flex-row items-end gap-4 w-full border-t border-gray-100 pt-3 mb-4">
-                <div className="w-64 p-1">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase italic">Referencia (Apodo):</label>
-                    <input
-                        type="text" name="apodoCliente" value={datos.apodoCliente} onChange={handleChange}
-                        className="input input-bordered w-full input-sm focus:border-red-500 bg-white text-black uppercase"
+            {/* Foto de Licencia */}
+            {clienteAEditar && (clienteAEditar.licenciaBase64 || clienteAEditar.licenciaUrl) && (
+                <div className="border-t border-gray-100 pt-4 mb-4">
+                    <div className="flex items-center gap-2 mb-3">
+                        <FaIdCard className="text-gray-400"/>
+                        <span className="text-[10px] font-black text-gray-600 uppercase">Licencia</span>
+                    </div>
+                    <img
+                        src={clienteAEditar.licenciaBase64 || clienteAEditar.licenciaUrl}
+                        alt="Licencia"
+                        className="max-w-[280px] rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setImagenAmpliada(clienteAEditar.licenciaBase64 || clienteAEditar.licenciaUrl)}
                     />
                 </div>
-            </div>
+            )}
 
             {/* Fila 3: Credenciales de Acceso (Opcional) */}
             <div className={`p-4 rounded-lg border mb-4 ${datos.emailAcceso || datos.passwordAcceso ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
@@ -409,6 +442,13 @@ const FormCliente = ({ user, onSuccess, clienteAEditar, onDelete }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Modal imagen ampliada */}
+            {imagenAmpliada && (
+                <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4" onClick={() => setImagenAmpliada(null)}>
+                    <img src={imagenAmpliada} alt="Licencia" className="max-w-full max-h-[90vh] rounded-xl shadow-2xl"/>
+                </div>
+            )}
 
             {/* Modal de Confirmación de Eliminación */}
             {mostrarConfirmEliminar && (

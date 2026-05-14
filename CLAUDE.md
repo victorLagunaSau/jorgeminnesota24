@@ -19,7 +19,9 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 **Stack:** Next.js 12.3.1, React 17, Tailwind CSS 3 + DaisyUI 4, Firebase v7 (Auth, Firestore, Storage, Functions), Puppeteer (auction scraping), Framer Motion (animations), moment.js (dates)
 
-**Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). No `next.config.js` — uses default Next.js 12 config. Additional server-side env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` (used in API routes only).
+**Deployment:** Main app on **Vercel**. Auction scraper on a **Digital Ocean VPS** (see `vps-scraper/`).
+
+**Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). `next.config.js` sets `images.unoptimized = true` for static export compatibility. Additional server-side env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` (used in API routes only), `SCRAPER_URL` + `SCRAPER_API_KEY` (VPS scraper connection), `FCM_SERVER_KEY` (push notifications).
 
 ### Key Architectural Patterns
 
@@ -32,22 +34,11 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 ### Component Organization
 
-Components are organized into four top-level directories:
-
-- **`components/features/`** — All admin panel modules, organized by domain:
-  - `caja/` — Cash register: vehicle payments, entries/exits, daily/total cuts
-  - `vehiculos/` — Vehicle CRUD, bulk registration, tracking, deletion
-  - `viajes/` — Trip management, driver sheets, verification, liquidation, history
-  - `analisis/` — Financial analysis, advance payments, authorizations, expenses (adminMaster only)
-  - `choferes/`, `clientes/`, `empresas/` — Entity management (drivers, clients, carriers)
-  - `cobranza/` — Collections and pending payments
-  - `reportes/` — Income reports, collection reports, pending payment reports
-  - `config/` — Users, state/price management, migration tools, ERC deletion
-  - `solicitudes/` — Vehicle requests from clients
-- **`components/ui/`** — Shared UI primitives: Alert, EmptyState, LoadingSpinner, Pagination, SearchBar, StatusBadge, StatusSteps, `buttons/`, `inputs/`, `modals/` (ConfirmModal)
-- **`components/auth/`** — Login, registration, password recovery forms
+- **`components/features/`** — All admin panel modules, organized by domain (caja, vehiculos, viajes, analisis, choferes, clientes, empresas, cobranza, reportes, config, solicitudes). The `analisis/` subdirectory is restricted to `adminMaster` users.
+- **`components/ui/`** — Shared UI primitives (Alert, EmptyState, LoadingSpinner, Pagination, SearchBar, StatusBadge, StatusSteps, buttons, inputs, modals)
+- **`components/auth/`** — Login, registration, password recovery
 - **`components/Layout/`** — Header, HeaderPanel, Sidebar, Footer, Layout wrapper
-- **`components/marketing/`** — Landing page components (Hero, Pricing, Feature, Catalogo, Testimoni)
+- **`components/marketing/`** — Landing page components
 
 ### Vehicle Status Pipeline
 
@@ -57,24 +48,32 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 
 ### Firestore Collections (key ones)
 
-- `vehiculos` — vehicle inventory with status tracking
-- `viajesPendientes` / `viajesPagados` — unpaid / paid trips
-- `movimientos`, `entradasCaja`, `salidasCaja` — cash register movements
-- `choferes`, `clientes`, `empresas` — entity data (cached in AdminDataContext)
-- `solicitudesVehiculos` — client vehicle requests
-- `lotesEnTransito` — lot tracking
-- `auditLog` — audit trail entries
-- `config` — system configuration and sequential IDs
-- `tokensChofer` — FCM/push notification tokens for drivers
-- `pagosNomina` — payroll payments
+All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
+- `viajesPendientes` / `viajesPagados` — unpaid vs paid trips (separate collections, not a status field)
+- `movimientos`, `entradasCaja`, `salidasCaja` — three separate collections for cash register
+- `tokensChofer` — temporary 6-char access codes for drivers (not FCM tokens)
+- `tokensCliente` — FCM push notification tokens for clients (from Capacitor app)
+- `config` — system configuration and sequential ID counters
 
 ### Pages and Routing
 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
 - **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `clients` + `solicitar` (cliente)
-- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging)
-- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF)
+- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients)
+- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF), `generarComisionesPDF.js` (commissions PDF)
+
+### VPS Scraper (`vps-scraper/`)
+
+Standalone Express + Puppeteer microservice deployed on a Digital Ocean VPS. Vercel can't run Puppeteer (serverless limits), so auction scraping is offloaded here.
+
+```
+Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars → response
+```
+
+- `vps-scraper/server.js` — Express server, persistent browser instance, ephemeral contexts per request
+- Requires `x-api-key` header matching `SCRAPER_API_KEY` env var
+- Has its own `CLAUDE.md` with setup/deployment instructions
 
 ### User Roles and Permissions
 
@@ -93,6 +92,10 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
 - **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.
 
+## Other Notes
+
+- **README.md is outdated** — it's from the original landing page template and does not reflect the current app. Ignore it.
+
 ## Known Issues to Be Aware Of
 
 - `setup-master.js` and `clonar-usuario.js` pages have no auth protection
@@ -104,3 +107,31 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 - `firebase` is v7 (legacy namespace API, not modular v9+). All new Firebase code must use the `import firebase from "firebase/app"` + `firebase.firestore()` pattern — do not use v9 modular imports
 - Hardcoded name-based permission in `Sidebar.js`: `puedeVerAnticipos` checks if user name includes "olivia" or "cristela" to gate access to `historialAnticipos` and related sub-modules
 - `tailwind.config.js` defines `boxShadow` at top-level `theme` (not `theme.extend`), which replaces all default Tailwind shadows with a custom set — adding new shadow utilities requires updating this config
+
+## Mobile App (Capacitor)
+
+The client portal (`/clients`, `/solicitar`) is wrapped as a native iOS/Android app using **Capacitor 6** in the `mobile/` directory.
+
+### Mobile Commands
+
+```bash
+cd mobile
+bash build.sh           # Full pipeline: npm run export → copy to www/ → redirect index → cap sync
+npx cap sync ios        # Sync web assets + plugins to iOS
+npx cap open ios        # Open in Xcode
+```
+
+### Mobile Architecture
+
+- **Config:** `mobile/capacitor.config.json` — `CapacitorHttp.enabled: false` is critical (enabling it breaks Firestore WebChannel streaming)
+- **Build pipeline:** `mobile/build.sh` runs `npm run export` from root, copies `out/` to `mobile/www/`, replaces `index.html` with a redirect to `/clients.html`, then `cap sync`
+- **iOS project:** `mobile/ios/App/App.xcodeproj` (Swift Package Manager, NOT xcworkspace)
+- **Safe areas:** CSS classes `.safe-area-top` / `.safe-area-bottom` in `styles/tailwind.css` for Capacitor WebView notch handling. Applied to headers and page containers in `clients.js` and `solicitar.js`
+- **Viewport:** `_document.js` has `maximum-scale=1.0, user-scalable=no` to prevent iOS auto-zoom on inputs
+- **iOS auto-zoom fix:** `styles/tailwind.css` forces `font-size: 16px !important` on all inputs/selects/textareas
+
+### Push Notifications (code ready, pending external setup)
+
+All notification code is implemented. Helper functions `notificarCambioEstatus()` and `notificarCambioSolicitud()` in `utils/index.js` call `/api/send-push`. Notifications fire on vehicle status changes and solicitud status changes across multiple components. Requires Apple Developer Account + APNs key + Firebase FCM setup to activate — push notifications only work on real devices, not the iOS simulator.
+
+Token flow: client logs in → `clients.js` registers FCM token via Capacitor → saved to `tokensCliente` → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.

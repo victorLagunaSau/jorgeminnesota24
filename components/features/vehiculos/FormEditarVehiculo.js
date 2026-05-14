@@ -6,6 +6,7 @@ import 'firebase/firestore';
 import { VEHICLE_TYPES, VEHICLE_WAREHOUSES, TITLE_OPTIONS, PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS, TIMEOUTS, VEHICLE_STATUS_LIST } from "../../../constants";
 import { useAdminData } from "../../../context/adminData";
 import { registrarAuditLog } from "../../../utils/auditLog";
+import { notificarCambioEstatus } from "../../../utils";
 import Alert from "../../ui/Alert";
 
 const FormEditVehiculo = ({vehiculo, onClose, user}) => {
@@ -168,6 +169,13 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
 
         if (Object.keys(cambios).length > 0) {
             await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
+        }
+
+        // Push notification si cambió el estatus
+        if (cambios.estatus) {
+            const nombreCliente = cliente || vehiculo.cliente;
+            const vehiculoInfo = `${vehiculo.marca || marca} ${vehiculo.modelo || modelo}`;
+            notificarCambioEstatus(nombreCliente, estatus, vehiculoInfo);
         }
     };
     const handleDeleteVehiculo = async () => {

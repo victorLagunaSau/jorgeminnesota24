@@ -103,10 +103,10 @@ const ReporteMovimientos = React.forwardRef(({
         )}
 
         {/* Tabla de Entradas */}
-        <TablaEntradas entradasData={entradasData} totalRecibido={totalRecibido}/>
+        <TablaEntradas entradasData={entradasData} totalRecibido={totalRecibido} isAdminMaster={isAdminMaster} onDataChange={onDataChange}/>
 
         {/* Tabla de Salidas */}
-        <TablaSalidas salidasData={salidasData} totalSalidas={totalSalidas}/>
+        <TablaSalidas salidasData={salidasData} totalSalidas={totalSalidas} isAdminMaster={isAdminMaster} onDataChange={onDataChange}/>
 
         <div className="mt-4 border-t border-gray-300 pt-4">
     <h3 className="text-xl font-semibold">Resumen de Efectivo</h3>

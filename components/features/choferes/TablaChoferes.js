@@ -351,6 +351,17 @@ const TablaChoferes = ({ onEditarChofer, isAdminMaster }) => {
                                         <div className="flex items-center gap-1 text-gray-400 font-bold">
                                             <FaIdCard /> {c.licencia}
                                         </div>
+                                        {c.clave && (
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <span className="text-[9px] font-black text-green-700 bg-green-50 px-1.5 py-0.5 rounded font-mono tracking-widest">
+                                                    {c.clave}
+                                                </span>
+                                                <button onClick={() => {navigator.clipboard.writeText(c.clave); setCopiadoId('clave_'+c.id); setTimeout(()=>setCopiadoId(null), 2000)}}
+                                                    className={`transition-colors text-[10px] ${copiadoId === 'clave_'+c.id ? 'text-green-600' : 'text-gray-400'}`}>
+                                                    {copiadoId === 'clave_'+c.id ? <FaCheck size={10} /> : <FaCopy size={10} />}
+                                                </button>
+                                            </div>
+                                        )}
                                         <span className="text-[9px] font-black text-gray-500 italic">
                                             {c.paisChofer || 'UNITED STATES'}
                                         </span>

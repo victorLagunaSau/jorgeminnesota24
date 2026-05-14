@@ -8,6 +8,7 @@ import {useAdminData} from "../../../context/adminData";
 import { COLLECTIONS, VEHICLE_STATUS, WAREHOUSES, TITLE_OPTIONS } from "../../../constants";
 import Alert from "../../ui/Alert";
 import StatusBadge from "../../ui/StatusBadge";
+import { notificarCambioEstatus } from "../../../utils";
 
 const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) => {
     const { choferes: choferesAdmin } = useAdminData();
@@ -493,6 +494,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                             telefonoCliente: v.clienteTelefono || "",
                             tipoVehiculo: "",
                             titulo: v.titulo || "NO",
+                            ...(v.solicitudId ? { solicitudId: v.solicitudId } : {}),
                         };
 
                         // Guardar en la colección de VEHICULOS (Inventario activo)
@@ -560,6 +562,13 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                 show: true,
                 mensaje: `Pago procesado exitosamente. El PDF se imprimirá automáticamente.`,
                 tipo: "success"
+            });
+
+            // Push notification a cada cliente del viaje
+            (viaje.vehiculos || []).forEach(v => {
+                if (v.clienteNombre) {
+                    notificarCambioEstatus(v.clienteNombre, "EB", `${v.marca} ${v.modelo}`);
+                }
             });
 
             // Preparar el PDF para imprimir con el estado de origen y métodos de pago

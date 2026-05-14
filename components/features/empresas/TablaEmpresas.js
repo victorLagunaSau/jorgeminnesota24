@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import {
-    FaFilePdf, FaFileImage, FaMapMarkerAlt, FaEdit, FaUserCircle, FaTrashAlt
+    FaFilePdf, FaFileImage, FaMapMarkerAlt, FaEdit, FaUserCircle, FaTrashAlt,
+    FaGlobeAmericas, FaTimes, FaCheck
 } from "react-icons/fa";
 import { COLLECTIONS } from "../../../constants";
 import SearchBar from "../../ui/SearchBar";
@@ -9,11 +10,30 @@ import Pagination from "../../ui/Pagination";
 import EmptyState from "../../ui/EmptyState";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 
+const US_STATES_MAP = {
+    'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+    'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+    'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+    'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+    'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+    'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+    'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+    'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+    'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+    'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+    'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+    'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+    'HI': 'Hawaii', 'AK': 'Alaska'
+};
+
 const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
     const [lista, setLista] = useState([]);
     const [busqueda, setBusqueda] = useState("");
     const [pagina, setPagina] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [estadosAbierto, setEstadosAbierto] = useState(null);
+    const [guardandoEstados, setGuardandoEstados] = useState(null);
+    const [busquedaEstado, setBusquedaEstado] = useState("");
     const xPagina = 10;
 
     useEffect(() => {
@@ -36,6 +56,23 @@ const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
             console.error("Error al eliminar:", error);
             alert("Error al eliminar empresa.");
         }
+    };
+
+    const toggleEstado = async (empresaId, estadoCode) => {
+        const empresa = lista.find(e => e.id === empresaId);
+        if (!empresa) return;
+        const actuales = empresa.estadosAutorizados || [];
+        const nuevos = actuales.includes(estadoCode)
+            ? actuales.filter(s => s !== estadoCode)
+            : [...actuales, estadoCode].sort();
+
+        setGuardandoEstados(empresaId);
+        try {
+            await firestore().collection(COLLECTIONS.EMPRESAS).doc(empresaId).update({ estadosAutorizados: nuevos });
+        } catch (err) {
+            console.error("Error guardando estados:", err);
+        }
+        setGuardandoEstados(null);
     };
 
     const filtrados = lista.filter(e => {
@@ -79,6 +116,7 @@ const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
                         <th className="py-4">Empresa / Acceso</th>
                         <th>Tax ID / MC#</th>
                         <th>Ubicación</th>
+                        <th>Estados Autorizados</th>
                         <th className="text-center">W-9</th>
                         {onEditar && <th className="text-center">Acciones</th>}
                     </tr>
@@ -86,12 +124,15 @@ const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
                 <tbody className="text-black text-[12px]">
                     {paginados.length === 0 && (
                         <tr>
-                            <td colSpan={onEditar ? 5 : 4}>
+                            <td colSpan={onEditar ? 6 : 5}>
                                 <EmptyState mensaje="No se encontraron empresas" />
                             </td>
                         </tr>
                     )}
-                    {paginados.map((e) => (
+                    {paginados.map((e) => {
+                        const estados = e.estadosAutorizados || [];
+                        const isOpen = estadosAbierto === e.id;
+                        return (
                         <tr key={e.id} className="hover:bg-blue-50 border-b border-gray-100 transition-colors">
                             <td className="py-3">
                                 <div className="font-bold text-blue-900 uppercase text-[13px] leading-tight">
@@ -115,6 +156,29 @@ const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
                                     <div className="text-[11px] italic">
                                         {e.ciudadEmpresa}, {e.estadoEmpresa} {e.zipCode}
                                     </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div
+                                    className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => { setBusquedaEstado(""); setEstadosAbierto(e.id); }}
+                                >
+                                    <FaGlobeAmericas className="text-blue-500 text-xs" />
+                                    {estados.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                                            {estados.slice(0, 5).map(s => (
+                                                <span key={s} className="bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded">
+                                                    {s}
+                                                </span>
+                                            ))}
+                                            {estados.length > 5 && (
+                                                <span className="text-[9px] text-gray-400 font-bold">+{estados.length - 5}</span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] text-gray-400 italic">Sin estados</span>
+                                    )}
                                 </div>
                             </td>
 
@@ -148,13 +212,87 @@ const TablaEmpresas = ({ onEditar, isAdminMaster }) => {
                                 </td>
                             )}
                         </tr>
-                    ))}
+                        );
+                    })}
                 </tbody>
             </table>
 
             <div className="p-3 bg-gray-50 flex justify-between items-center border-t border-gray-200">
                 <span className="text-[11px] text-gray-400 font-bold italic uppercase">Registros: {filtrados.length}</span>
             </div>
+
+            {/* Modal de Estados Autorizados */}
+            {estadosAbierto && (() => {
+                const empresa = lista.find(emp => emp.id === estadosAbierto);
+                if (!empresa) return null;
+                const estados = empresa.estadosAutorizados || [];
+                return (
+                    <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setEstadosAbierto(null)}>
+                        <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                            {/* Header */}
+                            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                                        <FaGlobeAmericas className="text-blue-500" />
+                                        Estados Autorizados
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        {empresa.nombreEmpresa}
+                                        <span className="ml-2 text-blue-600 font-bold">{estados.length} seleccionados</span>
+                                        {guardandoEstados === empresa.id && <span className="loading loading-spinner loading-xs text-blue-500 ml-2"></span>}
+                                    </p>
+                                </div>
+                                <button onClick={() => setEstadosAbierto(null)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                    <FaTimes />
+                                </button>
+                            </div>
+
+                            {/* Search + Grid de estados */}
+                            <div className="px-6 pt-4 pb-2">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar estado..."
+                                    value={busquedaEstado}
+                                    onChange={(e) => setBusquedaEstado(e.target.value)}
+                                    className="input input-bordered input-sm w-full bg-gray-50 text-black"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="px-6 pb-6 overflow-y-auto max-h-[55vh]">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {Object.entries(US_STATES_MAP)
+                                        .filter(([code, name]) => {
+                                            if (!busquedaEstado) return true;
+                                            const b = busquedaEstado.toLowerCase();
+                                            return code.toLowerCase().includes(b) || name.toLowerCase().includes(b);
+                                        })
+                                        .sort((a, b) => a[1].localeCompare(b[1])).map(([code, name]) => {
+                                        const activo = estados.includes(code);
+                                        return (
+                                            <button
+                                                key={code}
+                                                onClick={() => toggleEstado(empresa.id, code)}
+                                                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all border ${
+                                                    activo
+                                                        ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                                                        : "bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-400 hover:bg-blue-50"
+                                                }`}
+                                            >
+                                                <span className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                                    activo ? "bg-white/20" : "bg-white border border-gray-300"
+                                                }`}>
+                                                    {activo && <FaCheck className="text-xs" />}
+                                                </span>
+                                                <span className={`text-sm font-bold ${activo ? "text-white" : "text-gray-800"}`}>{name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 };

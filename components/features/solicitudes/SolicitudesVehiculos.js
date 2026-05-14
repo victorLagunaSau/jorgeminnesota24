@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
+import { notificarCambioSolicitud } from "../../../utils";
 import {
     FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaCalendarAlt, FaSearch,
     FaCheck, FaTruck, FaSpinner, FaEye, FaTimes, FaBarcode, FaKey,
@@ -46,6 +47,12 @@ const SolicitudesVehiculos = ({ user }) => {
                 [`fecha${nuevoEstado.charAt(0).toUpperCase() + nuevoEstado.slice(1)}`]: new Date(),
                 actualizadoPor: user?.nombre || "Admin"
             });
+
+            // Push notification al cliente
+            const sol = solicitudes.find(s => s.id === id);
+            if (sol) {
+                notificarCambioSolicitud(sol.clienteNombre, nuevoEstado, `${sol.year} ${sol.make} ${sol.model}`);
+            }
         } catch (error) {
             console.error("Error actualizando estado:", error);
             alert("Error al actualizar el estado");
@@ -58,6 +65,7 @@ const SolicitudesVehiculos = ({ user }) => {
         const config = {
             pendiente: { bg: "bg-yellow-100", text: "text-yellow-800", icon: FaClock, label: "Pendiente" },
             aprobado: { bg: "bg-blue-100", text: "text-blue-800", icon: FaCheck, label: "Aprobado" },
+            asignado: { bg: "bg-indigo-100", text: "text-indigo-800", icon: FaTruck, label: "Asignado" },
             en_proceso: { bg: "bg-purple-100", text: "text-purple-800", icon: FaTruck, label: "En Proceso" },
             completado: { bg: "bg-green-100", text: "text-green-800", icon: FaCheckCircle, label: "Completado" }
         };
@@ -95,6 +103,7 @@ const SolicitudesVehiculos = ({ user }) => {
         todas: solicitudes.length,
         pendiente: solicitudes.filter(s => s.estado === "pendiente").length,
         aprobado: solicitudes.filter(s => s.estado === "aprobado").length,
+        asignado: solicitudes.filter(s => s.estado === "asignado").length,
         en_proceso: solicitudes.filter(s => s.estado === "en_proceso").length,
         completado: solicitudes.filter(s => s.estado === "completado").length
     };
@@ -146,7 +155,7 @@ const SolicitudesVehiculos = ({ user }) => {
 
                     {/* Filtro por estado */}
                     <div className="flex flex-wrap gap-2">
-                        {["todas", "pendiente", "aprobado", "en_proceso", "completado"].map((estado) => {
+                        {["todas", "pendiente", "aprobado", "asignado", "en_proceso", "completado"].map((estado) => {
                             const isActive = filtro === estado;
                             const badge = estado !== "todas" ? getEstadoBadge(estado) : null;
                             return (

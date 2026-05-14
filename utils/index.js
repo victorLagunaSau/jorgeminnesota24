@@ -270,3 +270,93 @@ export const copyToClipboard = async (text) => {
 export const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
+
+/**
+ * Send push notification to a client when vehicle status changes
+ * @param {string} clienteNombre - Client name (uppercase, as stored in vehiculos)
+ * @param {string} nuevoEstatus - New vehicle status code (PR, IN, TR, EB, DS, EN)
+ * @param {string} vehiculoInfo - Vehicle description (e.g. "2019 CHEVROLET EQUINOX")
+ */
+export const notificarCambioEstatus = async (clienteNombre, nuevoEstatus, vehiculoInfo) => {
+  if (!clienteNombre) return;
+
+  const { VEHICLE_STATUS, VEHICLE_STATUS_DESCRIPTIONS } = require("../constants");
+
+  const statusLabel = VEHICLE_STATUS[nuevoEstatus]?.label || nuevoEstatus;
+  const statusDesc = VEHICLE_STATUS_DESCRIPTIONS[nuevoEstatus] || "";
+
+  const titulo = `${vehiculoInfo} — ${statusLabel}`;
+  const mensaje = statusDesc || `El estatus de tu vehículo cambió a: ${statusLabel}`;
+
+  try {
+    await fetch("/api/send-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clienteNombre, titulo, mensaje }),
+    });
+  } catch (err) {
+    console.error("Error enviando push notification:", err);
+  }
+};
+
+/**
+ * Send push notification to a driver when they get assigned a new trip
+ * @param {string} choferId - Driver's Firestore document ID
+ * @param {number} numVehiculos - Number of vehicles in the trip
+ * @param {string} empresaNombre - Carrier company name
+ */
+export const notificarViajeAsignado = async (choferId, numVehiculos, empresaNombre) => {
+  if (!choferId) return;
+
+  const titulo = "Nuevo viaje asignado";
+  const mensaje = `${empresaNombre} te asignó un viaje con ${numVehiculos} vehículo${numVehiculos > 1 ? 's' : ''}. Abre la app para ver los detalles.`;
+
+  try {
+    await fetch("/api/send-push-chofer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choferId, titulo, mensaje }),
+    });
+  } catch (err) {
+    console.error("Error enviando push al chofer:", err);
+  }
+};
+
+/**
+ * Send push notification to a client when their solicitud status changes
+ * @param {string} clienteNombre - Client name
+ * @param {string} nuevoEstado - New solicitud state (pendiente, aprobado, en_proceso, completado)
+ * @param {string} vehiculoInfo - Vehicle description
+ */
+export const notificarCambioSolicitud = async (clienteNombre, nuevoEstado, vehiculoInfo) => {
+  if (!clienteNombre) return;
+
+  const labels = {
+    pendiente: "Pendiente",
+    aprobado: "Aprobada",
+    asignado: "Asignada",
+    en_proceso: "En Camino",
+    completado: "Completada",
+  };
+
+  const mensajes = {
+    pendiente: "Tu solicitud está pendiente de revisión.",
+    aprobado: "Tu solicitud fue aprobada.",
+    asignado: "Tu vehículo fue asignado a un transportista.",
+    en_proceso: "Tu vehículo está en camino.",
+    completado: "Tu solicitud fue completada.",
+  };
+
+  const titulo = `Solicitud ${labels[nuevoEstado] || nuevoEstado} — ${vehiculoInfo}`;
+  const mensaje = mensajes[nuevoEstado] || `Tu solicitud cambió a: ${nuevoEstado}`;
+
+  try {
+    await fetch("/api/send-push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clienteNombre, titulo, mensaje }),
+    });
+  } catch (err) {
+    console.error("Error enviando push notification:", err);
+  }
+};

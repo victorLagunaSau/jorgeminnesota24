@@ -1,5 +1,6 @@
 import React, {useState, useEffect} from "react";
 import {firestore} from '../../../firebase/firebaseIni';
+import { notificarCambioEstatus } from "../../../utils";
 
 const Vehiculos = ({viaje}) => {
     const [vehiculos, setVehiculos] = useState([]);
@@ -16,6 +17,10 @@ const Vehiculos = ({viaje}) => {
             const updatedVehiculos = [...vehiculos];
             updatedVehiculos[index].estatus = "TR";
             setVehiculos(updatedVehiculos);
+
+            // Push notification al cliente
+            const v = vehiculos[index];
+            notificarCambioEstatus(v.cliente, "TR", `${v.marca} ${v.modelo}`);
         } catch (error) {
             console.error("Error cambiando estatus del vehículo:", error);
         }
