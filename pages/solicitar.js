@@ -3,10 +3,11 @@ import Head from "next/head";
 import Link from "next/link";
 import { useAuthContext } from "../context/auth";
 import { firestore } from "../firebase/firebaseIni";
+import { COLLECTIONS } from "../constants";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus, FaTrash,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
-    FaClock, FaArrowLeft, FaCheckCircle
+    FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse
 } from "react-icons/fa";
 
 const SolicitarPage = () => {
@@ -21,9 +22,11 @@ const SolicitarPage = () => {
 
     // Estados para lista de solicitudes
     const [solicitudes, setSolicitudes] = useState([]);
+    const [solicitudesCompletadas, setSolicitudesCompletadas] = useState([]);
+    const [vehiculosEntregados, setVehiculosEntregados] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
-
+    const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
     // Login form
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
@@ -89,7 +92,8 @@ const SolicitarPage = () => {
                     const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
                     return fechaB - fechaA;
                 });
-                setSolicitudes(lista);
+                setSolicitudes(lista.filter(s => s.estado !== "completado"));
+                setSolicitudesCompletadas(lista.filter(s => s.estado === "completado"));
                 setLoadingSolicitudes(false);
             }, (error) => {
                 console.error("Error cargando solicitudes:", error);
@@ -98,6 +102,28 @@ const SolicitarPage = () => {
 
         return () => unsubscribe();
     }, [user]);
+
+    // Cargar vehículos entregados del cliente
+    useEffect(() => {
+        const clienteNombre = user?.datosCliente?.cliente;
+        if (!clienteNombre) return;
+
+        const unsubscribe = firestore()
+            .collection(COLLECTIONS.VEHICULOS)
+            .where("cliente", "==", clienteNombre)
+            .where("estatus", "==", "EN")
+            .onSnapshot((snap) => {
+                const lista = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                lista.sort((a, b) => {
+                    const fechaA = a.registro?.timestamp?.toDate?.() || new Date(0);
+                    const fechaB = b.registro?.timestamp?.toDate?.() || new Date(0);
+                    return fechaB - fechaA;
+                });
+                setVehiculosEntregados(lista);
+            });
+
+        return () => unsubscribe();
+    }, [user?.datosCliente?.cliente]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -508,43 +534,159 @@ const SolicitarPage = () => {
                         )}
                     </div>
 
-                    {/* Panel de Solicitudes */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
-                        <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
-                            <FaClock className="text-orange-600 text-xs"/> Mis Solicitudes
-                        </h2>
+                    {/* Panel de Solicitudes / Historial */}
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-200">
+                            <button
+                                onClick={() => setTabSolicitudes("solicitudes")}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
+                                    tabSolicitudes === "solicitudes"
+                                        ? "text-orange-700 border-b-2 border-orange-600 bg-orange-50/50"
+                                        : "text-gray-400 hover:text-gray-600"
+                                }`}
+                            >
+                                <FaClock className="text-[10px]"/> Solicitudes
+                                {solicitudes.length > 0 && (
+                                    <span className="bg-orange-200 text-orange-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
+                                )}
+                            </button>
+                            <button
+                                onClick={() => setTabSolicitudes("historial")}
+                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
+                                    tabSolicitudes === "historial"
+                                        ? "text-green-700 border-b-2 border-green-600 bg-green-50/50"
+                                        : "text-gray-400 hover:text-gray-600"
+                                }`}
+                            >
+                                <FaHistory className="text-[10px]"/> Historial
+                                {(solicitudesCompletadas.length + vehiculosEntregados.length) > 0 && (
+                                    <span className="bg-green-200 text-green-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
+                                )}
+                            </button>
+                        </div>
 
-                        {loadingSolicitudes ? (
-                            <div className="flex justify-center py-8">
-                                <span className="loading loading-spinner loading-md text-blue-600"></span>
-                            </div>
-                        ) : solicitudes.length === 0 ? (
-                            <div className="text-center py-8">
-                                <FaCar className="text-4xl text-gray-300 mx-auto mb-3"/>
-                                <p className="text-sm text-gray-500">No tienes solicitudes aún</p>
-                                <p className="text-xs text-gray-400">Busca un vehículo para comenzar</p>
-                            </div>
+                        <div className="p-3">
+                        {tabSolicitudes === "solicitudes" ? (
+                            /* === Solicitudes activas === */
+                            loadingSolicitudes ? (
+                                <div className="flex justify-center py-8">
+                                    <span className="loading loading-spinner loading-md text-blue-600"></span>
+                                </div>
+                            ) : solicitudes.length === 0 ? (
+                                <div className="text-center py-8">
+                                    <FaCar className="text-4xl text-gray-300 mx-auto mb-3"/>
+                                    <p className="text-sm text-gray-500">No tienes solicitudes aún</p>
+                                    <p className="text-xs text-gray-400">Busca un vehículo para comenzar</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {solicitudes.map((sol) => {
+                                        const badge = getEstadoBadge(sol.estado);
+                                        return (
+                                            <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                                <div className="flex gap-2 items-start">
+                                                    {sol.imageUrl && (
+                                                        <img
+                                                            src={sol.imageUrl}
+                                                            alt={`${sol.year} ${sol.make}`}
+                                                            className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
+                                                        />
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-start justify-between gap-1">
+                                                            <p className="font-bold text-xs text-gray-800 uppercase truncate">
+                                                                {sol.year} {sol.make} {sol.model}
+                                                            </p>
+                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 ${badge.className}`}>
+                                                                {badge.label}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-[9px] text-gray-500">
+                                                            Lote: {sol.lotNumber} • {sol.source}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                            <span className="flex items-center gap-0.5 truncate">
+                                                                <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
+                                                            </span>
+                                                            <span className="flex items-center gap-0.5 flex-shrink-0">
+                                                                <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {sol.estado === "pendiente" && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleEliminarSolicitud(sol.id); }}
+                                                            className="text-red-400 p-1 flex-shrink-0"
+                                                        >
+                                                            <FaTrash className="text-xs"/>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )
                         ) : (
-                            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                                {solicitudes.map((sol) => {
-                                    const badge = getEstadoBadge(sol.estado);
-                                    return (
+                            /* === Historial === */
+                            (solicitudesCompletadas.length + vehiculosEntregados.length) === 0 ? (
+                                <div className="text-center py-8">
+                                    <FaHistory className="text-4xl text-gray-300 mx-auto mb-3"/>
+                                    <p className="text-sm text-gray-500">No tienes historial aún</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                                    {/* Vehículos entregados */}
+                                    {vehiculosEntregados.map((v) => (
+                                        <div key={v.id} className="border border-green-100 rounded-lg p-2 bg-green-50/30">
+                                            <div className="flex gap-2 items-start">
+                                                <div className="w-14 h-12 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                    <FaCheckCircle className="text-green-500 text-lg"/>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-1">
+                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
+                                                            {v.marca} {v.modelo}
+                                                        </p>
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-200 text-green-800">
+                                                            Entregado
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-500">
+                                                        Lote: {v.binNip} • {v.almacen || '-'}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                        <span className="flex items-center gap-0.5 truncate">
+                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {v.ciudad}, {v.estado}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {/* Solicitudes completadas */}
+                                    {solicitudesCompletadas.map((sol) => (
                                         <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
                                             <div className="flex gap-2 items-start">
-                                                {sol.imageUrl && (
+                                                {sol.imageUrl ? (
                                                     <img
                                                         src={sol.imageUrl}
                                                         alt={`${sol.year} ${sol.make}`}
                                                         className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
                                                     />
+                                                ) : (
+                                                    <div className="w-14 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                        <FaCar className="text-gray-300"/>
+                                                    </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-start justify-between gap-1">
                                                         <p className="font-bold text-xs text-gray-800 uppercase truncate">
                                                             {sol.year} {sol.make} {sol.model}
                                                         </p>
-                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 ${badge.className}`}>
-                                                            {badge.label}
+                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-100 text-green-800">
+                                                            Completado
                                                         </span>
                                                     </div>
                                                     <p className="text-[9px] text-gray-500">
@@ -554,31 +696,21 @@ const SolicitarPage = () => {
                                                         <span className="flex items-center gap-0.5 truncate">
                                                             <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
                                                         </span>
-                                                        <span className="flex items-center gap-0.5 flex-shrink-0">
-                                                            <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
-                                                        </span>
                                                     </div>
-                                                    {sol.estado === "completado" && sol.fechaCompletado && (
+                                                    {sol.fechaCompletado && (
                                                         <p className="text-[9px] text-green-600 font-bold mt-1">
                                                             <FaCheckCircle className="inline mr-0.5 text-[8px]"/>
-                                                            Completado: {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                            {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </p>
                                                     )}
                                                 </div>
-                                                {sol.estado === "pendiente" && (
-                                                    <button
-                                                        onClick={() => handleEliminarSolicitud(sol.id)}
-                                                        className="text-red-400 p-1 flex-shrink-0"
-                                                    >
-                                                        <FaTrash className="text-xs"/>
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
+                                    ))}
+                                </div>
+                            )
                         )}
+                        </div>
                     </div>
                 </div>
             </main>

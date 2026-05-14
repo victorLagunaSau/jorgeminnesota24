@@ -10,7 +10,7 @@ import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaTruck, FaMapMarkerAlt, FaPhone,
     FaSearch, FaCalendarAlt, FaWarehouse, FaPlus, FaUserCircle, FaArrowLeft,
     FaEnvelope, FaIdCard, FaGlobe, FaCity, FaCheckCircle, FaLockOpen,
-    FaUserPlus, FaEye, FaEyeSlash, FaCamera, FaClock
+    FaUserPlus, FaEye, FaEyeSlash, FaCamera, FaClock, FaTimes, FaBarcode, FaKey
 } from "react-icons/fa";
 
 const ClientsPage = () => {
@@ -21,6 +21,8 @@ const ClientsPage = () => {
     const [busqueda, setBusqueda] = useState("");
 
     const [vista, setVista] = useState("vehiculos"); // "vehiculos" | "perfil"
+    const [vehiculoDetalle, setVehiculoDetalle] = useState(null);
+    const [solicitudDetalle, setSolicitudDetalle] = useState(null);
 
     // Login state
     const [modoAuth, setModoAuth] = useState("login"); // "login" | "registro"
@@ -731,9 +733,11 @@ const ClientsPage = () => {
     // PORTAL (usuario autenticado y aprobado)
     // ============================================================
     const vehiculosFiltrados = vehiculos.filter(v =>
-        v.binNip?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        v.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        v.modelo?.toLowerCase().includes(busqueda.toLowerCase())
+        v.estatus !== "EN" && (
+            v.binNip?.toLowerCase().includes(busqueda.toLowerCase()) ||
+            v.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
+            v.modelo?.toLowerCase().includes(busqueda.toLowerCase())
+        )
     );
 
     return (
@@ -900,21 +904,18 @@ const ClientsPage = () => {
                     {solicitudes.length > 0 && (
                         <div className="max-w-6xl mx-auto px-4 mb-4">
                             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200 flex items-center justify-between">
+                                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
                                     <div className="flex items-center gap-2">
                                         <FaTruck className="text-amber-600" />
                                         <span className="text-sm font-black text-amber-800 uppercase">Mis Solicitudes</span>
                                         <span className="bg-amber-200 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{solicitudes.length}</span>
                                     </div>
-                                    <Link href="/solicitar">
-                                        <a className="text-[10px] font-bold text-amber-700 underline">Ver todas</a>
-                                    </Link>
                                 </div>
                                 <div className="divide-y divide-gray-100">
                                     {solicitudes.map(sol => {
                                         const badge = getSolicitudBadge(sol.estado);
                                         return (
-                                            <div key={sol.id} className="px-4 py-3 flex items-center gap-3">
+                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-amber-50/50 transition-colors">
                                                 {sol.imageUrl ? (
                                                     <img src={sol.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
                                                 ) : (
@@ -975,7 +976,8 @@ const ClientsPage = () => {
                                     {vehiculosFiltrados.map((v, index) => (
                                         <div
                                             key={v.id}
-                                            className={`p-4 hover:bg-blue-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                            onClick={() => setVehiculoDetalle(v)}
+                                            className={`p-4 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
                                         >
                                             {/* Vista móvil */}
                                             <div className="md:hidden space-y-3">
@@ -1044,6 +1046,170 @@ const ClientsPage = () => {
                         )}
                     </main>
                 </>
+            )}
+
+            {/* Modal Detalle Vehículo */}
+            {vehiculoDetalle && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setVehiculoDetalle(null)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Header con status */}
+                        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl p-5">
+                            <button onClick={() => setVehiculoDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white">
+                                <FaTimes size={12} />
+                            </button>
+                            <p className="text-gray-400 text-xs font-bold uppercase">Vehículo</p>
+                            <h3 className="text-white text-xl font-black uppercase mt-1">{vehiculoDetalle.binNip}</h3>
+                            <p className="text-gray-300 text-sm">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</p>
+                            <div className="flex items-center gap-2 mt-3">
+                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${getStatusColor(vehiculoDetalle.estatus)}`}>
+                                    {getStatusLabel(vehiculoDetalle.estatus)}
+                                </span>
+                                {vehiculoDetalle.estatus === 'TR' && (
+                                    <span className="flex items-center gap-1 text-blue-300 text-[10px] font-bold">
+                                        <FaTruck className="animate-pulse"/> En tránsito
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Status Steps */}
+                        <div className="px-5 py-4 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                {['PR', 'IN', 'TR', 'EB', 'DS', 'EN'].map((step, i) => {
+                                    const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
+                                    const currentIndex = statusOrder.indexOf(vehiculoDetalle.estatus);
+                                    const isActive = i <= currentIndex;
+                                    const isCurrent = step === vehiculoDetalle.estatus;
+                                    return (
+                                        <div key={step} className="flex flex-col items-center gap-1 flex-1">
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold ${
+                                                isCurrent ? "bg-blue-600 text-white ring-2 ring-blue-200" :
+                                                isActive ? "bg-green-500 text-white" :
+                                                "bg-gray-200 text-gray-400"
+                                            }`}>
+                                                {isActive && i < currentIndex ? <FaCheckCircle className="text-[10px]"/> : step}
+                                            </div>
+                                            <span className={`text-[7px] font-bold uppercase ${isCurrent ? "text-blue-600" : isActive ? "text-green-600" : "text-gray-300"}`}>
+                                                {getStatusLabel(step)}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Datos */}
+                        <div className="p-5 space-y-2.5 text-sm text-gray-600">
+                            <div className="flex items-center gap-2.5">
+                                <FaBarcode className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Lote</span>
+                                <span className="font-mono font-bold text-gray-800">{vehiculoDetalle.binNip}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaCar className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Vehículo</span>
+                                <span className="font-medium text-gray-800">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaMapMarkerAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Origen</span>
+                                <span className="text-gray-800">{vehiculoDetalle.ciudad || '-'}, {vehiculoDetalle.estado || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaWarehouse className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Almacén</span>
+                                <span className="text-gray-800">{vehiculoDetalle.almacen || '-'}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                                <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                <span className="text-gray-400 text-xs w-20">Registro</span>
+                                <span className="text-gray-800">{formatDate(vehiculoDetalle.registro?.timestamp)}</span>
+                            </div>
+                            {vehiculoDetalle.cliente && (
+                                <div className="flex items-center gap-2.5">
+                                    <FaUser className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Cliente</span>
+                                    <span className="font-medium text-gray-800">{vehiculoDetalle.cliente}</span>
+                                </div>
+                            )}
+                            {vehiculoDetalle.referencia && (
+                                <div className="flex items-center gap-2.5">
+                                    <FaIdCard className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Referencia</span>
+                                    <span className="text-gray-800">{vehiculoDetalle.referencia}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle Solicitud */}
+            {solicitudDetalle && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setSolicitudDetalle(null)}>
+                    <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        {/* Imagen */}
+                        <div className="relative">
+                            {solicitudDetalle.imageUrl ? (
+                                <img src={solicitudDetalle.imageUrl} alt="" className="w-full h-44 object-cover rounded-t-2xl"/>
+                            ) : (
+                                <div className="w-full h-32 bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl flex items-center justify-center">
+                                    <FaCar className="text-4xl text-gray-600"/>
+                                </div>
+                            )}
+                            <button onClick={() => setSolicitudDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/60 rounded-full text-white">
+                                <FaTimes size={12}/>
+                            </button>
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">{solicitudDetalle.source}</span>
+                                {(() => {
+                                    const badge = getSolicitudBadge(solicitudDetalle.estado);
+                                    return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>{badge.label}</span>;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="p-4">
+                            <h4 className="text-lg font-bold text-gray-800">
+                                {solicitudDetalle.year} {solicitudDetalle.make} {solicitudDetalle.model}
+                            </h4>
+
+                            <div className="mt-3 space-y-2 text-sm text-gray-600">
+                                <div className="flex items-center gap-2">
+                                    <FaBarcode className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Lote</span>
+                                    <span className="font-mono font-medium text-gray-800">{solicitudDetalle.lotNumber}</span>
+                                </div>
+                                {solicitudDetalle.vin && (
+                                    <div className="flex items-center gap-2">
+                                        <FaKey className="text-gray-400 text-xs flex-shrink-0"/>
+                                        <span className="text-gray-400 text-xs w-20">VIN</span>
+                                        <span className="font-mono text-gray-800 text-xs">{solicitudDetalle.vin}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <FaMapMarkerAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Ubicación</span>
+                                    <span className="text-gray-800">{solicitudDetalle.location || '-'}</span>
+                                </div>
+                                {solicitudDetalle.auctionDate && (
+                                    <div className="flex items-center gap-2">
+                                        <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                        <span className="text-gray-400 text-xs w-20">Comprado</span>
+                                        <span className="text-gray-800">{solicitudDetalle.auctionDate}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <FaCalendarAlt className="text-gray-400 text-xs flex-shrink-0"/>
+                                    <span className="text-gray-400 text-xs w-20">Solicitado</span>
+                                    <span className="text-gray-800">
+                                        {solicitudDetalle.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || '-'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Footer */}

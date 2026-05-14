@@ -34,22 +34,11 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 ### Component Organization
 
-Components are organized into four top-level directories:
-
-- **`components/features/`** — All admin panel modules, organized by domain:
-  - `caja/` — Cash register: vehicle payments, entries/exits, daily/total cuts
-  - `vehiculos/` — Vehicle CRUD, bulk registration, tracking, deletion
-  - `viajes/` — Trip management, driver sheets, verification, liquidation, history
-  - `analisis/` — Financial analysis, advance payments, authorizations, expenses (adminMaster only)
-  - `choferes/`, `clientes/`, `empresas/` — Entity management (drivers, clients, carriers)
-  - `cobranza/` — Collections and pending payments
-  - `reportes/` — Income reports, collection reports, pending payment reports
-  - `config/` — Users, state/price management, migration tools, ERC deletion
-  - `solicitudes/` — Vehicle requests from clients
-- **`components/ui/`** — Shared UI primitives: Alert, EmptyState, LoadingSpinner, Pagination, SearchBar, StatusBadge, StatusSteps, `buttons/`, `inputs/`, `modals/` (ConfirmModal)
-- **`components/auth/`** — Login, registration, password recovery forms
+- **`components/features/`** — All admin panel modules, organized by domain (caja, vehiculos, viajes, analisis, choferes, clientes, empresas, cobranza, reportes, config, solicitudes). The `analisis/` subdirectory is restricted to `adminMaster` users.
+- **`components/ui/`** — Shared UI primitives (Alert, EmptyState, LoadingSpinner, Pagination, SearchBar, StatusBadge, StatusSteps, buttons, inputs, modals)
+- **`components/auth/`** — Login, registration, password recovery
 - **`components/Layout/`** — Header, HeaderPanel, Sidebar, Footer, Layout wrapper
-- **`components/marketing/`** — Landing page components (Hero, Pricing, Feature, Catalogo, Testimoni)
+- **`components/marketing/`** — Landing page components
 
 ### Vehicle Status Pipeline
 
@@ -59,17 +48,12 @@ PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS 
 
 ### Firestore Collections (key ones)
 
-- `vehiculos` — vehicle inventory with status tracking
-- `viajesPendientes` / `viajesPagados` — unpaid / paid trips
-- `movimientos`, `entradasCaja`, `salidasCaja` — cash register movements
-- `choferes`, `clientes`, `empresas` — entity data (cached in AdminDataContext)
-- `solicitudesVehiculos` — client vehicle requests
-- `lotesEnTransito` — lot tracking
-- `auditLog` — audit trail entries
-- `config` — system configuration and sequential IDs
-- `tokensChofer` — temporary access tokens for drivers (6-char codes, not FCM)
-- `tokensCliente` — FCM push notification tokens for clients (saved from Capacitor app)
-- `pagosNomina` — payroll payments
+All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
+- `viajesPendientes` / `viajesPagados` — unpaid vs paid trips (separate collections, not a status field)
+- `movimientos`, `entradasCaja`, `salidasCaja` — three separate collections for cash register
+- `tokensChofer` — temporary 6-char access codes for drivers (not FCM tokens)
+- `tokensCliente` — FCM push notification tokens for clients (from Capacitor app)
+- `config` — system configuration and sequential ID counters
 
 ### Pages and Routing
 
@@ -108,6 +92,10 @@ Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars 
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
 - **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.
 
+## Other Notes
+
+- **README.md is outdated** — it's from the original landing page template and does not reflect the current app. Ignore it.
+
 ## Known Issues to Be Aware Of
 
 - `setup-master.js` and `clonar-usuario.js` pages have no auth protection
@@ -144,24 +132,6 @@ npx cap open ios        # Open in Xcode
 
 ### Push Notifications (code ready, pending external setup)
 
-All code is implemented and hooked up. Notifications fire when:
-- Vehicle status changes: `FormEditarVehiculo.js` (manual), `EntregadoVehiculo.js` (EN), `Vehiculo.js` (TR), `ModalLiquidacion.js` (EB), `TablaViajes.js` (EB)
-- Solicitud status changes: `SolicitudesVehiculos.js`
+All notification code is implemented. Helper functions `notificarCambioEstatus()` and `notificarCambioSolicitud()` in `utils/index.js` call `/api/send-push`. Notifications fire on vehicle status changes and solicitud status changes across multiple components. Requires Apple Developer Account + APNs key + Firebase FCM setup to activate — push notifications only work on real devices, not the iOS simulator.
 
-Helper functions: `notificarCambioEstatus()` and `notificarCambioSolicitud()` in `utils/index.js` call `/api/send-push`.
-
-**Pending setup to activate push notifications:**
-1. Apple Developer Account ($99/year) — required for APNs
-2. In Apple Developer > Keys: create an APNs Authentication Key, download the `.p8` file
-3. In Firebase Console > Project Settings > Cloud Messaging > Apple app configuration: upload the APNs key
-4. In Firebase Console > Project Settings > Cloud Messaging: copy the **Server Key** and add it as `FCM_SERVER_KEY` in `.env.local`
-5. In Xcode > App target > Signing & Capabilities: add **Push Notifications** capability
-6. Push notifications only work on real devices, NOT on the iOS simulator
-
-Token flow: client logs in on the app → `clients.js` registers FCM token via `window.Capacitor.Plugins.PushNotifications` → token saved to Firestore `tokensCliente` collection → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.
-
-### Pending Mobile Tasks
-- Test push notifications on a real iPhone (requires Apple Developer Account + APNs setup above)
-- CORS for scraper API: with `CapacitorHttp.enabled: false`, the scraper fetch on `/solicitar` may be blocked by CORS from the Capacitor WebView origin (`capacitor://localhost`). If so, add CORS headers to the scraper server or re-enable CapacitorHttp only for that specific fetch
-- App Store submission: screenshots, privacy policy URL, Apple Developer account
-- Play Store submission: screenshots, feature graphic, Google Play account ($25)
+Token flow: client logs in → `clients.js` registers FCM token via Capacitor → saved to `tokensCliente` → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.
