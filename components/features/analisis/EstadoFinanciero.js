@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaMoneyBillWave, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie } from 'react-icons/fa';
+import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie, FaReceipt } from 'react-icons/fa';
 
 const MESES_NOMBRES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -113,6 +113,7 @@ const EstadoFinanciero = () => {
     const [movimientos, setMovimientos] = useState([]);
     const [viajesPagados, setViajesPagados] = useState([]);
     const [pagosNomina, setPagosNomina] = useState([]);
+    const [gastosAll, setGastosAll] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalData, setModalData] = useState(null);
 
@@ -149,7 +150,7 @@ const EstadoFinanciero = () => {
         setLoading(true);
         setModalData(null);
         let loadedCount = 0;
-        const checkDone = () => { loadedCount++; if (loadedCount >= 3) setLoading(false); };
+        const checkDone = () => { loadedCount++; if (loadedCount >= 4) setLoading(false); };
 
         const unsub1 = firestore()
             .collection(COLLECTIONS.MOVIMIENTOS)
@@ -178,7 +179,16 @@ const EstadoFinanciero = () => {
                 checkDone();
             }, () => checkDone());
 
-        return () => { unsub1(); unsub2(); unsub3(); };
+        // Gastos: fechaGasto es string "YYYY-MM-DD", no Timestamp — cargar todos los revisados y filtrar en cliente
+        const unsub4 = firestore()
+            .collection("gastos")
+            .where("estado", "==", "revisado")
+            .onSnapshot((snap) => {
+                setGastosAll(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                checkDone();
+            }, () => checkDone());
+
+        return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
     }, [fechaInicio, fechaFin]);
 
     // === DATOS FILTRADOS ===
@@ -186,7 +196,6 @@ const EstadoFinanciero = () => {
         const vehiculos = movimientos.filter(m => m.estatus === "EN" && m.tipo !== "Pago" && m.tipo !== "Abono");
         const anticipos = movimientos.filter(m => m.tipo === "Anticipo");
         const abonos = movimientos.filter(m => m.tipo === "Abono");
-        const entradas = movimientos.filter(m => m.estatus === "EE" && m.tipo === "Entrada" && m.entradaCajaTipo !== "ECI");
 
         // Vehiculos con crédito
         const vehiculosCredito = vehiculos.filter(m => (parseFloat(m.creditoOtorgado) || 0) > 0);
@@ -209,12 +218,17 @@ const EstadoFinanciero = () => {
             });
         });
 
-        return { vehiculos, anticipos, abonos, entradas, vehiculosCredito, vehiculosSaldoPendiente, vehiculosChofer };
-    }, [movimientos, viajesPagados]);
+        // Gastos filtrados por rango de fechas (fechaGasto es string "YYYY-MM-DD")
+        const inicioStr = fechaInicio.toISOString().split("T")[0];
+        const finStr = fechaFin.toISOString().split("T")[0];
+        const gastosFiltrados = gastosAll.filter(g => g.fechaGasto && g.fechaGasto >= inicioStr && g.fechaGasto <= finStr);
+
+        return { vehiculos, anticipos, abonos, vehiculosCredito, vehiculosSaldoPendiente, vehiculosChofer, gastos: gastosFiltrados };
+    }, [movimientos, viajesPagados, gastosAll, fechaInicio, fechaFin]);
 
     // === CALCULOS ===
     const financiero = useMemo(() => {
-        const { vehiculos, anticipos, abonos, entradas } = datos;
+        const { vehiculos, anticipos, abonos } = datos;
 
         const v = {
             count: vehiculos.length,
@@ -234,24 +248,55 @@ const EstadoFinanciero = () => {
 
         const ant = { count: anticipos.length, total: anticipos.reduce((t, m) => t + (parseFloat(m.anticipoPago) || 0), 0) };
         const ab = { count: abonos.length, efectivo: abonos.reduce((t, m) => t + (parseFloat(m.cajaRecibo) || 0), 0), cc: abonos.reduce((t, m) => t + (parseFloat(m.cajaCC) || 0), 0) };
-        const ent = { count: entradas.length, total: entradas.reduce((t, m) => t + (parseFloat(m.cajaRecibo) || 0), 0) };
+
+        const pcFletes = viajesPagados.reduce((t, vi) => {
+            const rf = vi.resumenFinanciero || {};
+            // Si existe totalFletes, usar los campos desglosados
+            if (rf.totalFletes !== undefined) {
+                return t + (parseFloat(rf.totalFletes) || 0);
+            }
+            // Fallback: sumar fletes desde los vehículos individuales
+            return t + (vi.vehiculos || []).reduce((s, v) => s + (parseFloat(v.flete) || 0), 0);
+        }, 0);
+        const pcStorage = viajesPagados.reduce((t, vi) => {
+            const rf = vi.resumenFinanciero || {};
+            if (rf.totalStorage !== undefined) return t + (parseFloat(rf.totalStorage) || 0);
+            return t + (vi.vehiculos || []).reduce((s, v) => s + (parseFloat(v.storage) || 0), 0);
+        }, 0);
+        const pcSobrepeso = viajesPagados.reduce((t, vi) => {
+            const rf = vi.resumenFinanciero || {};
+            if (rf.totalSobrepeso !== undefined) return t + (parseFloat(rf.totalSobrepeso) || 0);
+            return t + (vi.vehiculos || []).reduce((s, v) => s + (parseFloat(v.sPeso) || 0), 0);
+        }, 0);
+        const pcGastosExtra = viajesPagados.reduce((t, vi) => {
+            const rf = vi.resumenFinanciero || {};
+            if (rf.totalGastosExtra !== undefined) return t + (parseFloat(rf.totalGastosExtra) || 0);
+            return t + (vi.vehiculos || []).reduce((s, v) => s + (parseFloat(v.gExtra) || 0), 0);
+        }, 0);
+        const pcVehiculos = viajesPagados.reduce((t, vi) => {
+            const rf = vi.resumenFinanciero || {};
+            if (rf.totalVehiculos !== undefined) return t + (parseFloat(rf.totalVehiculos) || 0);
+            return t + (vi.vehiculos || []).length;
+        }, 0);
 
         const pc = {
             count: viajesPagados.length,
-            totalFletes: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalFletes) || 0), 0),
-            totalStorage: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalStorage) || 0), 0),
-            totalSobrepeso: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalSobrepeso) || 0), 0),
-            totalGastosExtra: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalGastosExtra) || 0), 0),
-            granTotal: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.granTotal) || 0), 0),
-            totalVehiculos: viajesPagados.reduce((t, vi) => t + (parseFloat(vi.resumenFinanciero?.totalVehiculos) || 0), 0),
+            totalFletes: pcFletes,
+            totalStorage: pcStorage,
+            totalSobrepeso: pcSobrepeso,
+            totalGastosExtra: pcGastosExtra,
+            granTotal: pcFletes + pcStorage + pcSobrepeso + pcGastosExtra,
+            totalVehiculos: pcVehiculos,
         };
 
         const nomina = { count: pagosNomina.length, total: pagosNomina.reduce((t, p) => t + (parseFloat(p.monto) || 0), 0) };
 
-        const totalIngresos = v.efectivo + v.cc + ant.total + ab.efectivo + ab.cc + ent.total;
-        const totalEgresos = pc.granTotal + nomina.total;
+        const gastos = { count: datos.gastos.length, total: datos.gastos.reduce((t, g) => t + (parseFloat(g.monto) || 0), 0) };
 
-        return { vehiculos: v, credito: { otorgado: creditoOtorgado, saldoPendiente }, anticipos: ant, abonos: ab, entradas: ent, pagosChoferes: pc, nomina, totalIngresos, totalEgresos, balance: totalIngresos - totalEgresos };
+        const totalIngresos = v.efectivo + v.cc + ant.total + ab.efectivo + ab.cc;
+        const totalEgresos = pc.granTotal + nomina.total + gastos.total;
+
+        return { vehiculos: v, credito: { otorgado: creditoOtorgado, saldoPendiente }, anticipos: ant, abonos: ab, pagosChoferes: pc, nomina, gastos, totalIngresos, totalEgresos, balance: totalIngresos - totalEgresos };
     }, [datos, viajesPagados, pagosNomina]);
 
     // === COLUMNAS PARA DETALLE ===
@@ -285,21 +330,6 @@ const EstadoFinanciero = () => {
         { key: 'fecha', label: 'Fecha', render: (m) => formatTs(m.timestamp) },
         { key: 'cajaRecibo', label: 'Efectivo', align: 'right', fmt: true, color: 'text-green-700' },
         { key: 'cajaCC', label: 'Tarjeta', align: 'right', fmt: true, color: 'text-blue-600' },
-    ];
-
-    const tipoEntradaLabel = (tipo) => {
-        if (tipo === 'ECI') return 'Capital Inicial';
-        if (tipo === 'ERC') return 'Recibo Capital';
-        if (tipo === 'EP') return 'Pago';
-        return tipo || '-';
-    };
-
-    const colEntrada = [
-        { key: 'entradaCajaTipo', label: 'Tipo', render: (m) => tipoEntradaLabel(m.entradaCajaTipo), bold: true },
-        { key: 'entradaCajaReceptor', label: 'Receptor' },
-        { key: 'entradaCajaConceptoPago', label: 'Concepto' },
-        { key: 'fecha', label: 'Fecha', render: (m) => formatTs(m.timestamp) },
-        { key: 'cajaRecibo', label: 'Monto', align: 'right', fmt: true, bold: true, color: 'text-green-700' },
     ];
 
     const colCredito = [
@@ -451,20 +481,6 @@ const EstadoFinanciero = () => {
                             </button>
                         </div>
 
-                        {/* Entradas */}
-                        <div className="p-4">
-                            <button onClick={() => setModalData({ titulo: 'Entradas de Caja', items: datos.entradas, columnas: colEntrada, total: financiero.entradas.total })} className="flex items-center justify-between w-full hover:bg-gray-50 rounded-lg p-1 transition-all cursor-pointer">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 bg-lime-100 rounded-lg flex items-center justify-center"><FaMoneyBillWave className="text-lime-600" size={14} /></div>
-                                    <div className="text-left">
-                                        <p className="text-sm font-bold text-gray-800">Entradas de Caja</p>
-                                        <p className="text-[10px] text-gray-400 uppercase">{financiero.entradas.count} entradas</p>
-                                    </div>
-                                </div>
-                                <p className="text-lg font-black text-green-700">{fmt(financiero.entradas.total)}</p>
-                            </button>
-                        </div>
-
                         {/* Total */}
                         <div className="p-4 bg-green-50">
                             <div className="flex items-center justify-between">
@@ -524,6 +540,32 @@ const EstadoFinanciero = () => {
                                     </div>
                                 </div>
                                 <p className="text-lg font-black text-red-700">{fmt(financiero.nomina.total)}</p>
+                            </button>
+                        </div>
+
+                        {/* Gastos Operativos */}
+                        <div className="p-4">
+                            <button onClick={() => setModalData({
+                                titulo: 'Gastos Operativos',
+                                items: datos.gastos,
+                                columnas: [
+                                    { key: 'concepto', label: 'Concepto', bold: true },
+                                    { key: 'categoria', label: 'Categoría' },
+                                    { key: 'metodoPago', label: 'Pago' },
+                                    { key: 'fechaGasto', label: 'Fecha' },
+                                    { key: 'creadoPor', label: 'Subido por', render: (g) => g.creadoPor?.nombre || '-' },
+                                    { key: 'monto', label: 'Monto', align: 'right', fmt: true, bold: true, color: 'text-red-700' },
+                                ],
+                                total: financiero.gastos.total
+                            })} className="flex items-center justify-between w-full hover:bg-gray-50 rounded-lg p-1 transition-all cursor-pointer">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center"><FaReceipt className="text-pink-600" size={14} /></div>
+                                    <div className="text-left">
+                                        <p className="text-sm font-bold text-gray-800">Gastos Operativos</p>
+                                        <p className="text-[10px] text-gray-400 uppercase">{financiero.gastos.count} gastos</p>
+                                    </div>
+                                </div>
+                                <p className="text-lg font-black text-red-700">{fmt(financiero.gastos.total)}</p>
                             </button>
                         </div>
 

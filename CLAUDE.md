@@ -41,11 +41,18 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 - **`components/Layout/`** — Header, HeaderPanel, Sidebar, Footer, Layout wrapper
 - **`components/marketing/`** — Landing page components
 
-### Vehicle Status Pipeline
+### Status Pipelines
 
+**Vehicle statuses** (`VEHICLE_STATUS` in constants):
 ```
 PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS (Unloaded) -> EN (Delivered)
 ```
+
+**Trip statuses** (`TRIP_STATUS`): `PENDIENTE` → `VERIFICADO` → `PAGADO` (moves from `viajesPendientes` to `viajesPagados` collection on payment)
+
+**Solicitud statuses** (`SOLICITUD_STATUS`): `pendiente` → `asignado` → `en_proceso` → `completado`
+
+**Vehicle types** (`VEHICLE_TYPES`): A (ligero), B (mediano), C (pesado)
 
 ### Firestore Collections (key ones)
 
@@ -96,6 +103,8 @@ Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars 
 - **Components:** Functional components with hooks only. No class components.
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
 - **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.
+- **Image uploads:** Vehicle photos go through `browser-image-compression` + `react-easy-crop` before uploading to Firebase Storage.
+- **No `.env.example` file exists.** Required env vars must be inferred from this document (see Firebase config section above).
 
 ## Other Notes
 
