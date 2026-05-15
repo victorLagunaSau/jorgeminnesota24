@@ -27,7 +27,8 @@ const ReporteMovimientos = React.forwardRef(({
                                                  salidasData,
                                                  totalSalidas,
                                                  isAdminMaster,
-                                                 onDataChange
+                                                 onDataChange,
+                                                 modificacionesData
                                              }, ref) => (
     <div ref={ref} className="m-4" style={{maxWidth: "90%", marginLeft: "auto", marginRight: "auto"}}>
         <div className="encabezado-impresion w-full flex justify-between border-t border-gray-300 pt-1 hidden-print">
@@ -155,6 +156,47 @@ const ReporteMovimientos = React.forwardRef(({
         </tbody>
     </table>
 </div>
+
+        {/* Modificaciones del Día - en página aparte al imprimir */}
+        {modificacionesData && modificacionesData.length > 0 && (
+            <div className="mt-6" style={{ pageBreakBefore: 'always' }}>
+                <h3 className="text-xl font-semibold text-orange-800 mb-2">Modificaciones del Día</h3>
+                <p className="text-xs text-gray-400 mb-2">{modificacionesData.length} modificación(es) — {endDate}</p>
+                <table className="min-w-full bg-white border text-xs">
+                    <thead>
+                        <tr className="bg-orange-50">
+                            <th className="px-2 py-1 border">Lote</th>
+                            <th className="px-2 py-1 border">Marca</th>
+                            <th className="px-2 py-1 border">Modelo</th>
+                            <th className="px-2 py-1 border">Cliente</th>
+                            <th className="px-2 py-1 border">Modificación</th>
+                            <th className="px-2 py-1 border">Descripción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {modificacionesData.map((m) => (
+                            <tr key={m.id}>
+                                <td className="px-2 py-1 border font-bold">{m.binNip || '-'}</td>
+                                <td className="px-2 py-1 border">{m.marca || '-'}</td>
+                                <td className="px-2 py-1 border">{m.modelo || '-'}</td>
+                                <td className="px-2 py-1 border">{m.cliente || '-'}</td>
+                                <td className="px-2 py-1 border">
+                                    {m.cambios ? Object.entries(m.cambios).map(([campo, val]) => (
+                                        <div key={campo}>
+                                            <span className="font-semibold">{campo}:</span>{' '}
+                                            <span className="text-red-500 line-through">{String(val.antes || '-')}</span>
+                                            {' → '}
+                                            <span className="text-green-600 font-bold">{String(val.despues || '-')}</span>
+                                        </div>
+                                    )) : m.accion || '-'}
+                                </td>
+                                <td className="px-2 py-1 border text-gray-600">{m.descripcion || '-'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )}
     </div>
 ));
 
@@ -167,6 +209,7 @@ const CorteDia = ({user}) => {
     const [salidasData, setSalidasData] = useState([]);
     const [abonosData, setAbonosData] = useState([]);
     const [anticiposData, setAnticiposData] = useState([]);
+    const [modificacionesData, setModificacionesData] = useState([]);
     const [errorMessage, setErrorMessage] = useState("");
     const componentRef = useRef(null);
 
@@ -182,7 +225,7 @@ const CorteDia = ({user}) => {
             .where("tipo", "==", USER_TYPES.ADMIN)
             .onSnapshot((snap) => {
                 const todos = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const conCaja = todos.filter(u => u.caja === true);
+                const conCaja = todos.filter(u => u.caja === true || u.adminMaster === true);
                 conCaja.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
                 setUsuariosCaja(conCaja);
             });
@@ -238,11 +281,27 @@ const CorteDia = ({user}) => {
         const filteredAbonos = filteredUserID.filter((movement) => movement.tipo === "Abono");
         const filteredAnticipos = filteredUserID.filter((movement) => movement.tipo === "Anticipo");
 
+        // Consulta de modificaciones del día (auditLog)
+        const auditSnapshot = await firestore()
+            .collection(COLLECTIONS.AUDIT_LOG)
+            .where("timestamp", ">", new Date(startTimestamp))
+            .where("timestamp", "<", new Date(endTimestamp))
+            .get();
+
+        const auditDocs = auditSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const filteredModificaciones = auditDocs.filter(m => m.usuarioId === targetUser.id);
+        filteredModificaciones.sort((a, b) => {
+            const ta = a.timestamp instanceof Date ? a.timestamp.getTime() : (a.timestamp?.seconds || 0) * 1000;
+            const tb = b.timestamp instanceof Date ? b.timestamp.getTime() : (b.timestamp?.seconds || 0) * 1000;
+            return ta - tb;
+        });
+
         setVehiculosData(filteredVehiculos);
         setEntradasData(filteredEntradas);
         setSalidasData(filteredSalidas);
         setAbonosData(filteredAbonos);
         setAnticiposData(filteredAnticipos);
+        setModificacionesData(filteredModificaciones);
     };
 
     const totalPago = vehiculosData.reduce((total, movement) => total + (parseFloat(movement.totalPago) || 0), 0);
@@ -375,6 +434,7 @@ const CorteDia = ({user}) => {
                 totalSalidas={totalSalidas}
                 isAdminMaster={isAdminMaster}
                 onDataChange={handleButtonClick}
+                modificacionesData={modificacionesData}
             />
         </div>
     );

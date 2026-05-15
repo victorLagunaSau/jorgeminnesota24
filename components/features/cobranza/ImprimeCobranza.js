@@ -84,6 +84,7 @@ const ImprimeCobranza = forwardRef(({ vehiculos }, ref) => {
                         <th style={thStyle}>Lote</th>
                         <th style={thStyle}>Vehículo</th>
                         <th style={thStyle}>Origen</th>
+                        <th style={thStyle}>Autorizó</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Flete</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Storage</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>S.Peso</th>
@@ -107,6 +108,7 @@ const ImprimeCobranza = forwardRef(({ vehiculos }, ref) => {
                                 <td style={{ ...tdStyle, fontFamily: "monospace", fontWeight: "bold" }}>{v.binNip}</td>
                                 <td style={tdStyle}>{v.marca} {v.modelo}</td>
                                 <td style={{ ...tdStyle, fontSize: "9px" }}>{v.ciudad}, {v.estado}</td>
+                                <td style={{ ...tdStyle, fontSize: "9px" }}>{v.usuarioFiado || '-'}</td>
                                 <td style={{ ...tdStyle, textAlign: "right" }}>{fmt(parseFloat(v.price) || 0)}</td>
                                 <td style={{ ...tdStyle, textAlign: "right" }}>{fmt(parseFloat(v.storage) || 0)}</td>
                                 <td style={{ ...tdStyle, textAlign: "right" }}>{fmt(parseFloat(v.sobrePeso) || 0)}</td>
@@ -120,7 +122,7 @@ const ImprimeCobranza = forwardRef(({ vehiculos }, ref) => {
                 </tbody>
                 <tfoot>
                     <tr style={{ borderTop: "2px solid #374151", background: "#f9fafb", fontWeight: "bold" }}>
-                        <td colSpan="10" style={{ ...tdStyle, textAlign: "right", fontSize: "11px" }}>TOTALES:</td>
+                        <td colSpan="11" style={{ ...tdStyle, textAlign: "right", fontSize: "11px" }}>TOTALES:</td>
                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "11px" }}>{fmt(totalPrecio)}</td>
                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "11px", color: "#15803d" }}>{fmt(totalCobrado)}</td>
                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "11px", color: "#c2410c" }}>{fmt(totalPendiente)}</td>

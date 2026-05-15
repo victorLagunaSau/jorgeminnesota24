@@ -41,6 +41,8 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
 
     const [estatus, setEstatus] = useState('');
     const [saving, setSaving] = useState(false);
+    const [showDescripcionModal, setShowDescripcionModal] = useState(false);
+    const [descripcionCambio, setDescripcionCambio] = useState('');
 
     const clientesFiltrados = clientesRaw.filter(c =>
         c.cliente?.toLowerCase().includes(cliente.toLowerCase())
@@ -132,9 +134,16 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
             return;
         }
 
+        setDescripcionCambio('');
+        setShowDescripcionModal(true);
+    };
+
+    const handleConfirmarCambio = async () => {
+        if (!descripcionCambio.trim()) return;
+        setShowDescripcionModal(false);
         setSaving(true);
         try {
-            await handleActualizarVehiculo();
+            await handleActualizarVehiculo(descripcionCambio.trim());
             setSuccess('Vehículo actualizado con éxito.');
             onClose();
         } catch (err) {
@@ -145,7 +154,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
         }
     };
 
-    const handleActualizarVehiculo = async () => {
+    const handleActualizarVehiculo = async (descCambio) => {
         const todos = {
             gatePass, almacen, tipoVehiculo, marca, modelo, cliente, telefonoCliente, descripcion, estado, ciudad,
             price: String(price),
@@ -168,7 +177,7 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
         await firebase.firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculo.binNip).update(nuevos);
 
         if (Object.keys(cambios).length > 0) {
-            await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios);
+            await registrarAuditLog("edicion", user, { binNip: vehiculo.binNip, cliente: cliente || vehiculo.cliente, marca: marca || vehiculo.marca, modelo: modelo || vehiculo.modelo }, cambios, descCambio);
         }
 
         // Push notification si cambió el estatus
@@ -467,13 +476,6 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                 </div>
             </div>
             <div className="flex justify-between mt-5">
-                {/*<button*/}
-                {/*    type="button"*/}
-                {/*    onClick={handleDeleteVehiculo}*/}
-                {/*    className="btn btn-sm btn-danger w-1/6"*/}
-                {/*>*/}
-                {/*    Eliminar*/}
-                {/*</button>*/}
                 <button
                     type="button"
                     onClick={handleSubmit}
@@ -483,6 +485,39 @@ const FormEditVehiculo = ({vehiculo, onClose, user}) => {
                     {saving ? 'Actualizando...' : 'Actualizar'}
                 </button>
             </div>
+
+            {showDescripcionModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
+                        <h3 className="text-lg font-black text-gray-800 mb-4">Descripción del cambio</h3>
+                        <textarea
+                            className="textarea textarea-bordered w-full bg-white text-gray-800 font-semibold"
+                            rows={3}
+                            placeholder="Describe el motivo del cambio..."
+                            value={descripcionCambio}
+                            onChange={(e) => setDescripcionCambio(e.target.value)}
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={() => setShowDescripcionModal(false)}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="button"
+                                className="btn btn-primary text-white"
+                                disabled={!descripcionCambio.trim()}
+                                onClick={handleConfirmarCambio}
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </form>
     );
 };
