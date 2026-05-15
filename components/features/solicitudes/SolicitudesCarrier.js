@@ -219,7 +219,7 @@ const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
         s.location?.toLowerCase().includes(busqueda.toLowerCase());
 
     const enEstadoAutorizado = (sol) => {
-        if (!estadosAutorizados || estadosAutorizados.length === 0) return true;
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return false;
         if (!sol.location) return false;
         const match = sol.location.match(/\b([A-Z]{2})\b/);
         if (match && US_STATES_MAP[match[1]]) return estadosAutorizados.includes(match[1]);
@@ -266,9 +266,9 @@ const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
     }, [listaActual]);
 
     const contadores = {
-        pendientes: solicitudes.filter(s => !s.estado || s.estado === "pendiente" || s.estado === "aprobado").length,
-        asignados: solicitudes.filter(s => s.estado === "asignado" || s.estado === "en_proceso").length,
-        completados: solicitudes.filter(s => s.estado === "completado").length
+        pendientes: solicitudes.filter(s => (!s.estado || s.estado === "pendiente" || s.estado === "aprobado") && enEstadoAutorizado(s)).length,
+        asignados: solicitudes.filter(s => (s.estado === "asignado" || s.estado === "en_proceso") && enEstadoAutorizado(s)).length,
+        completados: solicitudes.filter(s => s.estado === "completado" && enEstadoAutorizado(s)).length
     };
 
     const renderFila = (sol) => {

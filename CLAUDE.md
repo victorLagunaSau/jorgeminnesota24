@@ -27,6 +27,7 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 - **State management:** React Context API only (no Redux). Two context providers: `AuthContext` (`context/auth.js`) wraps the entire app in `_app.js`; `AdminDataContext` (`context/adminData.js`) wraps only the admin panel (scoped inside the admin page, not global) and provides real-time cached data for drivers/clients/companies via Firestore `onSnapshot`. Components outside the admin panel cannot use `useAdminData()`. AdminDataContext exposes lookup helpers: `getChoferById`, `getClienteById`, `getEmpresaById`, `getChoferByNombre`, `getClienteByNombre` (no `getEmpresaByNombre`).
 - **Admin panel module routing:** `components/features/Admin.js` is a large switch statement (~30 cases) that renders the active module. This is client-side state routing (not URL-based) — there are no distinct URLs per admin module. `components/Layout/Sidebar.js` controls navigation by setting `selectedModule` state, which Admin.js switches on. To add a new admin module: (1) add the module name to `ADMIN_MODULES` in `constants/index.js`, (2) add a `case` in `Admin.js` `renderModule()`, (3) add a sidebar entry in `Sidebar.js`. **Note:** 18 module names are defined in `ADMIN_MODULES`; the remaining (~11, mostly análisis submodules like `estadoFinanciero`, `gastos`, `empleados`, `historialAnticipos`, `historialAutorizaciones`, and utility modules like `registroMasivoVehiculos`, `eliminaVehiculos`) use string literals directly in Sidebar.js and Admin.js.
+- **Authorization system:** The `historialAutorizaciones` module (`components/features/analisis/HistorialAutorizaciones.js`) tracks pending authorizations for vehicle edits (`edicion`), deletions (`eliminacion`), and lot changes (`cambioLote`). It also appears in the header nav via `HeaderPanel.js` as a notification badge. This is an audit/approval workflow — not to be confused with auth/login.
 - **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js` (re-exported via `services/index.js`). Import from `services/` barrel export. Use it instead of direct Firestore calls. Key exports: `addDocument`, `updateDocument`, `deleteDocument`, `setDocument` (with optional merge), `getDocument`, `getCollection`, `queryDocuments` (multi-where), `batchWrite`, `subscribeToDocument`, `subscribeToCollection`, and the raw `firestore` instance. Includes a **sequential ID system** (`getNextConsecutive`, `runTransactionWithConsecutive`, `updateConsecutive`) for generating incrementing IDs stored in the `config` collection under keys defined in `CONFIG_KEYS`. **Important:** `addDocument` auto-injects `createdAt` and `updateDocument` auto-injects `updatedAt` — don't add these manually in calling code. **Gotcha:** `CONFIG_KEYS` has inconsistent naming — most are camelCase but `"Viajes pagados"` has a space.
 - **Constants as single source of truth:** `constants/index.js` exports all enums and config: collection names (`COLLECTIONS`), vehicle/trip statuses, payment methods, user roles (`USER_TYPES`), admin module names (`ADMIN_MODULES`), company info for receipts, field validation limits, and helper functions (`getStatusLabel`, `getStatusIndex`, `formatFirestoreTimestamp`). Use `formatFirestoreTimestamp` for all timestamp rendering — it handles both Firestore Timestamp objects and plain JS Dates. There is also a `utils/constants.js` with overlapping vehicle status definitions — prefer `constants/index.js` as the canonical source.
 - **Custom hooks:** Located in `hooks/` (with barrel export via `hooks/index.js`) — `useFirestoreCollection` (real-time subscriptions), `useAuth`, `useAlert`, `usePagination`, `useCopyToClipboard`. Note: some components still implement their own Firestore listeners.
@@ -40,11 +41,18 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 - **`components/Layout/`** — Header, HeaderPanel, Sidebar, Footer, Layout wrapper
 - **`components/marketing/`** — Landing page components
 
-### Vehicle Status Pipeline
+### Status Pipelines
 
+**Vehicle statuses** (`VEHICLE_STATUS` in constants):
 ```
 PR (Registered) -> IN (Loading) -> TR (In Transit) -> EB (In Brownsville) -> DS (Unloaded) -> EN (Delivered)
 ```
+
+**Trip statuses** (`TRIP_STATUS`): `PENDIENTE` → `VERIFICADO` → `PAGADO` (moves from `viajesPendientes` to `viajesPagados` collection on payment)
+
+**Solicitud statuses** (`SOLICITUD_STATUS`): `pendiente` → `asignado` → `en_proceso` → `completado`
+
+**Vehicle types** (`VEHICLE_TYPES`): A (ligero), B (mediano), C (pesado)
 
 ### Firestore Collections (key ones)
 
@@ -64,7 +72,7 @@ All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
 - **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `clients` + `solicitar` (cliente)
-- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients)
+- **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients), `api/send-push-chofer` (FCM push notifications to drivers)
 - **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF), `generarComisionesPDF.js` (commissions PDF)
 
 ### VPS Scraper (`vps-scraper/`)
@@ -95,6 +103,8 @@ Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars 
 - **Components:** Functional components with hooks only. No class components.
 - **Payment methods:** Cash, check, Zelle, card — all registered manually (no payment processor integration).
 - **Printing:** Receipt/document printing uses `react-to-print`. Excel exports use `xlsx`.
+- **Image uploads:** Vehicle photos go through `browser-image-compression` + `react-easy-crop` before uploading to Firebase Storage.
+- **No `.env.example` file exists.** Required env vars must be inferred from this document (see Firebase config section above).
 
 ## Other Notes
 

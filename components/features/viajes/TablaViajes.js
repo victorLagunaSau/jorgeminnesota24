@@ -336,10 +336,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
     const ejecutarPago = async (viaje) => {
         setProcesandoPago(true);
         const fechaOperacionActual = new Date();
-        // MasterAdmin: usar la fecha original del viaje para fechaPago (viajes históricos)
-        const isAdminMaster = user?.adminMaster === true;
         const fechaDelViaje = viaje.fechaCreacion?.toDate ? viaje.fechaCreacion.toDate() : (viaje.fechaCreacion ? new Date(viaje.fechaCreacion) : null);
-        const fechaPagoFinal = (isAdminMaster && fechaDelViaje) ? fechaDelViaje : fechaOperacionActual;
         const empresaSeleccionada = viaje.empresaNombre || viaje.chofer?.empresa || "";
         // Usar el número de viaje ingresado al pagar
         const numViajeFinal = numViajePago.trim() || viaje.numViaje;
@@ -521,7 +518,8 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     ...viaje,
                     numViaje: numViajeFinal,
                     folioPago: nuevoFolioContable,
-                    fechaPago: fechaPagoFinal,
+                    fechaPago: fechaOperacionActual,
+                    fechaViaje: fechaDelViaje || fechaOperacionActual,
                     empresaLiderId: viaje.empresaLiderId || viaje.chofer?.empresaLiderId || "",
                     pagadoPor: {id: user?.id, nombre: user?.nombre},
                     empresaLiquidada: empresaSeleccionada,

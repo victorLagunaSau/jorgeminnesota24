@@ -49,7 +49,7 @@ const CarriersPage = () => {
 
     // Helper para verificar si una location pertenece a un estado autorizado
     const locationEnEstadoAutorizado = (location) => {
-        if (!estadosAutorizados || estadosAutorizados.length === 0) return true; // sin filtro = ver todo
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return false; // sin estados autorizados = no ver nada
         if (!location) return false;
         const US_STATES_MAP = {
             'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
