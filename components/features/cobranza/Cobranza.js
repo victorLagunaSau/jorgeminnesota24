@@ -19,11 +19,33 @@ const Cobranza = ({ user }) => {
         let datosLegacy = [];
         let loadCount = 0;
 
-        const combinar = () => {
+        const combinar = async () => {
             loadCount++;
             const porId = new Map();
             [...datosFiados, ...datosLegacy].forEach(v => porId.set(v.id, v));
             const todos = Array.from(porId.values());
+
+            // Para vehículos sin usuarioFiado, buscar en movimientos quién hizo la salida
+            const sinUsuario = todos.filter(v => !v.usuarioFiado);
+            if (sinUsuario.length > 0) {
+                const promesas = sinUsuario.map(async (v) => {
+                    try {
+                        const movSnap = await firestore()
+                            .collection("movimientos")
+                            .where("binNip", "==", v.id)
+                            .where("estatus", "==", "EN")
+                            .where("tipo", "==", "Salida")
+                            .limit(1)
+                            .get();
+                        if (!movSnap.empty) {
+                            const mov = movSnap.docs[0].data();
+                            v.usuarioFiado = mov.usuario || '';
+                        }
+                    } catch (e) {}
+                });
+                await Promise.all(promesas);
+            }
+
             todos.sort((a, b) => {
                 const ta = a.timestamp?.seconds || 0;
                 const tb = b.timestamp?.seconds || 0;
@@ -91,6 +113,7 @@ const Cobranza = ({ user }) => {
             Lote: v.binNip,
             Vehiculo: `${v.marca} ${v.modelo}`,
             Origen: `${v.ciudad}, ${v.estado}`,
+            Autorizo: v.usuarioFiado || '-',
             Precio: (parseFloat(v.price) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sobrePeso) || 0) + (parseFloat(v.gastosExtra) || 0),
             Cobrado: (parseFloat(v.cajaRecibo) || 0) - (parseFloat(v.cajaCambio) || 0) + (parseFloat(v.cajaCC) || 0),
             Pendiente: parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0,
@@ -179,6 +202,7 @@ const Cobranza = ({ user }) => {
                                 <th className="py-3">Lote</th>
                                 <th className="py-3">Vehículo</th>
                                 <th className="py-3">Origen</th>
+                                <th className="py-3">Autorizó</th>
                                 <th className="py-3 text-right">Precio</th>
                                 <th className="py-3 text-right">Cobrado</th>
                                 <th className="py-3 text-right">Pendiente</th>
@@ -188,7 +212,7 @@ const Cobranza = ({ user }) => {
                         <tbody className="text-sm">
                             {filtrados.length === 0 ? (
                                 <tr>
-                                    <td colSpan="10" className="text-center py-16 text-gray-300">
+                                    <td colSpan="11" className="text-center py-16 text-gray-300">
                                         <FaTruck className="mx-auto text-4xl mb-2" />
                                         <p className="font-bold">Sin fletes pendientes</p>
                                     </td>
@@ -209,6 +233,7 @@ const Cobranza = ({ user }) => {
                                             <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
                                             <td className="text-gray-600">{v.marca} {v.modelo}</td>
                                             <td className="text-gray-400 text-xs">{v.ciudad}, {v.estado}</td>
+                                            <td className="text-gray-600 text-xs font-semibold">{v.usuarioFiado || '-'}</td>
                                             <td className="text-right">{fmt(precio)}</td>
                                             <td className="text-right text-green-600">{fmt(cobrado)}</td>
                                             <td className="text-right font-bold text-orange-600">{fmt(saldo)}</td>

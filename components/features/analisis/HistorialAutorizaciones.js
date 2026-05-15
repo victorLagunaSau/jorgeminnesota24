@@ -140,13 +140,14 @@ const HistorialAutorizaciones = () => {
                             <th>Vehículo</th>
                             <th>Cliente</th>
                             <th>Cambios</th>
+                            <th>Descripción</th>
                             <th>Fecha</th>
                         </tr>
                     </thead>
                     <tbody className="text-sm">
                         {filtrados.length === 0 ? (
                             <tr>
-                                <td colSpan="7" className="text-center py-10 text-gray-300">
+                                <td colSpan="8" className="text-center py-10 text-gray-300">
                                     No se encontraron registros
                                 </td>
                             </tr>
@@ -167,6 +168,9 @@ const HistorialAutorizaciones = () => {
                                         <td className="text-gray-600">{r.cliente}</td>
                                         <td className="max-w-xs">
                                             {r.cambios ? formatCambios(r.cambios) : <span className="text-gray-300">-</span>}
+                                        </td>
+                                        <td className="max-w-xs text-gray-600 text-xs">
+                                            {r.descripcion || <span className="text-gray-300">-</span>}
                                         </td>
                                         <td className="text-gray-400 whitespace-nowrap">
                                             {r.timestamp?.seconds

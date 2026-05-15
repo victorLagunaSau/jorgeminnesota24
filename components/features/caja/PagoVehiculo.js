@@ -123,6 +123,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 saldoFiado: pCredito,
                 abonosFiado: [],
                 pagosPendientes: false,
+                ...(esFiado ? { usuarioFiado: user.nombre, usuarioFiadoId: user.id } : {}),
             };
 
             await firestore()
