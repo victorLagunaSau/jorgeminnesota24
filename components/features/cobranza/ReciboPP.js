@@ -26,79 +26,58 @@ const ReciboPP = forwardRef(({ vehiculo, abono, fechaPago, user }, ref) => {
 
     const Recibo = ({ title }) => (
         <div
-            className="border-2 border-gray-400 p-4 my-4"
-            style={{ fontFamily: "Arial", fontSize: "14px" }}
+            className="border border-gray-400 p-2 my-1"
+            style={{ fontFamily: "Arial", fontSize: "11px" }}
         >
-            <div className="flex justify-between mb-2">
-                <img src="/assets/Logoprint.png" className="w-15 mr-1" alt="Logo" />
-                <h2 className="text-lg font-bold">RECIBO DE ABONO / PAGO FIADO</h2>
-                <div>
-                    <p>
-                        <strong>Fecha:</strong> {moment(fechaPago).format("DD/MM/YYYY")}
-                    </p>
-                    <p className="text-sm italic">{title}</p>
+            <div className="flex justify-between items-center mb-1">
+                <img src="/assets/Logoprint.png" style={{ height: "28px" }} alt="Logo" />
+                <h2 className="text-sm font-bold">RECIBO DE ABONO / PAGO FIADO</h2>
+                <div className="text-right">
+                    <p><strong>Fecha:</strong> {moment(fechaPago).format("DD/MM/YYYY")}</p>
+                    <p className="text-xs italic">{title}</p>
                 </div>
             </div>
-            <hr className="mb-2" />
-            <div className="mb-2">
-                <p>
-                    <strong>Cliente:</strong> {vehiculo?.cliente}{" "}
-                    <strong>Vehículo:</strong> {vehiculo?.marca} {vehiculo?.modelo}{" "}
-                    <strong>Descripción:</strong> {vehiculo?.descripcion}
+            <hr className="mb-1" />
+            <p className="text-lg font-black text-center mb-1">LOTE: {vehiculo?.binNip}</p>
+            <div className="flex gap-4 mb-1">
+                <p><strong>Cliente:</strong> {vehiculo?.cliente}</p>
+                <p><strong>Vehículo:</strong> {vehiculo?.marca} {vehiculo?.modelo}</p>
+                <p><strong>Descripción:</strong> {vehiculo?.descripcion}</p>
+            </div>
+            <div className="mb-1">
+                <p className="text-base">Abono: <strong>${montoAbono.toFixed(2)}</strong> dólares
+                    {efectivoAbono > 0 && <span> — Efectivo: ${efectivoAbono.toFixed(2)}</span>}
+                    {ccAbono > 0 && <span> — CC: ${ccAbono.toFixed(2)}</span>}
                 </p>
             </div>
-            <div className="mb-2 text-xl">
-                <p>Este comprobante corresponde a un abono por:</p>
-                <p>
-                    <strong>${montoAbono.toFixed(2)}</strong> dólares.
-                </p>
-                {efectivoAbono > 0 && (
-                    <p className="text-base">Efectivo: ${efectivoAbono.toFixed(2)}</p>
-                )}
-                {ccAbono > 0 && <p className="text-base">Tarjeta (CC): ${ccAbono.toFixed(2)}</p>}
+            <div className="flex gap-4 mb-1">
+                <p><strong>Total Venta:</strong> ${totalVenta.toFixed(2)}</p>
+                <p><strong>Pagado acumulado:</strong> ${totalPagado.toFixed(2)}</p>
+                <p className="text-base font-bold"><strong>Restante:</strong> ${saldoDespues.toFixed(2)}</p>
             </div>
-            <div className="mb-2">
-                <p>
-                    <strong>Total de Venta:</strong> ${totalVenta.toFixed(2)}
-                </p>
-                <p>
-                    <strong>Total Pagado acumulado:</strong> ${totalPagado.toFixed(2)} (
-                    {totalPagadoPalabras})
-                </p>
-                <p className="text-xl">
-                    <strong>Restante por Pagar:</strong> ${saldoDespues.toFixed(2)}
-                </p>
-                {abonosPrevios.length > 0 && (
-                    <div className="mt-2">
-                        <p className="font-semibold">Abonos previos:</p>
-                        <ul className="ml-4 list-disc text-sm">
-                            {abonosPrevios.map((a, i) => (
-                                <li key={i}>
-                                    ${parseFloat(a.monto).toFixed(2)}{" "}
-                                    {a.fecha?.toDate
-                                        ? `— ${a.fecha.toDate().toLocaleDateString()}`
-                                        : ""}
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
-            <div className="mt-4 flex justify-between items-end">
-                <p>
-                    <strong>Atendido por:</strong> {user?.nombre}
-                </p>
-                <div className="text-center mt-8">
+            {abonosPrevios.length > 0 && (
+                <div className="mb-1">
+                    <span className="font-semibold">Abonos previos: </span>
+                    {abonosPrevios.map((a, i) => (
+                        <span key={i} className="text-xs">
+                            ${parseFloat(a.monto).toFixed(2)}{a.fecha?.toDate ? ` (${a.fecha.toDate().toLocaleDateString()})` : ""}{i < abonosPrevios.length - 1 ? ", " : ""}
+                        </span>
+                    ))}
+                </div>
+            )}
+            <div className="flex justify-between items-end mt-2">
+                <p><strong>Atendido por:</strong> {user?.nombre}</p>
+                <div className="text-center">
                     __________________________
                     <br />
-                    <strong>Firma del Cliente</strong>
+                    <span className="text-xs font-bold">Firma del Cliente</span>
                 </div>
             </div>
         </div>
     );
 
     return (
-        <div ref={ref} className="p-6" style={{ maxWidth: "700px", margin: "auto" }}>
+        <div ref={ref} className="p-2" style={{ maxWidth: "700px", margin: "auto" }}>
             <Recibo title="Copia Cliente" />
             <Recibo title="Copia Oficina" />
         </div>

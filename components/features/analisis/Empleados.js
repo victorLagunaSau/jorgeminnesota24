@@ -3,7 +3,7 @@ import firebase from "firebase/app";
 import "firebase/firestore";
 import { storage } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaPlus, FaTrash, FaChevronDown, FaChevronRight, FaFilePdf, FaUpload, FaExternalLinkAlt } from "react-icons/fa";
+import { FaPlus, FaTrash, FaFilePdf, FaUpload, FaExternalLinkAlt } from "react-icons/fa";
 
 const EMPLEADOS = [
     { id: "cristela", nombre: "Cristela Govea", email: "goveacristela@gmail.com", sueldoSemanal: 500 },
@@ -12,37 +12,47 @@ const EMPLEADOS = [
     { id: "jorge", nombre: "Jorge Martinez", email: "jorgeminnesota19@gmail.com", sueldoSemanal: 1000 },
 ];
 
-// Genera semanas lunes-sábado para un mes dado
+// Genera semanas para un mes. La primera semana arranca el 1ro del mes, las demás lunes-sábado.
 const getSemanasDelMes = (anio, mes) => {
     const semanas = [];
     const primerDia = new Date(anio, mes - 1, 1);
     const ultimoDia = new Date(anio, mes, 0);
 
-    // Encontrar el primer lunes (puede ser del mes anterior)
+    // Encontrar el primer lunes del mes
     let lunes = new Date(primerDia);
     const dia = lunes.getDay();
     if (dia !== 1) {
-        // Retroceder al lunes más cercano
-        const diff = dia === 0 ? 6 : dia - 1;
-        lunes.setDate(lunes.getDate() - diff);
+        const avance = dia === 0 ? 1 : 8 - dia;
+        lunes.setDate(lunes.getDate() + avance);
     }
 
-    let numSemana = 1;
-    while (lunes <= ultimoDia) {
+    // Semana 1: del 1ro del mes hasta el primer sábado (después del primer lunes)
+    const primerSabado = new Date(lunes);
+    primerSabado.setDate(lunes.getDate() + 5);
+
+    const fmt = (d) => d.getDate() + " " + d.toLocaleDateString("es-MX", { month: "short" });
+
+    semanas.push({
+        num: 1,
+        label: `Semana 1: ${fmt(primerDia)} - ${fmt(primerSabado)}`,
+        inicio: new Date(primerDia),
+        fin: new Date(primerSabado.getFullYear(), primerSabado.getMonth(), primerSabado.getDate(), 23, 59, 59, 999),
+        key: `${anio}-${String(mes).padStart(2, "0")}-S1`,
+    });
+
+    // Semanas siguientes: lunes-sábado mientras el lunes caiga en el mes
+    lunes.setDate(lunes.getDate() + 7);
+    let numSemana = 2;
+    while (lunes.getMonth() + 1 === mes) {
         const sabado = new Date(lunes);
         sabado.setDate(lunes.getDate() + 5);
-
-        const inicioLabel = lunes.getDate() + " " + lunes.toLocaleDateString("es-MX", { month: "short" });
-        const finLabel = sabado.getDate() + " " + sabado.toLocaleDateString("es-MX", { month: "short" });
-
         semanas.push({
             num: numSemana,
-            label: `Semana ${numSemana}: ${inicioLabel} - ${finLabel}`,
+            label: `Semana ${numSemana}: ${fmt(lunes)} - ${fmt(sabado)}`,
             inicio: new Date(lunes),
             fin: new Date(sabado.getFullYear(), sabado.getMonth(), sabado.getDate(), 23, 59, 59, 999),
             key: `${anio}-${String(mes).padStart(2, "0")}-S${numSemana}`,
         });
-
         lunes = new Date(lunes);
         lunes.setDate(lunes.getDate() + 7);
         numSemana++;
@@ -50,28 +60,32 @@ const getSemanasDelMes = (anio, mes) => {
     return semanas;
 };
 
+// Determinar en qué semana cae una fecha
+const getSemanaParaFecha = (fecha, anio, mes) => {
+    const semanas = getSemanasDelMes(anio, mes);
+    for (const s of semanas) {
+        if (fecha >= s.inicio && fecha <= s.fin) return s;
+    }
+    return semanas[semanas.length - 1] || null;
+};
+
 const Empleados = () => {
     const [pagos, setPagos] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [empleadoExpandido, setEmpleadoExpandido] = useState(null);
     const [modalPago, setModalPago] = useState({ show: false, empleado: null });
-    const [formPago, setFormPago] = useState({ monto: "", concepto: "Sueldo semanal", nota: "" });
+    const [formPago, setFormPago] = useState({ monto: "", concepto: "Sueldo semanal", nota: "", fecha: "" });
     const [archivoPago, setArchivoPago] = useState(null);
     const [guardando, setGuardando] = useState(false);
     const [confirmEliminar, setConfirmEliminar] = useState(null);
     const [subiendoPdf, setSubiendoPdf] = useState(null);
     const fileInputRef = useRef(null);
-    const fileInputSubirRef = useRef(null);
     const [filtroMes, setFiltroMes] = useState(() => {
         const hoy = new Date();
         return `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
     });
-    const [filtroSemana, setFiltroSemana] = useState("todas");
 
-    // Calcular semanas del mes seleccionado
     const [anioSel, mesSel] = filtroMes.split("-").map(Number);
     const semanasDelMes = getSemanasDelMes(anioSel, mesSel);
-    const semanaActiva = semanasDelMes.find(s => s.key === filtroSemana) || null;
 
     useEffect(() => {
         const unsub = firebase.firestore()
@@ -94,27 +108,31 @@ const Empleados = () => {
         if (!formPago.monto || parseFloat(formPago.monto) <= 0) return;
         setGuardando(true);
         try {
+            const fechaPago = formPago.fecha ? new Date(formPago.fecha + "T12:00:00") : new Date();
+            const fAnio = fechaPago.getFullYear();
+            const fMes = fechaPago.getMonth() + 1;
+            const semana = getSemanaParaFecha(fechaPago, fAnio, fMes);
+
             const pagoData = {
                 empleadoId: modalPago.empleado.id,
                 empleadoNombre: modalPago.empleado.nombre,
                 monto: parseFloat(formPago.monto),
                 concepto: formPago.concepto,
                 nota: formPago.nota,
-                fecha: new Date(),
-                semana: semanaActiva ? semanaActiva.key : null,
-                semanaLabel: semanaActiva ? semanaActiva.label : null,
+                fecha: fechaPago,
+                semana: semana ? semana.key : `${fAnio}-${String(fMes).padStart(2, "0")}-S1`,
+                semanaLabel: semana ? semana.label : null,
             };
 
             const docRef = await firebase.firestore().collection(COLLECTIONS.PAGOS_NOMINA).add(pagoData);
 
-            // Subir PDF si se adjuntó
             if (archivoPago) {
                 const url = await subirPdf(archivoPago, modalPago.empleado.id, docRef.id);
                 await docRef.update({ archivoUrl: url, archivoNombre: archivoPago.name });
             }
 
             setModalPago({ show: false, empleado: null });
-            setFormPago({ monto: "", concepto: "Sueldo semanal", nota: "" });
+            setFormPago({ monto: "", concepto: "Sueldo semanal", nota: "", fecha: "" });
             setArchivoPago(null);
         } catch (err) {
             alert("Error al registrar pago: " + err.message);
@@ -138,6 +156,22 @@ const Empleados = () => {
         }
     };
 
+    const editarFechaPago = async (pagoId, nuevaFechaStr) => {
+        try {
+            const nuevaFecha = new Date(nuevaFechaStr + "T12:00:00");
+            const fAnio = nuevaFecha.getFullYear();
+            const fMes = nuevaFecha.getMonth() + 1;
+            const semana = getSemanaParaFecha(nuevaFecha, fAnio, fMes);
+            await firebase.firestore().collection(COLLECTIONS.PAGOS_NOMINA).doc(pagoId).update({
+                fecha: nuevaFecha,
+                semana: semana ? semana.key : `${fAnio}-${String(fMes).padStart(2, "0")}-S1`,
+                semanaLabel: semana ? semana.label : null,
+            });
+        } catch (err) {
+            alert("Error al actualizar fecha: " + err.message);
+        }
+    };
+
     const eliminarPago = async (pagoId) => {
         try {
             await firebase.firestore().collection(COLLECTIONS.PAGOS_NOMINA).doc(pagoId).delete();
@@ -150,14 +184,16 @@ const Empleados = () => {
     const getPagosEmpleado = (empleadoId) => {
         return pagos.filter(p => {
             if (p.empleadoId !== empleadoId) return false;
-            const fecha = p.fecha?.toDate ? p.fecha.toDate() : new Date(p.fecha);
-            // Filtro por mes
-            if (fecha.getFullYear() !== anioSel || fecha.getMonth() + 1 !== mesSel) return false;
-            // Filtro por semana
-            if (semanaActiva) {
-                return fecha >= semanaActiva.inicio && fecha <= semanaActiva.fin;
+            if (p.semana) {
+                const [sAnio, sMes] = p.semana.split("-").map(Number);
+                return sAnio === anioSel && sMes === mesSel;
             }
-            return true;
+            const fecha = p.fecha?.toDate ? p.fecha.toDate() : new Date(p.fecha);
+            return fecha.getFullYear() === anioSel && fecha.getMonth() + 1 === mesSel;
+        }).sort((a, b) => {
+            const fa = a.fecha?.toDate ? a.fecha.toDate() : new Date(a.fecha);
+            const fb = b.fecha?.toDate ? b.fecha.toDate() : new Date(b.fecha);
+            return fa - fb;
         });
     };
 
@@ -169,14 +205,13 @@ const Empleados = () => {
         return EMPLEADOS.reduce((acc, e) => acc + getTotalEmpleado(e.id), 0);
     };
 
-    const getTotalPagosAllTime = (empleadoId) => {
-        return pagos.filter(p => p.empleadoId === empleadoId).reduce((acc, p) => acc + (p.monto || 0), 0);
-    };
-
-    // Total acumulado del año actual
     const getTotalAnio = () => {
         const anioActual = new Date().getFullYear();
         return pagos.filter(p => {
+            if (p.semana) {
+                const sAnio = parseInt(p.semana.split("-")[0]);
+                return sAnio === anioActual;
+            }
             const fecha = p.fecha?.toDate ? p.fecha.toDate() : new Date(p.fecha);
             return fecha.getFullYear() === anioActual;
         }).reduce((acc, p) => acc + (p.monto || 0), 0);
@@ -184,12 +219,19 @@ const Empleados = () => {
 
     const formatFecha = (fecha) => {
         const d = fecha?.toDate ? fecha.toDate() : new Date(fecha);
-        return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+    };
+
+    const getSemanaLabel = (pago) => {
+        if (pago.semana) {
+            const parts = pago.semana.match(/S(\d+)$/);
+            return parts ? `Semana ${parts[1]}:` : "";
+        }
+        return "";
     };
 
     const mesLabel = () => {
-        const [anio, mes] = filtroMes.split("-").map(Number);
-        const d = new Date(anio, mes - 1);
+        const d = new Date(anioSel, mesSel - 1);
         return d.toLocaleDateString("es-MX", { month: "long", year: "numeric" });
     };
 
@@ -200,205 +242,171 @@ const Empleados = () => {
     }
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="w-full">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
-                <div>
-                    <h2 className="text-xl font-black text-gray-800 uppercase tracking-tight">Empleados</h2>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Control de pagos y nomina</p>
+                <h2 className="text-2xl font-black text-gray-800">Nómina de Empleados</h2>
+                <input
+                    type="month"
+                    value={filtroMes}
+                    onChange={(e) => setFiltroMes(e.target.value)}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 focus:border-gray-400 focus:outline-none"
+                />
+            </div>
+
+            {/* Resumen del mes */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Pagado en {mesLabel()}</p>
+                    <p className="text-2xl font-black text-gray-800 mt-1">${getTotalGeneral().toLocaleString()}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <input
-                        type="month"
-                        value={filtroMes}
-                        onChange={(e) => { setFiltroMes(e.target.value); setFiltroSemana("todas"); }}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 focus:border-gray-400 focus:outline-none"
-                    />
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Nómina semanal</p>
+                    <p className="text-2xl font-black text-gray-800 mt-1">${nominaSemanal.toLocaleString()}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Acumulado {new Date().getFullYear()}</p>
+                    <p className="text-2xl font-black text-gray-800 mt-1">${getTotalAnio().toLocaleString()}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 uppercase font-semibold">Semanas del mes</p>
+                    <p className="text-2xl font-black text-gray-800 mt-1">{semanasDelMes.length}</p>
                 </div>
             </div>
 
-            {/* Selector de semanas */}
-            <div className="flex flex-wrap gap-2 mb-6">
-                <button
-                    onClick={() => setFiltroSemana("todas")}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${filtroSemana === "todas" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-                >
-                    Todo el mes
-                </button>
-                {semanasDelMes.map(s => (
-                    <button
-                        key={s.key}
-                        onClick={() => setFiltroSemana(s.key)}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-colors ${filtroSemana === s.key ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
-                    >
-                        {s.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Resumen */}
-            <div className="flex flex-wrap gap-6 mb-8 pb-6 border-b border-gray-100">
-                <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Pagado {semanaActiva ? `semana ${semanaActiva.num}` : mesLabel()}</p>
-                    <p className="text-2xl font-black text-gray-800 mt-0.5">${getTotalGeneral().toLocaleString()}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Nomina semanal</p>
-                    <p className="text-2xl font-black text-gray-800 mt-0.5">${nominaSemanal.toLocaleString()}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Acumulado {new Date().getFullYear()}</p>
-                    <p className="text-2xl font-black text-gray-800 mt-0.5">${getTotalAnio().toLocaleString()}</p>
-                </div>
-                <div>
-                    <p className="text-[10px] text-gray-400 uppercase font-semibold">Empleados</p>
-                    <p className="text-2xl font-black text-gray-800 mt-0.5">{EMPLEADOS.length}</p>
-                </div>
-            </div>
-
-            {/* Lista de empleados */}
-            <div className="space-y-2">
+            {/* Empleados */}
+            <div className="space-y-6">
                 {EMPLEADOS.map(emp => {
                     const pagosEmp = getPagosEmpleado(emp.id);
                     const totalMes = getTotalEmpleado(emp.id);
-                    const totalHistorico = getTotalPagosAllTime(emp.id);
-                    const expandido = empleadoExpandido === emp.id;
 
                     return (
-                        <div key={emp.id} className={`border rounded-lg overflow-hidden transition-colors ${expandido ? 'border-gray-300 bg-white' : 'border-gray-100 bg-white'}`}>
-                            {/* Header empleado */}
-                            <div
-                                className="px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
-                                onClick={() => setEmpleadoExpandido(expandido ? null : emp.id)}
-                            >
+                        <div key={emp.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                            {/* Header del empleado */}
+                            <div className="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs">
+                                    <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold text-sm">
                                         {emp.nombre.charAt(0)}
                                     </div>
                                     <div>
-                                        <p className="font-bold text-gray-800 text-sm">{emp.nombre}</p>
-                                        <p className="text-[11px] text-gray-400">{emp.email}</p>
+                                        <p className="font-bold text-gray-800 text-lg">{emp.nombre}</p>
+                                        <p className="text-sm text-gray-400">${emp.sueldoSemanal}/semana</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-5">
-                                    <div className="text-right hidden sm:block">
-                                        <p className="text-[10px] text-gray-400">Semanal</p>
-                                        <p className="font-bold text-gray-600 text-sm">${emp.sueldoSemanal}</p>
-                                    </div>
+                                <div className="flex items-center gap-4">
                                     <div className="text-right">
-                                        <p className="text-[10px] text-gray-400">Este mes</p>
-                                        <p className="font-bold text-gray-800 text-sm">${totalMes.toLocaleString()}</p>
+                                        <p className="text-xs text-gray-400">Total del mes</p>
+                                        <p className="font-black text-gray-800 text-xl">${totalMes.toLocaleString()}</p>
                                     </div>
-                                    <div className="text-right hidden md:block">
-                                        <p className="text-[10px] text-gray-400">Total historico</p>
-                                        <p className="font-bold text-gray-500 text-sm">${totalHistorico.toLocaleString()}</p>
-                                    </div>
-                                    {expandido ? <FaChevronDown size={10} className="text-gray-300" /> : <FaChevronRight size={10} className="text-gray-300" />}
+                                    <button
+                                        onClick={() => {
+                                            const hoy = new Date();
+                                            const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+                                            setFormPago({ monto: String(emp.sueldoSemanal), concepto: "Sueldo semanal", nota: "", fecha: fechaHoy });
+                                            setArchivoPago(null);
+                                            setModalPago({ show: true, empleado: emp });
+                                        }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                                    >
+                                        <FaPlus size={10} /> Registrar Pago
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Detalle expandido */}
-                            {expandido && (
-                                <div className="border-t border-gray-100 px-4 py-4">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <p className="text-[11px] text-gray-400 font-semibold">Pagos - {semanaActiva ? `Semana ${semanaActiva.num} (${semanaActiva.label.split(": ")[1]})` : mesLabel()}</p>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setFormPago({ monto: String(emp.sueldoSemanal), concepto: "Sueldo semanal", nota: "" });
-                                                setArchivoPago(null);
-                                                setModalPago({ show: true, empleado: emp });
-                                            }}
-                                            className="flex items-center gap-1 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-[11px] font-semibold transition-colors"
-                                        >
-                                            <FaPlus size={9} /> Registrar Pago
-                                        </button>
-                                    </div>
-
-                                    {pagosEmp.length === 0 ? (
-                                        <p className="text-center text-gray-300 text-sm py-6">Sin pagos este mes</p>
-                                    ) : (
-                                        <table className="w-full text-[12px]">
-                                            <thead>
-                                                <tr className="text-gray-400 text-[10px] uppercase border-b border-gray-100">
-                                                    <td className="py-2 px-1">Fecha</td>
-                                                    <td className="py-2 px-1">Concepto</td>
-                                                    <td className="py-2 px-1">Nota</td>
-                                                    <td className="py-2 px-1 text-right">Monto</td>
-                                                    <td className="py-2 px-1 text-center">PDF</td>
-                                                    <td className="py-2 px-1 w-8"></td>
+                            {/* Tabla de pagos del mes */}
+                            <div className="px-5 py-4">
+                                {pagosEmp.length === 0 ? (
+                                    <p className="text-center text-gray-300 text-base py-8">Sin pagos en {mesLabel()}</p>
+                                ) : (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-gray-400 text-xs uppercase border-b border-gray-100">
+                                                <th className="py-3 px-2 text-left font-semibold">Semana</th>
+                                                <th className="py-3 px-2 text-left font-semibold">Fecha</th>
+                                                <th className="py-3 px-2 text-left font-semibold">Concepto</th>
+                                                <th className="py-3 px-2 text-left font-semibold">Nota</th>
+                                                <th className="py-3 px-2 text-right font-semibold">Monto</th>
+                                                <th className="py-3 px-2 text-center font-semibold">Payroll PDF</th>
+                                                <th className="py-3 px-2 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {pagosEmp.map(p => (
+                                                <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                                                    <td className="py-3 px-2 text-gray-500 font-semibold">{getSemanaLabel(p)}</td>
+                                                    <td className="py-3 px-2 text-gray-500">
+                                                        <input
+                                                            type="date"
+                                                            defaultValue={(() => {
+                                                                const f = p.fecha?.toDate ? p.fecha.toDate() : new Date(p.fecha);
+                                                                return `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,"0")}-${String(f.getDate()).padStart(2,"0")}`;
+                                                            })()}
+                                                            onChange={(e) => { if (e.target.value) editarFechaPago(p.id, e.target.value); }}
+                                                            className="px-2 py-1 border border-transparent hover:border-gray-300 focus:border-gray-400 rounded text-sm bg-transparent focus:bg-white outline-none cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="py-3 px-2 font-semibold text-gray-700">{p.concepto}</td>
+                                                    <td className="py-3 px-2 text-gray-400">{p.nota || "—"}</td>
+                                                    <td className="py-3 px-2 text-right font-bold text-gray-800 text-base">${p.monto.toLocaleString()}</td>
+                                                    <td className="py-3 px-2 text-center">
+                                                        {subiendoPdf === p.id ? (
+                                                            <span className="loading loading-spinner loading-sm text-gray-400"></span>
+                                                        ) : p.archivoUrl ? (
+                                                            <a
+                                                                href={p.archivoUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors text-xs font-semibold"
+                                                                title={p.archivoNombre}
+                                                            >
+                                                                <FaFilePdf size={14} />
+                                                                Ver PDF
+                                                                <FaExternalLinkAlt size={9} />
+                                                            </a>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => {
+                                                                    const input = document.createElement('input');
+                                                                    input.type = 'file';
+                                                                    input.accept = '.pdf';
+                                                                    input.onchange = (e) => {
+                                                                        if (e.target.files[0]) subirPdfAPago(p.id, p.empleadoId, e.target.files[0]);
+                                                                    };
+                                                                    input.click();
+                                                                }}
+                                                                className="inline-flex items-center gap-2 px-3 py-1.5 border-2 border-dashed border-gray-300 text-gray-400 hover:border-gray-500 hover:text-gray-600 rounded-lg transition-colors text-xs font-semibold"
+                                                                title="Subir comprobante PDF"
+                                                            >
+                                                                <FaUpload size={12} />
+                                                                Subir PDF
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 px-2 text-center">
+                                                        {confirmEliminar === p.id ? (
+                                                            <div className="flex gap-1 justify-center">
+                                                                <button onClick={() => eliminarPago(p.id)} className="text-xs bg-red-500 text-white px-2 py-1 rounded font-semibold">Sí</button>
+                                                                <button onClick={() => setConfirmEliminar(null)} className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded font-semibold">No</button>
+                                                            </div>
+                                                        ) : (
+                                                            <button onClick={() => setConfirmEliminar(p.id)} className="text-gray-300 hover:text-red-400 transition-colors">
+                                                                <FaTrash size={12} />
+                                                            </button>
+                                                        )}
+                                                    </td>
                                                 </tr>
-                                            </thead>
-                                            <tbody>
-                                                {pagosEmp.map(p => (
-                                                    <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                                                        <td className="py-2 px-1 text-gray-500">{formatFecha(p.fecha)}</td>
-                                                        <td className="py-2 px-1 font-semibold text-gray-700">{p.concepto}</td>
-                                                        <td className="py-2 px-1 text-gray-400">{p.nota || "-"}</td>
-                                                        <td className="py-2 px-1 text-right font-bold text-gray-800">${p.monto.toLocaleString()}</td>
-                                                        <td className="py-2 px-1 text-center">
-                                                            {subiendoPdf === p.id ? (
-                                                                <span className="loading loading-spinner loading-xs text-gray-400"></span>
-                                                            ) : p.archivoUrl ? (
-                                                                <a href={p.archivoUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-red-500 hover:text-red-700 transition-colors" title={p.archivoNombre}>
-                                                                    <FaFilePdf size={13} />
-                                                                    <FaExternalLinkAlt size={8} />
-                                                                </a>
-                                                            ) : (
-                                                                <>
-                                                                    <input
-                                                                        type="file"
-                                                                        accept=".pdf"
-                                                                        className="hidden"
-                                                                        ref={el => { if (subiendoPdf === `ref-${p.id}`) fileInputSubirRef.current = el; }}
-                                                                        onChange={(e) => {
-                                                                            if (e.target.files[0]) subirPdfAPago(p.id, p.empleadoId, e.target.files[0]);
-                                                                        }}
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => {
-                                                                            const input = document.createElement('input');
-                                                                            input.type = 'file';
-                                                                            input.accept = '.pdf';
-                                                                            input.onchange = (e) => {
-                                                                                if (e.target.files[0]) subirPdfAPago(p.id, p.empleadoId, e.target.files[0]);
-                                                                            };
-                                                                            input.click();
-                                                                        }}
-                                                                        className="text-gray-300 hover:text-gray-500 transition-colors"
-                                                                        title="Subir comprobante PDF"
-                                                                    >
-                                                                        <FaUpload size={11} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2 px-1 text-center">
-                                                            {confirmEliminar === p.id ? (
-                                                                <div className="flex gap-1 justify-center">
-                                                                    <button onClick={() => eliminarPago(p.id)} className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded font-semibold">Si</button>
-                                                                    <button onClick={() => setConfirmEliminar(null)} className="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded font-semibold">No</button>
-                                                                </div>
-                                                            ) : (
-                                                                <button onClick={() => setConfirmEliminar(p.id)} className="text-gray-200 hover:text-red-400 transition-colors">
-                                                                    <FaTrash size={10} />
-                                                                </button>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                            <tfoot>
-                                                <tr className="border-t border-gray-200">
-                                                    <td colSpan={3} className="py-2 px-1 text-right text-[10px] text-gray-400 uppercase font-semibold">Total</td>
-                                                    <td className="py-2 px-1 text-right font-bold text-gray-800">${totalMes.toLocaleString()}</td>
-                                                    <td colSpan={2}></td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
-                                    )}
-                                </div>
-                            )}
+                                            ))}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="border-t border-gray-200">
+                                                <td colSpan={4} className="py-3 px-2 text-right text-xs text-gray-400 uppercase font-semibold">Total del mes</td>
+                                                <td className="py-3 px-2 text-right font-black text-gray-800 text-base">${totalMes.toLocaleString()}</td>
+                                                <td colSpan={2}></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
@@ -407,29 +415,38 @@ const Empleados = () => {
             {/* Modal registrar pago */}
             {modalPago.show && (
                 <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => { setModalPago({ show: false, empleado: null }); setArchivoPago(null); }}>
-                    <div className="bg-white rounded-xl shadow-lg max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
-                        <h3 className="text-sm font-black text-gray-800 uppercase">Registrar Pago</h3>
-                        <p className="text-[11px] text-gray-400 mb-4">{modalPago.empleado.nombre} — ${modalPago.empleado.sueldoSemanal}/semana</p>
+                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                        <h3 className="text-lg font-black text-gray-800">Registrar Pago</h3>
+                        <p className="text-sm text-gray-400 mb-5">{modalPago.empleado.nombre} — ${modalPago.empleado.sueldoSemanal}/semana</p>
 
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase block mb-1">Monto</label>
+                                <label className="text-xs text-gray-500 font-semibold block mb-1">Fecha</label>
+                                <input
+                                    type="date"
+                                    value={formPago.fecha}
+                                    onChange={(e) => setFormPago({ ...formPago, fecha: e.target.value })}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg font-semibold text-sm focus:border-gray-400 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500 font-semibold block mb-1">Monto ($)</label>
                                 <input
                                     type="number"
                                     value={formPago.monto}
                                     onChange={(e) => setFormPago({ ...formPago, monto: e.target.value })}
                                     onFocus={(e) => e.target.select()}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg font-bold text-lg focus:border-gray-400 focus:outline-none"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg font-bold text-2xl focus:border-gray-400 focus:outline-none"
                                     placeholder="0"
                                     min="0"
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase block mb-1">Concepto</label>
+                                <label className="text-xs text-gray-500 font-semibold block mb-1">Concepto</label>
                                 <select
                                     value={formPago.concepto}
                                     onChange={(e) => setFormPago({ ...formPago, concepto: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg font-semibold text-sm focus:border-gray-400 focus:outline-none"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg font-semibold text-sm focus:border-gray-400 focus:outline-none"
                                 >
                                     <option>Sueldo semanal</option>
                                     <option>Bono</option>
@@ -439,17 +456,19 @@ const Empleados = () => {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase block mb-1">Nota (opcional)</label>
+                                <label className="text-xs text-gray-500 font-semibold block mb-1">Nota (opcional)</label>
                                 <input
                                     type="text"
                                     value={formPago.nota}
                                     onChange={(e) => setFormPago({ ...formPago, nota: e.target.value })}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:border-gray-400 focus:outline-none"
                                     placeholder="Ej: Semana del 1 al 7 mayo"
                                 />
                             </div>
+
+                            {/* Área de subir PDF */}
                             <div>
-                                <label className="text-[10px] text-gray-400 uppercase block mb-1">Comprobante PDF (opcional)</label>
+                                <label className="text-xs text-gray-500 font-semibold block mb-2">Documento Payroll (PDF)</label>
                                 <input
                                     type="file"
                                     accept=".pdf"
@@ -457,29 +476,40 @@ const Empleados = () => {
                                     className="hidden"
                                     onChange={(e) => setArchivoPago(e.target.files[0] || null)}
                                 />
-                                <button
+                                <div
                                     onClick={() => fileInputRef.current?.click()}
-                                    className={`w-full px-3 py-2 border border-dashed rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${archivoPago ? 'border-gray-400 bg-gray-50 text-gray-700' : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-500'}`}
+                                    className={`w-full p-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors flex flex-col items-center justify-center gap-2 ${archivoPago ? 'border-green-400 bg-green-50' : 'border-gray-300 hover:border-gray-400 bg-gray-50'}`}
                                 >
-                                    <FaFilePdf size={12} />
-                                    {archivoPago ? archivoPago.name : "Seleccionar archivo..."}
-                                </button>
+                                    {archivoPago ? (
+                                        <>
+                                            <FaFilePdf size={28} className="text-red-500" />
+                                            <p className="text-sm font-semibold text-gray-700">{archivoPago.name}</p>
+                                            <p className="text-xs text-green-600 font-semibold">Archivo listo para subir</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <FaUpload size={28} className="text-gray-300" />
+                                            <p className="text-sm font-semibold text-gray-500">Click aquí para subir el PDF del payroll</p>
+                                            <p className="text-xs text-gray-400">o arrastra el archivo aquí</p>
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex gap-2 mt-5">
+                        <div className="flex gap-3 mt-6">
                             <button
                                 onClick={() => { setModalPago({ show: false, empleado: null }); setArchivoPago(null); }}
-                                className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-semibold transition-colors"
+                                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-semibold transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={registrarPago}
                                 disabled={guardando || !formPago.monto || parseFloat(formPago.monto) <= 0}
-                                className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg text-sm font-semibold transition-colors"
+                                className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-lg text-sm font-bold transition-colors"
                             >
-                                {guardando ? "Guardando..." : `Pagar $${formPago.monto || "0"}`}
+                                {guardando ? "Guardando..." : `Registrar Pago $${formPago.monto || "0"}`}
                             </button>
                         </div>
                     </div>

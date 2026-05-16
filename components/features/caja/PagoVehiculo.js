@@ -406,8 +406,8 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                             Anticipo: <strong>- ${montoAnticipo} DLL</strong>
                         </p>
                     )}
-                    <p className={`mt-2 text-3xl font-black ${totalConAnticipo < 0 ? 'text-red-600' : 'text-green-800'}`}>
-                        A cobrar: <strong>$ {tieneAnticipo ? totalConAnticipo.toFixed(2) : total.toFixed(2)} DLL</strong>
+                    <p className={`mt-2 text-3xl font-black ${(montoACubrir - cubierto) <= 0 ? 'text-green-800' : 'text-red-600'}`}>
+                        A cobrar: <strong>$ {(montoACubrir - cubierto > 0 ? montoACubrir - cubierto : 0).toFixed(2)} DLL</strong>
                     </p>
                     {esFiado && (
                         <div className="mt-4 p-3 rounded-lg border-l-8 border-orange-600 bg-orange-100">

@@ -130,6 +130,23 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-sm text-black-500 ml-1 ">Sobre Peso: <strong>$ {datoSobrePeso} DLL</strong></p>
                     <p className="text-sm text-black-500 ml-1 ">Extras: <strong>$ {datoGastosExtra} DLL</strong></p>
                     <p className="text-xl text-black-500 ml-1 ">Total: <strong>$ {montoTotal} DLL</strong></p>
+
+                    <div className="border-t border-gray-300 mt-2 pt-1">
+                        <p className="text-xs text-black-500 ml-1 font-bold">Forma de pago:</p>
+                        {parseNumberOrZero(vehiculoData.cajaRecibo) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">Efectivo: <strong>$ {parseNumberOrZero(vehiculoData.cajaRecibo)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.cajaCC) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">CC: <strong>$ {parseNumberOrZero(vehiculoData.cajaCC)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.creditoOtorgado) > 0 && (
+                            <p className="text-sm text-red-600 ml-1 font-bold">Crédito: <strong>$ {parseNumberOrZero(vehiculoData.creditoOtorgado)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.anticipoPago) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">Anticipo: <strong>- $ {parseNumberOrZero(vehiculoData.anticipoPago)} DLL</strong></p>
+                        )}
+                    </div>
+
                     {vehiculoData.pagosPendientes && (
                         <div>
                             <h2 className="text-xl text-red-500">Pagos Pendientes</h2>
@@ -160,8 +177,8 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
     return (
         <div ref={ref} className="m-4" style={{maxWidth: "90%", marginLeft: "auto", marginRight: "auto"}}>
             <ReciboSalida title="Copia: Salida"/>
-            <InfoPagos title="Copia: Cliente pendiente de pago"/>
-            <InfoPagos title="Copia: Oficina pendiente de pago"/>
+            <InfoPagos title="Copia: Cliente"/>
+            <InfoPagos title="Copia: Oficina"/>
 
             Comentarios: {vehiculoData.comentarioPago}
         </div>
