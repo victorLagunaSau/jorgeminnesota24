@@ -103,6 +103,63 @@ const ReporteMovimientos = React.forwardRef(({
             </div>
         )}
 
+        {/* Tabla de Abonos (Cobranza) */}
+        {abonosData && abonosData.length > 0 && (
+            <div className="mt-4">
+                <h3 className="text-lg font-semibold text-blue-800">Abonos de Cobranza</h3>
+                <table className="min-w-full bg-white border text-xs">
+                    <thead>
+                        <tr className="bg-blue-50">
+                            <th className="px-2 py-1 border">Fecha</th>
+                            <th className="px-2 py-1 border">Lote</th>
+                            <th className="px-2 py-1 border">Cliente / Vehículo</th>
+                            <th className="px-2 py-1 border text-right">Efectivo</th>
+                            <th className="px-2 py-1 border text-right">CC</th>
+                            <th className="px-2 py-1 border text-right">Total Abono</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {abonosData.map((a) => (
+                            <tr key={a.id}>
+                                <td className="px-2 py-1 border">
+                                    {a.timestamp?.seconds
+                                        ? new Date(a.timestamp.seconds * 1000).toLocaleDateString()
+                                        : a.timestamp instanceof Date
+                                        ? a.timestamp.toLocaleDateString()
+                                        : "-"}
+                                </td>
+                                <td className="px-2 py-1 border font-bold">{a.binNip}</td>
+                                <td className="px-2 py-1 border">
+                                    {a.cliente} — {a.marca} {a.modelo}
+                                </td>
+                                <td className="px-2 py-1 border text-right text-green-700">
+                                    {(parseFloat(a.cajaRecibo) || 0) > 0 ? `$${(parseFloat(a.cajaRecibo) || 0).toFixed(2)}` : '-'}
+                                </td>
+                                <td className="px-2 py-1 border text-right text-blue-600">
+                                    {(parseFloat(a.cajaCC) || 0) > 0 ? `$${(parseFloat(a.cajaCC) || 0).toFixed(2)}` : '-'}
+                                </td>
+                                <td className="px-2 py-1 border text-right font-bold">
+                                    ${(parseFloat(a.montoAbono) || (parseFloat(a.cajaRecibo) || 0) + (parseFloat(a.cajaCC) || 0)).toFixed(2)}
+                                </td>
+                            </tr>
+                        ))}
+                        {totalAbonosEfectivo > 0 && (
+                        <tr className="bg-blue-50 font-semibold">
+                            <td colSpan="5" className="px-2 py-1 border text-right">Total Abonos Efectivo:</td>
+                            <td className="px-2 py-1 border text-right text-green-700">${totalAbonosEfectivo.toFixed(2)}</td>
+                        </tr>
+                        )}
+                        {totalAbonosCC > 0 && (
+                        <tr className="bg-blue-50 font-semibold">
+                            <td colSpan="5" className="px-2 py-1 border text-right">Total Abonos CC:</td>
+                            <td className="px-2 py-1 border text-right text-blue-600">${totalAbonosCC.toFixed(2)}</td>
+                        </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        )}
+
         {/* Tabla de Entradas */}
         <TablaEntradas entradasData={entradasData} totalRecibido={totalRecibido} isAdminMaster={isAdminMaster} onDataChange={onDataChange}/>
 
@@ -133,6 +190,22 @@ const ReporteMovimientos = React.forwardRef(({
                 </td>
             </tr>
             )}
+            {totalAbonosEfectivo > 0 && (
+            <tr>
+                <td className="border px-4 py-2 font-semibold text-blue-800">Abonos Cobranza Efectivo:</td>
+                <td className="border px-4 py-2 font-semibold text-right text-blue-800">
+                    ${totalAbonosEfectivo.toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            )}
+            {totalAbonosCC > 0 && (
+            <tr>
+                <td className="border px-4 py-2 font-semibold text-blue-600">Abonos Cobranza CC:</td>
+                <td className="border px-4 py-2 font-semibold text-right text-blue-600">
+                    ${totalAbonosCC.toFixed(2).toLocaleString('en-US')}
+                </td>
+            </tr>
+            )}
             <tr>
                 <td className="border px-4 py-2 font-semibold">Total de Entradas:</td>
                 <td className="border px-4 py-2 font-semibold text-right">
@@ -149,7 +222,7 @@ const ReporteMovimientos = React.forwardRef(({
                 <td className="border px-4 py-2 font-bold">Total General:</td>
                 <td className="border px-4 py-2 font-bold text-right">
                     ${(
-                        totalCaja + totalAnticipos + totalRecibido - totalSalidas
+                        totalCaja + totalAnticipos + totalAbonosEfectivo + totalRecibido - totalSalidas
                     ).toFixed(2).toLocaleString('en-US')}
                 </td>
             </tr>
