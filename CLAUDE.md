@@ -71,7 +71,8 @@ All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
-- **Role-specific portals:** `carriers` + `loads` (empresa), `misviajes` (chofer), `clients` + `solicitar` (cliente)
+- **Role-specific portals:** `carriers` + `loads` + `carrier-mapa` (empresa), `misviajes` + `driver` + `driver-mapa` (chofer), `clients` + `solicitar` (cliente)
+- **Other:** `privacy` (privacy policy page)
 - **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients), `api/send-push-chofer` (FCM push notifications to drivers)
 - **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF), `generarComisionesPDF.js` (commissions PDF)
 
@@ -112,7 +113,6 @@ Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars 
 
 ## Known Issues to Be Aware Of
 
-- `setup-master.js` and `clonar-usuario.js` pages have no auth protection
 - `/api/scrape-vehicle` has no authentication or rate limiting
 - No Firestore security rules file exists
 - Payment writes in `PagoVehiculo.js` and `PagosPendientes.js` are not atomic (vehicle + movement written separately)

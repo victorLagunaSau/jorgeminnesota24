@@ -138,6 +138,21 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                     <p className="text-xl text-black-500 ml-1 ">Total: <strong>$ {montoTotal} DLL</strong></p>
                     <p className="text-xs text-black-500 ml-1 ">({montoEnDolaresTotal})</p>
 
+                    <div className="border-t border-gray-300 mt-2 pt-1">
+                        <p className="text-xs text-black-500 ml-1 font-bold">Forma de pago:</p>
+                        {parseNumberOrZero(vehiculoData.cajaRecibo) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">Efectivo: <strong>$ {parseNumberOrZero(vehiculoData.cajaRecibo)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.cajaCC) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">CC: <strong>$ {parseNumberOrZero(vehiculoData.cajaCC)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.cajaCambio) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">Cambio: <strong>- $ {parseNumberOrZero(vehiculoData.cajaCambio)} DLL</strong></p>
+                        )}
+                        {parseNumberOrZero(vehiculoData.anticipoPago) > 0 && (
+                            <p className="text-sm text-black-500 ml-1">Anticipo: <strong>- $ {parseNumberOrZero(vehiculoData.anticipoPago)} DLL</strong></p>
+                        )}
+                    </div>
                 </div>
                 <p></p>
             </div>
