@@ -524,6 +524,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                     pagadoPor: {id: user?.id, nombre: user?.nombre},
                     empresaLiquidada: empresaSeleccionada,
                     estadoOrigen: estadoOrigen,
+                    metodoPago: metodoPago,
                     estatus: "PAGADO",
                     resumenFinanciero: {
                         ...viaje.resumenFinanciero,
