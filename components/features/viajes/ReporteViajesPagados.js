@@ -89,6 +89,10 @@ const ReporteViajesPagados = ({ user }) => {
 
     // Asignar chofer a viaje importado
     const asignarChoferAViaje = async (viaje, chofer) => {
+        if (!chofer.empresaNombre) {
+            alert("Este chofer no tiene empresa asignada. Asígnale una empresa primero en el módulo de Choferes.");
+            return;
+        }
         setDropdownChoferViaje(null);
         setBusquedaChoferHistorial("");
         try {
@@ -125,6 +129,10 @@ const ReporteViajesPagados = ({ user }) => {
     const [loadingReasignar, setLoadingReasignar] = useState(false);
 
     const reasignarChoferViaje = async (viaje, chofer) => {
+        if (!chofer.empresaNombre) {
+            alert("Este chofer no tiene empresa asignada. Asígnale una empresa primero en el módulo de Choferes.");
+            return;
+        }
         setLoadingReasignar(true);
         try {
             const docId = viaje.docId || viaje.numViaje;
@@ -582,9 +590,9 @@ const ReporteViajesPagados = ({ user }) => {
                                                                 </div>
                                                                 <div className="absolute z-[200] w-72 bg-white border-2 border-black shadow-2xl rounded-md max-h-48 overflow-y-auto mt-1 left-0">
                                                                     {choferes.filter(c => { const t = busquedaChoferReasignar.toUpperCase(); return !t || c.nombreChofer?.toUpperCase().includes(t) || c.empresaNombre?.toUpperCase().includes(t); }).slice(0, 15).map(c => (
-                                                                        <div key={c.id} className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between" onClick={() => reasignarChoferViaje(viaje, c)}>
+                                                                        <div key={c.id} className={`p-2 cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between ${c.empresaNombre ? "hover:bg-blue-600 hover:text-white" : "opacity-50"}`} onClick={() => reasignarChoferViaje(viaje, c)}>
                                                                             <span>{c.nombreChofer}</span>
-                                                                            <span className="text-[8px] opacity-60">{c.empresaNombre}</span>
+                                                                            <span className={`text-[8px] ${c.empresaNombre ? "opacity-60" : "text-red-500 font-black"}`}>{c.empresaNombre || "SIN EMPRESA"}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -608,9 +616,9 @@ const ReporteViajesPagados = ({ user }) => {
                                                                 {dropdownChoferViaje === viaje.docId && (
                                                                     <div className="absolute z-[200] w-72 bg-white border-2 border-black shadow-2xl rounded-md max-h-48 overflow-y-auto mt-1 left-0">
                                                                         {choferes.filter(c => { const t = busquedaChoferHistorial.toUpperCase(); return !t || c.nombreChofer?.toUpperCase().includes(t) || c.empresaNombre?.toUpperCase().includes(t); }).slice(0, 15).map(c => (
-                                                                            <div key={c.id} className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between" onClick={() => asignarChoferAViaje(viaje, c)}>
+                                                                            <div key={c.id} className={`p-2 cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between ${c.empresaNombre ? "hover:bg-blue-600 hover:text-white" : "opacity-50"}`} onClick={() => asignarChoferAViaje(viaje, c)}>
                                                                                 <span>{c.nombreChofer}</span>
-                                                                                <span className="text-[8px] opacity-60">{c.empresaNombre}</span>
+                                                                                <span className={`text-[8px] ${c.empresaNombre ? "opacity-60" : "text-red-500 font-black"}`}>{c.empresaNombre || "SIN EMPRESA"}</span>
                                                                             </div>
                                                                         ))}
                                                                     </div>

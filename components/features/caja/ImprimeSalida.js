@@ -156,12 +156,17 @@ const ComponentToPrint = React.forwardRef(({vehiculoData}, ref) => {
                 </div>
                 <p></p>
             </div>
-            <p className="text-black-500">
-                <strong className="mr-3"> Alta de Vehiculo: </strong> {
-                vehiculoData?.registro?.timestamp?.seconds
-                    ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
-                    : moment().format('DD/MM/YYYY HH:mm:ss') // Fallback to current date
-            }</p>
+            <div className="flex justify-between">
+                <p className="text-black-500">
+                    <strong className="mr-3"> Alta de Vehiculo: </strong> {
+                    vehiculoData?.registro?.timestamp?.seconds
+                        ? moment(vehiculoData.registro.timestamp.seconds * 1000).format('DD/MM/YYYY HH:mm:ss')
+                        : moment().format('DD/MM/YYYY HH:mm:ss')
+                }</p>
+                {vehiculoData.usuarioCobro && (
+                    <p className="text-sm text-gray-500">Atendió: <strong>{vehiculoData.usuarioCobro}</strong></p>
+                )}
+            </div>
         </div>
     );
 
