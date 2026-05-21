@@ -1,32 +1,34 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
+import { useAdminData } from "../../../context/adminData";
 import {
-    FaSearch, FaFileExcel, FaTruck, FaBuilding, FaFileInvoice, FaLayerGroup,
-    FaPlus, FaList, FaHistory, FaCar, FaMapMarkerAlt, FaUser, FaTimes, FaTrash, FaSave, FaPen, FaCheck, FaTrashAlt, FaCommentDots, FaExchangeAlt
+    FaFileExcel, FaPlus, FaTimes, FaTrash, FaCheck, FaTrashAlt, FaCommentDots, FaExchangeAlt
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import moment from "moment";
 
 const ReporteViajesPagados = ({ user }) => {
+    // --- DATOS DEL CONTEXTO COMPARTIDO ---
+    const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
+    const choferes = useMemo(() => choferesRaw.map(c => ({
+        id: c.id, nombreChofer: c.nombreChofer, empresaNombre: c.empresaNombre,
+        empresaLiderId: c.empresaLiderId || "",
+    })), [choferesRaw]);
+    const clientes = useMemo(() => clientesRaw.map(c => ({
+        id: c.id, nombre: c.cliente, telefono: c.telefonoCliente
+    })), [clientesRaw]);
     // Estado para cambiar entre vista de historial y agregar viaje
-    const [vista, setVista] = useState("historial"); // "historial" | "agregar" | "importados"
+    const [vista, setVista] = useState("historial"); // "historial" | "agregar"
 
     // Estados del historial
     const [periodoSeleccionado, setPeriodoSeleccionado] = useState('semana');
     const [viajes, setViajes] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    // Viajes importados H-
-    const [viajesImportados, setViajesImportados] = useState([]);
-    const [loadingImportados, setLoadingImportados] = useState(false);
-    const [filtroImportados, setFiltroImportados] = useState("todos"); // "todos" | "pendientes" | "asignados"
-
     // Estados para agregar viaje pasado
     const [busqueda, setBusqueda] = useState("");
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState([]);
-    const [choferes, setChoferes] = useState([]);
-    const [clientes, setClientes] = useState([]);
     const [numViaje, setNumViaje] = useState("");
     const [busquedaCliente, setBusquedaCliente] = useState({});
     const [busquedaChofer, setBusquedaChofer] = useState("");
@@ -55,25 +57,6 @@ const ReporteViajesPagados = ({ user }) => {
     const [dropdownChoferViaje, setDropdownChoferViaje] = useState(null);
     const [busquedaChoferHistorial, setBusquedaChoferHistorial] = useState("");
 
-    // Cargar datos para agregar viajes
-    useEffect(() => {
-        const unsubChoferes = firestore().collection("choferes").onSnapshot(snap => {
-            setChoferes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-
-        const unsubClientes = firestore().collection("clientes").onSnapshot(snap => {
-            setClientes(snap.docs.map(doc => ({
-                id: doc.id,
-                nombre: doc.data().cliente,
-                telefono: doc.data().telefonoCliente
-            })));
-        });
-
-        return () => {
-            unsubChoferes();
-            unsubClientes();
-        };
-    }, []);
 
     // Función para cambiar número de viaje existente
     const cambiarNumeroViaje = (viajeActual, nuevoNum) => {
@@ -305,44 +288,31 @@ const ReporteViajesPagados = ({ user }) => {
             setViajes(data);
 
             // Consultar cuáles lotes ya fueron cobrados en Caja
-            const todosLotes = data.flatMap(v => (v.vehiculos || []).map(vh => vh.lote).filter(Boolean));
+            const todosLotes = [...new Set(data.flatMap(v => (v.vehiculos || []).map(vh => vh.lote).filter(Boolean)))];
             const pagados = {};
-            // Firestore limita "in" a 10 elementos, hacemos batches
+            // Firestore limita "in" a 10 elementos, lanzamos todos los batches en paralelo
+            const promesas = [];
             for (let i = 0; i < todosLotes.length; i += 10) {
-                const batch = todosLotes.slice(i, i + 10);
-                const vehSnap = await firestore().collection("vehiculos")
-                    .where(firebase.firestore.FieldPath.documentId(), "in", batch)
-                    .get();
-                vehSnap.docs.forEach(doc => {
+                promesas.push(
+                    firestore().collection("vehiculos")
+                        .where(firebase.firestore.FieldPath.documentId(), "in", todosLotes.slice(i, i + 10))
+                        .get()
+                );
+            }
+            const resultados = await Promise.all(promesas);
+            resultados.forEach(snap => {
+                snap.docs.forEach(doc => {
                     if (doc.data().estatus === "EN") {
                         pagados[doc.id] = true;
                     }
                 });
-            }
+            });
             setLotesPagados(pagados);
         } catch (e) { console.error(e); } finally { setLoading(false); }
     };
 
-    const consultarImportados = async () => {
-        setLoadingImportados(true);
-        try {
-            const snap = await firestore().collection("viajesPagados")
-                .where("metodo", "==", "IMPORTACION_HISTORIAL")
-                .get();
-            const data = snap.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-            data.sort((a, b) => {
-                const numA = parseInt((a.numViaje || "").replace("H-", "")) || 0;
-                const numB = parseInt((b.numViaje || "").replace("H-", "")) || 0;
-                return numB - numA;
-            });
-            setViajesImportados(data);
-        } catch (e) { console.error(e); }
-        setLoadingImportados(false);
-    };
-
     useEffect(() => {
         consultarViajes('semana');
-        consultarImportados();
     }, []);
 
     const exportarExcel = () => {
@@ -701,7 +671,7 @@ const ReporteViajesPagados = ({ user }) => {
                             Historial de Viajes
                         </h2>
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                            {vista === "historial" ? "Viajes Liquidados y Pagados" : vista === "importados" ? "Viajes Importados del Historial (H-)" : "Agregar Viaje Pasado"}
+                            {vista === "historial" ? "Viajes Liquidados y Pagados" : "Agregar Viaje Pasado"}
                         </p>
                     </div>
 
@@ -721,29 +691,6 @@ const ReporteViajesPagados = ({ user }) => {
                         </button>
                     </div>
                 </div>
-
-                {/* Tabs */}
-                {vista !== "agregar" && (
-                    <div className="flex gap-1 mt-3 mb-3">
-                        <button
-                            onClick={() => setVista("historial")}
-                            className={`px-4 py-2 text-[11px] font-black uppercase rounded-t ${vista === "historial" ? "bg-gray-800 text-white" : "bg-gray-200 text-gray-500 hover:bg-gray-300"}`}
-                        >
-                            Historial
-                        </button>
-                        <button
-                            onClick={() => setVista("importados")}
-                            className={`px-4 py-2 text-[11px] font-black uppercase rounded-t flex items-center gap-2 ${vista === "importados" ? "bg-orange-600 text-white" : "bg-gray-200 text-gray-500 hover:bg-gray-300"}`}
-                        >
-                            <FaHistory size={10} /> Viajes Importados (H-)
-                            {viajesImportados.filter(v => v.choferPendiente).length > 0 && (
-                                <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full font-black">
-                                    {viajesImportados.filter(v => v.choferPendiente).length}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-                )}
 
                 {/* Filtros solo en vista historial */}
                 {vista === "historial" && (
@@ -778,182 +725,7 @@ const ReporteViajesPagados = ({ user }) => {
             </div>
 
             {/* CONTENIDO */}
-            {vista === "importados" ? (
-                // VISTA VIAJES IMPORTADOS H-
-                <div className="p-2">
-                    {/* CONTADOR FIXED - Total contabilizado en tiempo real */}
-                    {viajesImportados.length > 0 && (() => {
-                        const asignados = viajesImportados.filter(v => !v.choferPendiente && v.chofer?.nombre);
-                        const sinAsignar = viajesImportados.filter(v => v.choferPendiente || !v.chofer?.nombre);
-                        const totalAsignados = asignados.reduce((acc, v) =>
-                            (v.vehiculos || []).reduce((a, vh) =>
-                                a + (parseFloat(vh.flete) || 0) + (parseFloat(vh.storage) || 0) + (parseFloat(vh.sPeso) || 0) + (parseFloat(vh.gExtra) || 0), acc), 0);
-                        const totalSinAsignar = sinAsignar.reduce((acc, v) =>
-                            (v.vehiculos || []).reduce((a, vh) =>
-                                a + (parseFloat(vh.flete) || 0) + (parseFloat(vh.storage) || 0) + (parseFloat(vh.sPeso) || 0) + (parseFloat(vh.gExtra) || 0), acc), 0);
-                        const vehAsignados = asignados.reduce((acc, v) => acc + (v.vehiculos || []).length, 0);
-                        const vehSinAsignar = sinAsignar.reduce((acc, v) => acc + (v.vehiculos || []).length, 0);
-                        return (
-                            <div className="fixed bottom-0 left-0 lg:left-64 right-0 z-30 bg-white border-t-2 border-orange-400 shadow-[0_-4px_12px_rgba(0,0,0,0.1)] px-4 py-2 flex items-center justify-between gap-4 flex-wrap">
-                                <div className="flex items-center gap-4">
-                                    <div className="text-center">
-                                        <p className="text-[9px] font-black uppercase text-gray-400">Contabilizados</p>
-                                        <p className="text-lg font-black text-green-700 leading-none">{asignados.length} <span className="text-[10px] text-gray-400 font-bold">viajes</span> <span className="text-[10px] text-green-600 font-bold">({vehAsignados} veh)</span></p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-[9px] font-black uppercase text-gray-400">Pendientes</p>
-                                        <p className="text-lg font-black text-orange-600 leading-none">{sinAsignar.length} <span className="text-[10px] text-gray-400 font-bold">viajes</span> <span className="text-[10px] text-orange-500 font-bold">({vehSinAsignar} veh)</span></p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right">
-                                        <p className="text-[9px] font-black uppercase text-green-600">Total Contabilizado</p>
-                                        <p className="text-xl font-black text-green-700 leading-none">${totalAsignados.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[9px] font-black uppercase text-orange-500">Falta por asignar</p>
-                                        <p className="text-xl font-black text-orange-600 leading-none">${totalSinAsignar.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    <div className="overflow-x-auto pb-20">
-                    <div className="flex items-center gap-3 mb-3 px-2">
-                        <span className="text-[10px] font-black uppercase text-gray-400">Filtrar:</span>
-                        {[
-                            { key: "todos", label: `Todos (${viajesImportados.length})` },
-                            { key: "pendientes", label: `Sin chofer (${viajesImportados.filter(v => v.choferPendiente || !v.chofer?.nombre).length})` },
-                            { key: "asignados", label: `Con chofer (${viajesImportados.filter(v => !v.choferPendiente && v.chofer?.nombre).length})` },
-                        ].map(f => (
-                            <button key={f.key}
-                                onClick={() => setFiltroImportados(f.key)}
-                                className={`btn btn-xs font-black uppercase ${filtroImportados === f.key ? "btn-warning text-black" : "btn-ghost"}`}
-                            >
-                                {f.label}
-                            </button>
-                        ))}
-                        <button onClick={consultarImportados} disabled={loadingImportados} className="btn btn-xs btn-ghost font-black uppercase ml-auto">
-                            {loadingImportados ? <span className="loading loading-spinner loading-xs"></span> : "Recargar"}
-                        </button>
-                    </div>
-
-                    {viajesImportados.length === 0 ? (
-                        <div className="text-center py-20">
-                            <p className="text-gray-400 font-bold uppercase">No hay viajes importados (H-)</p>
-                        </div>
-                    ) : (
-                        <table className="w-full border-collapse text-[11px]">
-                            <thead>
-                                <tr className="bg-orange-700 text-white text-[10px] uppercase font-black">
-                                    <th className="border border-orange-600 px-1 py-2 text-center">Fecha</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-center">Viaje</th>
-                                    <th className="border border-orange-600 px-1 py-2">Chofer</th>
-                                    <th className="border border-orange-600 px-1 py-2">Vehículo</th>
-                                    <th className="border border-orange-600 px-1 py-2">Lote</th>
-                                    <th className="border border-orange-600 px-1 py-2">Ruta</th>
-                                    <th className="border border-orange-600 px-1 py-2">Cliente</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-center">Título</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right">Flete</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right">Storage</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right">S.Peso</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right">G.Extra</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right">Total</th>
-                                    <th className="border border-orange-600 px-1 py-2 text-right bg-orange-800">Total Viaje</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {viajesImportados
-                                    .filter(v => {
-                                        if (filtroImportados === "pendientes") return v.choferPendiente || !v.chofer?.nombre;
-                                        if (filtroImportados === "asignados") return !v.choferPendiente && v.chofer?.nombre;
-                                        return true;
-                                    })
-                                    .map((viaje, vIndex) => {
-                                    const fecha = viaje.fechaPago?.toDate ? moment(viaje.fechaPago.toDate()).format("D MMM YY") : "";
-                                    const totalViaje = (viaje.vehiculos || []).reduce((acc, v) =>
-                                        acc + (parseFloat(v.flete) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0), 0);
-                                    return (viaje.vehiculos || []).map((v, idx) => {
-                                        const extras = (parseFloat(v.storage) || 0) + (parseFloat(v.sPeso) || 0) + (parseFloat(v.gExtra) || 0);
-                                        const total = (parseFloat(v.flete) || 0) + extras;
-                                        const sinChofer = viaje.choferPendiente || !viaje.chofer?.nombre;
-                                        const bgFila = sinChofer ? "bg-yellow-50" : "bg-white";
-                                        return (
-                                            <tr key={`imp-${vIndex}-${idx}`} className={`${bgFila} hover:bg-yellow-100 border-b border-gray-200`}>
-                                                <td className="border border-gray-200 px-1 py-1 text-center font-bold text-gray-600 whitespace-nowrap text-[10px]">{idx === 0 ? fecha : ""}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-center font-black text-orange-700 whitespace-nowrap">
-                                                    {idx === 0 ? (
-                                                        puedeEditarNumViaje && editandoViaje === viaje.docId ? (
-                                                            <div className="flex items-center gap-1 justify-center">
-                                                                <input type="text" className="w-16 border-2 border-blue-500 rounded text-center text-[11px] font-black px-1 py-1 focus:outline-none" value={nuevoNumViaje} onChange={(e) => setNuevoNumViaje(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') cambiarNumeroViaje(viaje, nuevoNumViaje); if (e.key === 'Escape') setEditandoViaje(null); }} autoFocus />
-                                                                <button onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)} className="w-5 h-5 flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white shadow-sm"><FaCheck size={8}/></button>
-                                                                <button onClick={() => setEditandoViaje(null)} className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-400 hover:bg-gray-500 text-white shadow-sm"><FaTimes size={8}/></button>
-                                                            </div>
-                                                        ) : (
-                                                            <span className={puedeEditarNumViaje ? "cursor-pointer hover:text-blue-600" : ""} onDoubleClick={puedeEditarNumViaje ? () => { setEditandoViaje(viaje.docId); setNuevoNumViaje(viaje.numViaje); } : undefined} title={puedeEditarNumViaje ? "Doble clic para editar" : ""}>
-                                                                #{viaje.numViaje}
-                                                            </span>
-                                                        )
-                                                    ) : ""}
-                                                </td>
-                                                <td className="border border-gray-200 px-1 py-1 uppercase text-gray-700" style={{ minWidth: "130px" }}>
-                                                    {idx === 0 ? (
-                                                        viaje.chofer?.nombre ? (
-                                                            <div>
-                                                                <div className="font-black text-blue-800 text-[11px] truncate">{viaje.chofer.nombre}</div>
-                                                                {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic">Ref: {viaje.choferExcel}</div>}
-                                                            </div>
-                                                        ) : (
-                                                            <div className="relative">
-                                                                {viaje.choferExcel && <div className="text-[8px] text-orange-500 italic font-bold mb-1">Ref: {viaje.choferExcel}</div>}
-                                                                <input type="text" placeholder="Asignar chofer..." className="input input-xs w-full font-bold uppercase text-[10px] bg-yellow-50 border-yellow-300" value={dropdownChoferViaje === viaje.docId ? busquedaChoferHistorial : ""} onChange={(e) => { setBusquedaChoferHistorial(e.target.value); setDropdownChoferViaje(viaje.docId); }} onFocus={() => setDropdownChoferViaje(viaje.docId)} />
-                                                                {dropdownChoferViaje === viaje.docId && (
-                                                                    <div className="absolute z-[200] w-72 bg-white border-2 border-black shadow-2xl rounded-md max-h-48 overflow-y-auto mt-1 left-0">
-                                                                        {choferes.filter(c => { const t = busquedaChoferHistorial.toUpperCase(); return !t || c.nombreChofer?.toUpperCase().includes(t) || c.empresaNombre?.toUpperCase().includes(t); }).slice(0, 15).map(c => (
-                                                                            <div key={c.id} className="p-2 hover:bg-blue-600 hover:text-white cursor-pointer text-[11px] font-bold uppercase border-b last:border-none flex justify-between" onClick={() => { asignarChoferAViaje(viaje, c); setViajesImportados(prev => prev.map(vi => (vi.docId || vi.numViaje) === (viaje.docId || viaje.numViaje) ? { ...vi, chofer: { id: c.id, nombre: c.nombreChofer, empresa: c.empresaNombre || "" }, choferPendiente: false, empresaLiquidada: c.empresaNombre || "" } : vi)); }}>
-                                                                                <span>{c.nombreChofer}</span>
-                                                                                <span className="text-[8px] opacity-60">{c.empresaNombre}</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        )
-                                                    ) : ""}
-                                                </td>
-                                                <td className="border border-gray-200 px-1 py-1 uppercase text-gray-600 text-[10px]">{v.marca} {v.modelo}</td>
-                                                <td className="border border-gray-200 px-1 py-1 font-mono font-black text-blue-700">{v.lote}</td>
-                                                <td className="border border-gray-200 px-1 py-1 uppercase text-[10px]"><span className="text-gray-600">{v.estado}</span> <span className="font-bold text-red-700">{v.ciudad}</span></td>
-                                                <td className="border border-gray-200 px-1 py-1 uppercase font-bold text-gray-800 text-[10px]">{v.clienteNombre || v.clienteAlt}</td>
-                                                <td className={`border border-gray-200 px-1 py-1 text-center font-black text-[10px] ${v.titulo === "SI" ? "text-green-700 bg-green-50" : "text-red-500"}`}>{v.titulo || "NO"}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-right font-mono font-bold">${v.flete}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.storage || 0}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.sPeso || 0}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-right font-mono">${v.gExtra || 0}</td>
-                                                <td className="border border-gray-200 px-1 py-1 text-right font-mono font-black text-gray-800">${total.toLocaleString()}</td>
-                                                {idx === 0 && (
-                                                    <td rowSpan={(viaje.vehiculos || []).length} className="border border-gray-200 px-1 py-1 text-right font-mono font-black text-orange-800 bg-orange-50 align-middle whitespace-nowrap">
-                                                        <div className="flex flex-col items-end gap-1">
-                                                            <span className="text-[12px]">${totalViaje.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                                                            {puedeEliminarViajes && (
-                                                                <button onClick={() => eliminarViaje(viaje)} disabled={loading} className="text-red-400 hover:text-red-600 text-[10px]" title="Eliminar viaje">
-                                                                    <FaTrashAlt size={11} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                )}
-                                            </tr>
-                                        );
-                                    });
-                                })}
-                            </tbody>
-                        </table>
-                    )}
-                    </div>
-                </div>
-            ) : vista === "historial" ? (
+            {vista === "historial" ? (
                 // VISTA HISTORIAL - TABLA TIPO EXCEL
                 <div className="p-2 overflow-x-auto">
                     {viajes.length === 0 ? (

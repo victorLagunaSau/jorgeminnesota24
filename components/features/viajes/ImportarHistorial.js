@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { firestore } from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
+import { useAdminData } from "../../../context/adminData";
 import * as XLSX from "xlsx";
 import moment from "moment";
 import {
@@ -9,9 +10,11 @@ import {
 } from "react-icons/fa";
 
 const ImportarHistorial = ({ user }) => {
+    // --- DATOS DEL CONTEXTO COMPARTIDO ---
+    const { choferes } = useAdminData();
+
     // Data
     const [viajes, setViajes] = useState([]);
-    const [choferes, setChoferes] = useState([]);
     const [vehiculosFirebase, setVehiculosFirebase] = useState({});
     const [totalVehiculosFirebase, setTotalVehiculosFirebase] = useState(0);
     const [cargandoFirebase, setCargandoFirebase] = useState(false);
@@ -29,13 +32,6 @@ const ImportarHistorial = ({ user }) => {
     const [exportandoListos, setExportandoListos] = useState(false);
     const POR_PAGINA = 25;
 
-    // Cargar choferes de Firebase (real-time)
-    useEffect(() => {
-        const unsub = firestore().collection("choferes").onSnapshot(snap => {
-            setChoferes(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-        return () => unsub();
-    }, []);
 
     // Obtener conteo total de vehiculos en Firebase
     useEffect(() => {
