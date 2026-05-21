@@ -285,12 +285,12 @@ const ReporteViajesPagados = ({ user }) => {
         }
     };
 
-    // Verificar si el usuario puede eliminar viajes
-    const puedeEliminarViajes = user?.adminMaster === true || user?.eliminarViajes === true;
-    // Solo Admin Master puede cambiar el número de viaje en el historial
-    const puedeEditarNumViaje = user?.adminMaster === true;
-    const puedeReasignarChofer = user?.adminMaster === true;
-    const puedeEditarViaje = user?.adminMaster === true;
+    // Permiso Historial = acceso completo al historial (editar, eliminar, reasignar, cambiar número)
+    const tieneHistorial = user?.adminMaster === true || user?.editarHistorial === true;
+    const puedeEliminarViajes = user?.adminMaster === true;
+    const puedeEditarNumViaje = tieneHistorial;
+    const puedeReasignarChofer = tieneHistorial;
+    const puedeEditarViaje = tieneHistorial;
 
     // Abre modal de confirmación
     const eliminarViaje = (viaje) => {
@@ -919,17 +919,15 @@ const ReporteViajesPagados = ({ user }) => {
                                                                 <div className="flex items-center gap-1">
                                                                     <button onClick={guardarEdicion} disabled={guardandoEdicion} className="w-6 h-6 flex items-center justify-center rounded-full bg-green-600 text-white shadow-sm hover:bg-green-700" title="Guardar"><FaSave size={10}/></button>
                                                                     <button onClick={cancelarEdicion} className="w-6 h-6 flex items-center justify-center rounded-full bg-gray-400 text-white shadow-sm hover:bg-gray-500" title="Cancelar"><FaTimes size={10}/></button>
+                                                                    {puedeEliminarViajes && (
+                                                                        <button onClick={() => eliminarViaje(viaje)} disabled={loading} className="w-6 h-6 flex items-center justify-center rounded-full bg-red-500 text-white shadow-sm hover:bg-red-600" title="Eliminar viaje"><FaTrashAlt size={10}/></button>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex items-center gap-1">
                                                                     {puedeEditarViaje && (
                                                                         <button onClick={() => iniciarEdicion(viaje)} className="text-blue-400 hover:text-blue-600" title="Editar viaje">
                                                                             <FaPen size={11} />
-                                                                        </button>
-                                                                    )}
-                                                                    {puedeEliminarViajes && (
-                                                                        <button onClick={() => eliminarViaje(viaje)} disabled={loading} className="text-red-400 hover:text-red-600" title="Eliminar viaje">
-                                                                            <FaTrashAlt size={11} />
                                                                         </button>
                                                                     )}
                                                                 </div>

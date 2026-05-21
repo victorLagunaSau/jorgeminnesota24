@@ -7,6 +7,7 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
     const isAdminMaster = user?.adminMaster === true;
     const nombreLower = (user?.nombre || "").toLowerCase();
     const puedeVerAnticipos = isAdminMaster || nombreLower.includes("olivia") || nombreLower.includes("cristela");
+    const puedeVerViajes = isAdminMaster || user?.viajes === true;
     const [openSubMenu, setOpenSubMenu] = useState({
         caja: false,
         reportes: false,
@@ -150,13 +151,16 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                         </li>
 
                         {/* Control de Viajes - Separado */}
+                        {puedeVerViajes && (
                         <li>
                             <button className={`${getButtonClass('viajes')} !font-black`} onClick={() => handleSelectModule('viajes')}>
                                 <FaTruckMoving className="mr-3 text-red-600" size={18} /> Control de Viajes
                             </button>
                         </li>
+                        )}
 
                         {/* Submenú Gestión de Viajes */}
+                        {puedeVerViajes && (
                         <li>
                             <button
                                 className={`w-full px-4 py-3 text-gray-700 text-[13px] font-semibold text-left hover:bg-gray-100 flex items-center justify-between transition-colors ${openSubMenu.viajesMenu ? 'bg-gray-50' : ''}`}
@@ -176,6 +180,7 @@ const Sidebar = ({ onSelectModule, selectedModule, isOpen, onClose }) => {
                                 </ul>
                             </div>
                         </li>
+                        )}
 
                         {/* Gastos */}
                         <li>

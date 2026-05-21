@@ -53,7 +53,7 @@ import SolicitudesVehiculos from "./solicitudes/SolicitudesVehiculos";
 
 const Admin = () => {
     const router = useRouter();
-    const { user, loading, isAdmin, signOut } = useAuthContext();
+    const { user, loading, isAdmin, signOut, isImpersonating } = useAuthContext();
     const [selectedModule, setSelectedModule] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pendingBinNip, setPendingBinNip] = useState(null);
@@ -166,7 +166,7 @@ const Admin = () => {
                     selectedModule={selectedModule}
                 />
 
-                <main className="lg:ml-64 mt-16 p-4 lg:p-8 min-h-screen">
+                <main className={`lg:ml-64 p-4 lg:p-8 min-h-screen ${isImpersonating ? 'mt-24' : 'mt-16'}`}>
                     {loading ? (
                         <div className="flex justify-center items-center h-full">
                             <div className="loading loading-spinner loading-lg text-red-600"></div>
