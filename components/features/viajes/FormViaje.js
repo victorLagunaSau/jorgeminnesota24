@@ -14,7 +14,7 @@ import Alert from "../../ui/Alert";
 
 const DRAFTS_KEY = "formViaje_borradores";
 
-const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas}) => {
+const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas, mostrarFechaManual}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
@@ -1209,7 +1209,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                     )}
                     </div>
                 <div className="text-center">
-                    {isAdminMaster ? (
+                    {mostrarFechaManual ? (
                         <input
                             type="date"
                             value={encabezado.fechaInput || ""}
