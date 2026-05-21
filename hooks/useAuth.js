@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { auth, firestore } from "../firebase/firebaseIni";
 import { COLLECTIONS, USER_TYPES } from "../constants";
 
@@ -8,6 +8,8 @@ import { COLLECTIONS, USER_TYPES } from "../constants";
  */
 export const useAuth = () => {
   const [user, setUser] = useState(null);
+  const [realUser, setRealUser] = useState(null);
+  const realUserRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -154,6 +156,33 @@ export const useAuth = () => {
     }
   }, []);
 
+  // Impersonar usuario — "Ver como"
+  const startImpersonating = useCallback(async (targetUserId) => {
+    try {
+      const userDoc = await firestore()
+        .collection(COLLECTIONS.USERS)
+        .doc(targetUserId)
+        .get();
+      if (userDoc.exists) {
+        realUserRef.current = user;
+        setRealUser(user);
+        setUser({ id: targetUserId, email: userDoc.data().email, ...userDoc.data() });
+      }
+    } catch (err) {
+      console.error("Error al impersonar:", err);
+    }
+  }, [user]);
+
+  const stopImpersonating = useCallback(() => {
+    if (realUserRef.current) {
+      setUser(realUserRef.current);
+      setRealUser(null);
+      realUserRef.current = null;
+    }
+  }, []);
+
+  const isImpersonating = !!realUser;
+
   // Permission checks
   const isAdminMaster = user?.adminMaster === true;
   const isAdmin = user?.tipo === USER_TYPES.ADMIN || user?.admin === true;
@@ -189,6 +218,7 @@ export const useAuth = () => {
 
   return {
     user,
+    realUser,
     loading,
     error,
     isAuthenticated: !!user,
@@ -198,11 +228,14 @@ export const useAuth = () => {
     isChofer,
     isCliente,
     hasCajaAccess,
+    isImpersonating,
     signIn,
     signOut,
     createUser,
     resetPassword,
     hasPermission,
+    startImpersonating,
+    stopImpersonating,
   };
 };
 

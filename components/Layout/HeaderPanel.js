@@ -1,11 +1,34 @@
 import React, { useState, useRef, useEffect } from "react";
-import { FaBars, FaSignOutAlt, FaUserCircle, FaChevronDown, FaChartBar, FaUsers, FaCheckCircle, FaUserTie } from "react-icons/fa";
+import { FaBars, FaSignOutAlt, FaUserCircle, FaChevronDown, FaChartBar, FaUsers, FaCheckCircle, FaUserTie, FaEye, FaTimesCircle } from "react-icons/fa";
+import { firestore } from "../../firebase/firebaseIni";
+import { COLLECTIONS, USER_TYPES } from "../../constants";
+import { useAuthContext } from "../../context/auth";
 
 const HeaderPanel = ({ user, onLogout, onToggleSidebar, onSelectModule, selectedModule }) => {
+    const { isImpersonating, startImpersonating, stopImpersonating, realUser } = useAuthContext();
     const [menuOpen, setMenuOpen] = useState(false);
     const [menuVisible, setMenuVisible] = useState(false);
+    const [showVerComo, setShowVerComo] = useState(false);
+    const [adminUsers, setAdminUsers] = useState([]);
     const menuRef = useRef(null);
-    const isAdminMaster = user?.adminMaster === true;
+    const isAdminMaster = isImpersonating ? realUser?.adminMaster === true : user?.adminMaster === true;
+
+    // Cargar usuarios admin cuando se abre "Ver como"
+    useEffect(() => {
+        if (!showVerComo) return;
+        const unsub = firestore()
+            .collection(COLLECTIONS.USERS)
+            .where("tipo", "==", USER_TYPES.ADMIN)
+            .onSnapshot(snap => {
+                const currentId = isImpersonating ? realUser?.id : user?.id;
+                const data = snap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(u => u.id !== currentId)
+                    .sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+                setAdminUsers(data);
+            });
+        return () => unsub();
+    }, [showVerComo]);
 
     // Animación de entrada/salida
     useEffect(() => {
@@ -24,15 +47,9 @@ const HeaderPanel = ({ user, onLogout, onToggleSidebar, onSelectModule, selected
                 setTimeout(() => setMenuOpen(false), 200);
             }
         };
-        const handleScroll = () => {
-            setMenuVisible(false);
-            setTimeout(() => setMenuOpen(false), 200);
-        };
         document.addEventListener("mousedown", handleClickOutside);
-        window.addEventListener("scroll", handleScroll, true);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
-            window.removeEventListener("scroll", handleScroll, true);
         };
     }, []);
 
@@ -58,7 +75,20 @@ const HeaderPanel = ({ user, onLogout, onToggleSidebar, onSelectModule, selected
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md lg:left-64">
+        <>
+        {isImpersonating && (
+            <div className="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-center py-1.5 text-[12px] font-black uppercase tracking-wide flex items-center justify-center gap-3">
+                <FaEye size={12} />
+                Viendo como: {user?.nombre || user?.email}
+                <button
+                    onClick={stopImpersonating}
+                    className="bg-white text-amber-600 px-3 py-0.5 rounded-full text-[11px] font-black uppercase hover:bg-amber-50 transition-colors flex items-center gap-1"
+                >
+                    <FaTimesCircle size={10} /> Salir
+                </button>
+            </div>
+        )}
+        <header className={`fixed left-0 right-0 z-50 bg-white shadow-md lg:left-64 ${isImpersonating ? 'top-8' : 'top-0'}`}>
             <div className="flex justify-between items-center h-16 px-4 lg:px-6">
                 {/* Botón hamburguesa (solo móvil) */}
                 <button
@@ -104,6 +134,40 @@ const HeaderPanel = ({ user, onLogout, onToggleSidebar, onSelectModule, selected
                                     }}
                                 >
                                     <div className="p-1.5">
+                                        {/* Ver como */}
+                                        <button
+                                            onClick={() => setShowVerComo(!showVerComo)}
+                                            className={`w-full px-3 py-2.5 text-left text-[13px] font-semibold flex items-center gap-2.5 rounded-lg transition-colors ${
+                                                showVerComo ? "bg-amber-50 text-amber-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                                            }`}
+                                        >
+                                            <FaEye size={14} className={showVerComo ? "text-amber-500" : "text-gray-400"} />
+                                            Ver como...
+                                            <FaChevronDown size={10} className={`ml-auto transition-transform duration-200 ${showVerComo ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {showVerComo && (
+                                            <div className="max-h-48 overflow-y-auto bg-gray-50 rounded-lg mx-1 mb-1">
+                                                {adminUsers.map(u => (
+                                                    <button
+                                                        key={u.id}
+                                                        onClick={() => {
+                                                            startImpersonating(u.id);
+                                                            setShowVerComo(false);
+                                                            setMenuVisible(false);
+                                                            setTimeout(() => setMenuOpen(false), 200);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-left text-[12px] font-semibold text-gray-600 hover:bg-white hover:text-gray-900 rounded-lg transition-colors flex items-center gap-2"
+                                                    >
+                                                        <FaUserCircle size={14} className="text-gray-400 flex-shrink-0" />
+                                                        <div>
+                                                            <p className="leading-tight">{u.nombre || "Sin nombre"}</p>
+                                                            <p className="text-[9px] text-gray-400 font-medium">{u.email}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <div className="border-b border-gray-100 my-1"></div>
                                         {adminModules.map(({ key, label, icon: Icon }) => (
                                             <button
                                                 key={key}
@@ -149,6 +213,7 @@ const HeaderPanel = ({ user, onLogout, onToggleSidebar, onSelectModule, selected
                 </div>
             </div>
         </header>
+        </>
     );
 };
 

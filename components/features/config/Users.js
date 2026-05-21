@@ -8,7 +8,7 @@ import SearchBar from "../../ui/SearchBar";
 import {
     FaUserShield, FaUserCog, FaCrown, FaCheck, FaTimes,
     FaCashRegister, FaTruck, FaChartBar, FaUsers, FaCog,
-    FaLock, FaTrashAlt, FaKey, FaCopy, FaClock, FaTrash
+    FaLock, FaTrashAlt, FaKey, FaCopy, FaClock, FaTrash, FaHistory
 } from "react-icons/fa";
 
 const Users = () => {
@@ -299,50 +299,41 @@ const Users = () => {
             {/* LEYENDA DE PERMISOS */}
             <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-200">
                 <h4 className="text-[11px] font-black uppercase text-gray-500 mb-3">Permisos Disponibles</h4>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-                        <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="flex items-start gap-2 text-[11px] font-bold text-gray-600">
+                        <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                             <FaCrown className="text-yellow-600" />
                         </div>
                         <div>
                             <p className="font-black text-gray-800">Admin Master</p>
-                            <p className="text-[9px] text-gray-400">Control total del sistema</p>
+                            <p className="text-[9px] text-gray-400">Acceso total: usuarios, choferes, empresas, eliminar vehículos y viajes, editar viajes pagados, reasignar chofer, gastos, corte de todos</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                    <div className="flex items-start gap-2 text-[11px] font-bold text-gray-600">
+                        <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                             <FaCashRegister className="text-green-600" />
                         </div>
                         <div>
                             <p className="font-black text-gray-800">Caja</p>
-                            <p className="text-[9px] text-gray-400">Cobros, cortes, entradas/salidas</p>
+                            <p className="text-[9px] text-gray-400">Cobro de vehículo, pago adelantado, salida de caja, entrada de caja, editar datos de vehículos, aparece en corte del día</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <div className="flex items-start gap-2 text-[11px] font-bold text-gray-600">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
                             <FaTruck className="text-blue-600" />
                         </div>
                         <div>
                             <p className="font-black text-gray-800">Viajes</p>
-                            <p className="text-[9px] text-gray-400">Control y gestión de viajes</p>
+                            <p className="text-[9px] text-gray-400">Acceso a Control de Viajes + Gestión de Viajes/Historial en el sidebar</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <FaChartBar className="text-purple-600" />
+                    <div className="flex items-start gap-2 text-[11px] font-bold text-gray-600">
+                        <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <FaHistory className="text-teal-600" />
                         </div>
                         <div>
-                            <p className="font-black text-gray-800">Reportes</p>
-                            <p className="text-[9px] text-gray-400">Ver reportes y estadísticas</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600">
-                        <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                            <FaTrashAlt className="text-red-600" />
-                        </div>
-                        <div>
-                            <p className="font-black text-gray-800">Eliminar Viajes</p>
-                            <p className="text-[9px] text-gray-400">Borrar viajes del historial</p>
+                            <p className="font-black text-gray-800">Historial</p>
+                            <p className="text-[9px] text-gray-400">Acceso completo al historial: editar viajes pagados, reasignar chofer, cambiar número de viaje y eliminar viajes</p>
                         </div>
                     </div>
                 </div>
@@ -383,26 +374,8 @@ const Users = () => {
                             </th>
                             <th className="text-center py-4">
                                 <div className="flex flex-col items-center">
-                                    <FaChartBar className="text-purple-600 mb-1" />
-                                    <span>Reportes</span>
-                                </div>
-                            </th>
-                            <th className="text-center py-4">
-                                <div className="flex flex-col items-center">
-                                    <FaUsers className="text-orange-600 mb-1" />
-                                    <span>Clientes</span>
-                                </div>
-                            </th>
-                            <th className="text-center py-4">
-                                <div className="flex flex-col items-center">
-                                    <FaCog className="text-gray-600 mb-1" />
-                                    <span>Config</span>
-                                </div>
-                            </th>
-                            <th className="text-center py-4 bg-red-50">
-                                <div className="flex flex-col items-center">
-                                    <FaTrashAlt className="text-red-600 mb-1" />
-                                    <span>Borrar Viajes</span>
+                                    <FaHistory className="text-teal-600 mb-1" />
+                                    <span>Historial</span>
                                 </div>
                             </th>
                         </tr>
@@ -410,7 +383,7 @@ const Users = () => {
                     <tbody>
                         {usuariosFiltrados.length === 0 ? (
                             <tr>
-                                <td colSpan="8" className="text-center py-10 text-gray-400 font-bold uppercase">
+                                <td colSpan="5" className="text-center py-10 text-gray-400 font-bold uppercase">
                                     No se encontraron usuarios
                                 </td>
                             </tr>
@@ -501,20 +474,23 @@ const Users = () => {
                                         </button>
                                     </td>
 
-                                    {/* Reportes */}
+
+
+
+                                    {/* Historial */}
                                     <td className="text-center">
                                         <button
-                                            onClick={() => actualizarPermiso(u.id, 'reportes', !u.reportes)}
+                                            onClick={() => actualizarPermiso(u.id, 'editarHistorial', !u.editarHistorial)}
                                             disabled={guardando === u.id || u.adminMaster}
                                             className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
-                                                u.adminMaster || u.reportes
-                                                    ? 'bg-purple-500 hover:bg-purple-600'
+                                                u.adminMaster || u.editarHistorial
+                                                    ? 'bg-teal-500 hover:bg-teal-600'
                                                     : 'bg-gray-200 hover:bg-gray-300'
                                             } ${u.adminMaster ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                                         >
                                             {guardando === u.id ? (
                                                 <span className="loading loading-spinner loading-xs text-white"></span>
-                                            ) : u.adminMaster || u.reportes ? (
+                                            ) : u.adminMaster || u.editarHistorial ? (
                                                 <FaCheck className="text-white" />
                                             ) : (
                                                 <FaTimes className="text-gray-400" />
@@ -522,68 +498,6 @@ const Users = () => {
                                         </button>
                                     </td>
 
-                                    {/* Clientes */}
-                                    <td className="text-center">
-                                        <button
-                                            onClick={() => actualizarPermiso(u.id, 'clientes', !u.clientes)}
-                                            disabled={guardando === u.id || u.adminMaster}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
-                                                u.adminMaster || u.clientes
-                                                    ? 'bg-orange-500 hover:bg-orange-600'
-                                                    : 'bg-gray-200 hover:bg-gray-300'
-                                            } ${u.adminMaster ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                        >
-                                            {guardando === u.id ? (
-                                                <span className="loading loading-spinner loading-xs text-white"></span>
-                                            ) : u.adminMaster || u.clientes ? (
-                                                <FaCheck className="text-white" />
-                                            ) : (
-                                                <FaTimes className="text-gray-400" />
-                                            )}
-                                        </button>
-                                    </td>
-
-                                    {/* Config */}
-                                    <td className="text-center">
-                                        <button
-                                            onClick={() => actualizarPermiso(u.id, 'config', !u.config)}
-                                            disabled={guardando === u.id || u.adminMaster}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
-                                                u.adminMaster || u.config
-                                                    ? 'bg-gray-600 hover:bg-gray-700'
-                                                    : 'bg-gray-200 hover:bg-gray-300'
-                                            } ${u.adminMaster ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                        >
-                                            {guardando === u.id ? (
-                                                <span className="loading loading-spinner loading-xs text-white"></span>
-                                            ) : u.adminMaster || u.config ? (
-                                                <FaCheck className="text-white" />
-                                            ) : (
-                                                <FaTimes className="text-gray-400" />
-                                            )}
-                                        </button>
-                                    </td>
-
-                                    {/* Eliminar Viajes */}
-                                    <td className="text-center bg-red-50/50">
-                                        <button
-                                            onClick={() => actualizarPermiso(u.id, 'eliminarViajes', !u.eliminarViajes)}
-                                            disabled={guardando === u.id || u.adminMaster}
-                                            className={`w-8 h-8 rounded-lg flex items-center justify-center mx-auto transition-all ${
-                                                u.adminMaster || u.eliminarViajes
-                                                    ? 'bg-red-500 hover:bg-red-600'
-                                                    : 'bg-gray-200 hover:bg-gray-300'
-                                            } ${u.adminMaster ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                                        >
-                                            {guardando === u.id ? (
-                                                <span className="loading loading-spinner loading-xs text-white"></span>
-                                            ) : u.adminMaster || u.eliminarViajes ? (
-                                                <FaCheck className="text-white" />
-                                            ) : (
-                                                <FaTimes className="text-gray-400" />
-                                            )}
-                                        </button>
-                                    </td>
                                 </tr>
                             ))
                         )}
