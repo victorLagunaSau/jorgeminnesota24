@@ -150,6 +150,16 @@ const Pagado = ({vehiculo, user, binNip, onVehiculoEliminado}) => {
                 }
             }
 
+            // Devolver folio si es el último
+            const folioEliminado = vehiculoData.folioVenta;
+            if (folioEliminado && folioEliminado !== "pendiente") {
+                const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+                const conDoc = await conRef.get();
+                if (conDoc.exists && conDoc.data().folioventa === folioEliminado) {
+                    batch.update(conRef, { folioventa: folioEliminado - 1 });
+                }
+            }
+
             await batch.commit();
 
             alert(
