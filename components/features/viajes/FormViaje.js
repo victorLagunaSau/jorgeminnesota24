@@ -14,7 +14,7 @@ import Alert from "../../ui/Alert";
 
 const DRAFTS_KEY = "formViaje_borradores";
 
-const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas}) => {
+const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas, mostrarFechaManual}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
@@ -329,20 +329,62 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
     };
 
     // Confirmar chofer manual con token (solo carriers)
-    const confirmarChoferManual = () => {
+    const [confirmandoChofer, setConfirmandoChofer] = useState(false);
+    const confirmarChoferManual = async () => {
         if (!choferManual || choferManual.trim() === "") {
             setAlertMessage({ msg: "Ingresa el nombre del chofer", tipo: 'error' });
             setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
             return;
         }
 
-        setEncabezado(prev => ({
-            ...prev,
-            choferId: "TEMPORAL_" + tokenUsado,
-            choferManual: choferManual.trim().toUpperCase()
-        }));
-        setBusquedaChofer(choferManual.trim().toUpperCase() + " (TEMPORAL)");
-        setMostrarLista(false);
+        setConfirmandoChofer(true);
+        try {
+            const nombre = choferManual.trim().toUpperCase();
+
+            // Crear chofer real en la colección choferes (igual que registrarChoferNuevo)
+            const conRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+            const docCon = await conRef.get();
+            const nuevoFolio = (docCon.data().choferes || 0) + 1;
+
+            const choferData = {
+                folio: nuevoFolio,
+                nombreChofer: nombre,
+                apodoChofer: "",
+                telefonoChofer: "",
+                paisChofer: "United States",
+                licencia: "N/A",
+                empresaId: "",
+                empresaNombre: "PENDIENTE",
+                empresaLiderId: "",
+                empresaLiderNombre: "SIN LIDER",
+                esNuevo: true,
+                registro: {
+                    usuario: user?.nombre || user?.datosEmpresa?.nombreEmpresa || "Carrier",
+                    idUsuario: user?.id || "N/A",
+                    timestamp: new Date(),
+                    tokenUsado: tokenUsado || null
+                }
+            };
+
+            const docRef = await firestore().collection(COLLECTIONS.CHOFERES).add(choferData);
+            await conRef.update({ choferes: nuevoFolio });
+
+            setEncabezado(prev => ({
+                ...prev,
+                choferId: docRef.id,
+                choferManual: ""
+            }));
+            setBusquedaChofer(nombre + " (NUEVO)");
+            setMostrarLista(false);
+            setAlertMessage({ msg: `Chofer "${nombre}" registrado`, tipo: 'success' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+        } catch (e) {
+            console.error("Error al registrar chofer con token:", e);
+            setAlertMessage({ msg: "Error al registrar chofer: " + e.message, tipo: 'error' });
+            setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 3000);
+        } finally {
+            setConfirmandoChofer(false);
+        }
     };
 
     // Registrar chofer nuevo desde el dropdown (admin/masterAdmin)
@@ -1133,9 +1175,10 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                             {!encabezado.choferId && (
                                 <button
                                     onClick={confirmarChoferManual}
+                                    disabled={confirmandoChofer}
                                     className="btn btn-sm text-white font-black btn-info"
                                 >
-                                    OK
+                                    {confirmandoChofer ? <span className="loading loading-spinner loading-xs"></span> : "OK"}
                                 </button>
                             )}
                         </div>
@@ -1209,7 +1252,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                     )}
                     </div>
                 <div className="text-center">
-                    {isAdminMaster ? (
+                    {mostrarFechaManual ? (
                         <input
                             type="date"
                             value={encabezado.fechaInput || ""}

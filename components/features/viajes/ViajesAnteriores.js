@@ -1,6 +1,7 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useEffect, useMemo} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import firebase from "firebase/app";
+import { useAdminData } from "../../../context/adminData";
 import {
     FaSearch,
     FaTrash,
@@ -14,11 +15,15 @@ import {
 } from "react-icons/fa";
 
 const ViajesAnteriores = ({user}) => {
+    // --- DATOS DEL CONTEXTO COMPARTIDO ---
+    const { choferes, clientes: clientesRaw } = useAdminData();
+    const clientes = useMemo(() => clientesRaw.map(c => ({
+        id: c.id, nombre: c.cliente, telefono: c.telefonoCliente
+    })), [clientesRaw]);
+
     const [busqueda, setBusqueda] = useState("");
     const [vehiculosSeleccionados, setVehiculosSeleccionados] = useState([]);
-    const [choferes, setChoferes] = useState([]);
     const [provincias, setProvincias] = useState([]);
-    const [clientes, setClientes] = useState([]); // Nueva colección
     const [loading, setLoading] = useState(false);
     const [folioPGM, setFolioPGM] = useState(null);
     const [busquedaCliente, setBusquedaCliente] = useState({}); // Estado para el buscador de cliente por fila
@@ -39,20 +44,8 @@ const ViajesAnteriores = ({user}) => {
     });
 
     useEffect(() => {
-        const unsubChoferes = firestore().collection("choferes").onSnapshot(snap => {
-            setChoferes(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
-        });
-
         const unsubProvincias = firestore().collection("province").onSnapshot(snap => {
             setProvincias(snap.docs.map(doc => ({id: doc.id, ...doc.data()})));
-        });
-
-        const unsubClientes = firestore().collection("clientes").onSnapshot(snap => {
-            setClientes(snap.docs.map(doc => ({
-                id: doc.id,
-                nombre: doc.data().cliente,
-                telefono: doc.data().telefonoCliente
-            })));
         });
 
         const fetchFolio = async () => {
@@ -63,9 +56,7 @@ const ViajesAnteriores = ({user}) => {
 
         fetchFolio();
         return () => {
-            unsubChoferes();
             unsubProvincias();
-            unsubClientes();
         };
     }, []);
 

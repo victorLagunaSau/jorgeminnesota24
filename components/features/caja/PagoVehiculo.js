@@ -123,6 +123,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                 saldoFiado: pCredito,
                 abonosFiado: [],
                 pagosPendientes: false,
+                usuarioCobro: user.nombre || "Admin",
                 ...(esFiado ? { usuarioFiado: user.nombre, usuarioFiadoId: user.id } : {}),
             };
 
@@ -194,6 +195,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
                     estadoPago: esFiado ? "fiado" : "pagado",
                     creditoOtorgado: pCredito,
                     saldoFiado: pCredito,
+                    usuarioCobro: user.nombre || "Admin",
                 },
             ]);
 
