@@ -1312,9 +1312,23 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                     <td className="p-1 text-center">
                                                         <span className="text-[11px] font-bold text-gray-400">${v.precioVenta || 0}</span>
                                                     </td>
-                                                    <td className="p-1 text-center">
-                                                        <span className="text-[11px] font-bold text-gray-400">${v.storage || "0"}</span>
-                                                    </td>
+                                                    {(() => {
+                                                        const storageVal = v.preciosClienteEditados ? (v.storageCliente || "0") : (v.storage || "0");
+                                                        const storageIsDiff = v.preciosClienteEditados && String(v.storageCliente) !== String(v.storage);
+                                                        return (
+                                                            <td className="p-1 text-center">
+                                                                {puedeEditar ? (
+                                                                    <input type="number" value={storageVal}
+                                                                        onChange={(e) => handleLocalEdit(viaje.id, idx, 'storageCliente', e.target.value)}
+                                                                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
+                                                                        className={`w-16 text-center rounded outline-none text-[11px] font-black py-1 ${storageIsDiff ? 'bg-blue-50 text-blue-800 border-[3px] border-sky-400' : 'bg-gray-50 input-neon'}`}
+                                                                        style={storageIsDiff ? {boxShadow: '0 0 10px rgba(56,189,248,0.6), 0 0 3px rgba(56,189,248,0.3)'} : {}}/>
+                                                                ) : (
+                                                                    <span className={`text-[11px] font-bold ${storageIsDiff ? 'text-blue-900' : ''} text-gray-400`}>${storageVal}</span>
+                                                                )}
+                                                            </td>
+                                                        );
+                                                    })()}
                                                     {[
                                                         {field: 'sPesoCliente', driver: 'sPeso'},
                                                         {field: 'gExtraCliente', driver: 'gExtra'}
