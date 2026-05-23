@@ -15,7 +15,7 @@ const SearchInput = () => {
     const buscarVehiculo = async () => {
         try {
             setCargando(true);
-            const vehiculoSnapshot = await firestore().collection("vehiculos").doc(binNip).get();
+            const vehiculoSnapshot = await firestore().collection("vehiculos").doc(binNip.toUpperCase().trim()).get();
             if (!vehiculoSnapshot.exists) {
                 setEstatus("");
                 setMensajeError("Vehículo no encontrado");
@@ -42,7 +42,7 @@ const SearchInput = () => {
         buscarVehiculo();
     };
     const handleInputChange = (event) => {
-        setBinNip(event.target.value);
+        setBinNip(event.target.value.toUpperCase().trim());
     };
     return (
         <div id="serch">

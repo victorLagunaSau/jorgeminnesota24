@@ -197,7 +197,7 @@ const ImportarHistorial = ({ user }) => {
                     actual = { numViaje: "PRE", refFolio: "", duenoOriginal: "", choferAsignado: null, choferIdFirebase: null, empresaChofer: "", vehiculos: [] };
                 }
 
-                const lote = String(row[4] || "").trim();
+                const lote = String(row[4] || "").trim().toUpperCase();
                 todosLotes.push(lote);
 
                 actual.vehiculos.push({

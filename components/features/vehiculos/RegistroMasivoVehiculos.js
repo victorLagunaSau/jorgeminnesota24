@@ -67,7 +67,7 @@ const RegistroMasivoVehiculos = ({ user }) => {
         setLoading(true);
         try {
             // Candado de Duplicidad
-            const check = await firestore().collection("vehiculos").doc(datos.binNip.trim()).get();
+            const check = await firestore().collection("vehiculos").doc(datos.binNip.toUpperCase().trim()).get();
             if (check.exists) {
                 alert(`El Lote ${datos.binNip} ya existe.`);
                 setLoading(false);
@@ -175,7 +175,7 @@ const RegistroMasivoVehiculos = ({ user }) => {
 
                 {/* FILA 2: DATOS DEL VEHÍCULO */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mb-4 border-t pt-3">
-                    <input type="text" placeholder="BIN / LOTE *" className="input input-bordered input-sm font-black text-blue-600" value={datos.binNip} onChange={e => setDatos({...datos, binNip: e.target.value})} />
+                    <input type="text" placeholder="BIN / LOTE *" className="input input-bordered input-sm font-black text-blue-600" maxLength={8} value={datos.binNip} onChange={e => setDatos({...datos, binNip: e.target.value.toUpperCase().trim()})} />
                     <input type="text" placeholder="GATE PASS / COMPRADOR" className="input input-bordered input-sm font-bold" value={datos.gatePass} onChange={e => setDatos({...datos, gatePass: e.target.value})} />
                     <select className="select select-bordered select-sm font-bold" value={datos.almacen} onChange={e => setDatos({...datos, almacen: e.target.value})}>
                         <option value="">Almacén...</option>

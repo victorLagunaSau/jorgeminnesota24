@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
-import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie, FaReceipt } from 'react-icons/fa';
+import ReactToPrint from "react-to-print";
+import { FaDollarSign, FaArrowUp, FaArrowDown, FaBalanceScale, FaCar, FaHandHoldingUsd, FaTruck, FaCreditCard, FaCalendarWeek, FaTimes, FaUserTie, FaReceipt, FaPrint } from 'react-icons/fa';
 
 const MESES_NOMBRES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -116,6 +117,7 @@ const EstadoFinanciero = () => {
     const [gastosAll, setGastosAll] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalData, setModalData] = useState(null);
+    const printRef = useRef();
 
     const mesesDisponibles = useMemo(() => getMesesDisponibles(), []);
 
@@ -193,7 +195,15 @@ const EstadoFinanciero = () => {
 
     // === DATOS FILTRADOS ===
     const datos = useMemo(() => {
-        const vehiculos = movimientos.filter(m => m.estatus === "EN" && m.tipo !== "Pago" && m.tipo !== "Abono");
+        // Construir set de lotes que tienen viaje en el periodo para excluir cobros retroactivos (ej: carros 2025 cargados a caja en 2026)
+        const lotesConViaje = new Set();
+        viajesPagados.forEach(viaje => {
+            (viaje.vehiculos || []).forEach(v => { if (v.lote) lotesConViaje.add(v.lote); });
+        });
+
+        const vehiculosTodos = movimientos.filter(m => m.estatus === "EN" && m.tipo !== "Pago" && m.tipo !== "Abono");
+        // Solo contar cobros de vehiculos que tienen viaje asociado en el periodo
+        const vehiculos = vehiculosTodos.filter(m => lotesConViaje.has(m.binNip));
         const anticipos = movimientos.filter(m => m.tipo === "Anticipo");
         const abonos = movimientos.filter(m => m.tipo === "Abono");
 
@@ -367,12 +377,22 @@ const EstadoFinanciero = () => {
                         <h2 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Estado Financiero</h2>
                         <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{formatFecha(fechaInicio)} — {formatFecha(fechaFin)}</p>
                     </div>
-                    <button
-                        onClick={() => { setModo("semana"); setMesesSeleccionados([]); }}
-                        className={`btn btn-sm font-black uppercase gap-2 ${modo === "semana" ? "btn-error text-white" : "btn-outline"}`}
-                    >
-                        <FaCalendarWeek size={12} /> Semana Actual
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => { setModo("semana"); setMesesSeleccionados([]); }}
+                            className={`btn btn-sm font-black uppercase gap-2 ${modo === "semana" ? "btn-error text-white" : "btn-outline"}`}
+                        >
+                            <FaCalendarWeek size={12} /> Semana Actual
+                        </button>
+                        <ReactToPrint
+                            trigger={() => (
+                                <button className="btn btn-sm btn-outline font-black uppercase gap-2">
+                                    <FaPrint size={12} /> Imprimir
+                                </button>
+                            )}
+                            content={() => printRef.current}
+                        />
+                    </div>
                 </div>
                 <div className="flex flex-wrap gap-2 items-center">
                     <span className="text-[10px] font-black uppercase text-gray-400 mr-1">Meses:</span>
@@ -635,6 +655,159 @@ const EstadoFinanciero = () => {
                     onClose={() => setModalData(null)}
                 />
             )}
+
+            {/* Vista de impresión oculta */}
+            <div style={{ display: 'none' }}>
+                <div ref={printRef} style={{ padding: '40px', fontFamily: 'Arial, sans-serif', color: '#111' }}>
+                    <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '3px solid #b40a0a', paddingBottom: '16px' }}>
+                        <h1 style={{ fontSize: '22px', fontWeight: '900', margin: 0, textTransform: 'uppercase', letterSpacing: '2px' }}>Jorge Minnesota Logistic LLC</h1>
+                        <h2 style={{ fontSize: '16px', fontWeight: '700', margin: '8px 0 4px', color: '#444' }}>Estado Financiero</h2>
+                        <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>{formatFecha(fechaInicio)} — {formatFecha(fechaFin)}</p>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '24px' }}>
+                        {/* INGRESOS */}
+                        <div style={{ flex: 1 }}>
+                            <h3 style={{ fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', color: '#166534', borderBottom: '2px solid #166534', paddingBottom: '4px', marginBottom: '12px' }}>Ingresos</h3>
+                            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                                <tbody>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Cobro de Vehículos</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.vehiculos.count} vehs</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.vehiculos.efectivo + financiero.vehiculos.cc)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Transporte</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.vehiculos.precio)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Storage</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.vehiculos.storage)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Sobrepeso</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.vehiculos.sobrePeso)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888', borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '2px 4px 6px 16px' }}>Gastos Extra</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px 6px' }}>{fmt(financiero.vehiculos.gastosExtra)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Efectivo</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.vehiculos.efectivo)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888', borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '2px 4px 6px 16px' }}>Tarjeta/CC</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px 6px' }}>{fmt(financiero.vehiculos.cc)}</td>
+                                    </tr>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Pagos Adelantados</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.anticipos.count}</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.anticipos.total)}</td>
+                                    </tr>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Abonos de Fiados</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.abonos.count}</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.abonos.efectivo + financiero.abonos.cc)}</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: '2px solid #166534' }}>
+                                        <td style={{ padding: '8px 4px', fontWeight: '900', fontSize: '13px' }}>TOTAL INGRESOS</td>
+                                        <td></td>
+                                        <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: '900', fontSize: '13px', color: '#166534' }}>{fmt(financiero.totalIngresos)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {/* EGRESOS */}
+                        <div style={{ flex: 1 }}>
+                            <h3 style={{ fontSize: '13px', fontWeight: '900', textTransform: 'uppercase', color: '#991b1b', borderBottom: '2px solid #991b1b', paddingBottom: '4px', marginBottom: '12px' }}>Egresos</h3>
+                            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                                <tbody>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Pagos a Choferes</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.pagosChoferes.count} viajes / {financiero.pagosChoferes.totalVehiculos} vehs</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.pagosChoferes.granTotal)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Fletes</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.pagosChoferes.totalFletes)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Storage</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.pagosChoferes.totalStorage)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888' }}>
+                                        <td style={{ padding: '2px 4px 2px 16px' }}>Sobrepeso</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px' }}>{fmt(financiero.pagosChoferes.totalSobrepeso)}</td>
+                                    </tr>
+                                    <tr style={{ fontSize: '10px', color: '#888', borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '2px 4px 6px 16px' }}>Gastos Extra</td>
+                                        <td></td>
+                                        <td style={{ textAlign: 'right', padding: '2px 4px 6px' }}>{fmt(financiero.pagosChoferes.totalGastosExtra)}</td>
+                                    </tr>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Nómina Empleados</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.nomina.count} pagos</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.nomina.total)}</td>
+                                    </tr>
+                                    <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                                        <td style={{ padding: '6px 4px', fontWeight: '700' }}>Gastos Operativos</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'center', color: '#666' }}>{financiero.gastos.count} gastos</td>
+                                        <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: '700' }}>{fmt(financiero.gastos.total)}</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr style={{ borderTop: '2px solid #991b1b' }}>
+                                        <td style={{ padding: '8px 4px', fontWeight: '900', fontSize: '13px' }}>TOTAL EGRESOS</td>
+                                        <td></td>
+                                        <td style={{ padding: '8px 4px', textAlign: 'right', fontWeight: '900', fontSize: '13px', color: '#991b1b' }}>{fmt(financiero.totalEgresos)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+
+                            {/* Informativos */}
+                            <div style={{ marginTop: '16px', padding: '8px', backgroundColor: '#fef3c7', borderRadius: '6px', fontSize: '10px' }}>
+                                <p style={{ fontWeight: '700', marginBottom: '4px', textTransform: 'uppercase', color: '#92400e' }}>Informativo (no afecta balance)</p>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Crédito Otorgado</span>
+                                    <span style={{ fontWeight: '700' }}>{fmt(financiero.credito.otorgado)}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Saldo Pendiente por cobrar</span>
+                                    <span style={{ fontWeight: '700' }}>{fmt(financiero.credito.saldoPendiente)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* BALANCE */}
+                    <div style={{ border: `3px solid ${financiero.balance >= 0 ? '#1d4ed8' : '#c2410c'}`, borderRadius: '8px', padding: '16px', textAlign: 'center', backgroundColor: financiero.balance >= 0 ? '#eff6ff' : '#fff7ed' }}>
+                        <p style={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#666', marginBottom: '4px' }}>Balance Neto del Periodo</p>
+                        <p style={{ fontSize: '28px', fontWeight: '900', color: financiero.balance >= 0 ? '#1d4ed8' : '#c2410c', margin: '4px 0' }}>
+                            {financiero.balance < 0 ? '-' : ''}{fmt(financiero.balance)}
+                        </p>
+                        <p style={{ fontSize: '10px', color: '#888', margin: 0 }}>
+                            Ingresos {fmt(financiero.totalIngresos)} — Egresos {fmt(financiero.totalEgresos)}
+                        </p>
+                    </div>
+
+                    <p style={{ fontSize: '9px', color: '#aaa', textAlign: 'center', marginTop: '20px' }}>
+                        Generado el {new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })} — Jorge Minnesota Logistic LLC
+                    </p>
+                </div>
+            </div>
         </div>
     );
 };

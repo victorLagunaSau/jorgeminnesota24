@@ -40,7 +40,8 @@ const ViajesAnteriores = ({user}) => {
     const [encabezado, setEncabezado] = useState({
         choferId: "",
         fechaManual: "",
-        empresaLiquidada: ""
+        empresaLiquidada: "",
+        numViajeManual: ""
     });
 
     useEffect(() => {
@@ -81,7 +82,7 @@ const ViajesAnteriores = ({user}) => {
         if (!busqueda) return;
         setLoading(true);
         try {
-            const vehDoc = await firestore().collection("vehiculos").doc(busqueda.trim()).get();
+            const vehDoc = await firestore().collection("vehiculos").doc(busqueda.toUpperCase().trim()).get();
             if (!vehDoc.exists) {
                 alert("Vehículo no encontrado.");
                 return;
@@ -89,7 +90,7 @@ const ViajesAnteriores = ({user}) => {
 
             const vehData = vehDoc.data();
             const viajeExistente = await firestore().collection("viajesPagados")
-                .where("vehiculos", "array-contains-any", [{lote: busqueda.trim()}]).get();
+                .where("vehiculos", "array-contains-any", [{lote: busqueda.toUpperCase().trim()}]).get();
 
             if (!viajeExistente.empty || vehData.numViaje) {
                 alert(`Error: El lote ${busqueda} ya tiene viaje asignado.`);
@@ -137,7 +138,7 @@ const ViajesAnteriores = ({user}) => {
         }
         setLoading(true);
         const batch = firestore().batch();
-        const numViajeFinal = `PGM-${folioPGM}`;
+        const numViajeFinal = encabezado.numViajeManual || `PGM-${folioPGM}`;
         const choferSel = choferes.find(c => c.id === encabezado.choferId);
 
         try {
@@ -177,7 +178,10 @@ const ViajesAnteriores = ({user}) => {
                     cliente: v.clienteNombre
                 });
             });
-            batch.update(firestore().collection("config").doc("consecutivos"), {folioManualPGM: folioPGM});
+            // Solo incrementar consecutivo PGM si se usó el folio automático
+            if (!encabezado.numViajeManual) {
+                batch.update(firestore().collection("config").doc("consecutivos"), {folioManualPGM: folioPGM});
+            }
 
             await batch.commit();
             alert(`Viaje ${numViajeFinal} creado exitosamente.`);
@@ -201,8 +205,15 @@ const ViajesAnteriores = ({user}) => {
             <div
                 className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
                 <div>
-                    <label className="text-[10px] font-black uppercase text-gray-400">Folio PGM</label>
-                    <div className="text-xl font-black text-red-600">PGM-{folioPGM}</div>
+                    <label className="text-[10px] font-black uppercase text-gray-400">Número de Viaje</label>
+                    <input
+                        type="text"
+                        className="input input-bordered input-sm w-full font-black text-red-600 text-lg uppercase"
+                        placeholder={`PGM-${folioPGM}`}
+                        value={encabezado.numViajeManual}
+                        onChange={(e) => setEncabezado({...encabezado, numViajeManual: e.target.value.toUpperCase().trim()})}
+                    />
+                    <span className="text-[8px] text-gray-400 italic">Si lo dejas vacío se asigna PGM-{folioPGM}</span>
                 </div>
                 <div>
                     <label className="text-[10px] font-black uppercase text-gray-400">Fecha Original (Papel)</label>
@@ -265,7 +276,7 @@ const ViajesAnteriores = ({user}) => {
             <div className="mb-6 flex gap-2">
                 <input type="text" placeholder="Escanea o escribe el Lote..."
                        className="input input-bordered flex-1 font-mono font-black uppercase" value={busqueda}
-                       onChange={(e) => setBusqueda(e.target.value)}
+                       onChange={(e) => setBusqueda(e.target.value.toUpperCase().trim())}
                        onKeyPress={(e) => e.key === 'Enter' && buscarVehiculo()}/>
                 <button onClick={buscarVehiculo} disabled={loading}
                         className="btn btn-accent text-white px-10 font-black uppercase">Validar Lote
@@ -397,7 +408,7 @@ const ViajesAnteriores = ({user}) => {
                     <span className="loading loading-spinner loading-sm"></span>
                 ) : (
                     <>
-                        <FaSave/> Procesar Viaje PGM-{folioPGM}
+                        <FaSave/> Procesar Viaje {encabezado.numViajeManual || `PGM-${folioPGM}`}
                     </>
                 )}
             </button>

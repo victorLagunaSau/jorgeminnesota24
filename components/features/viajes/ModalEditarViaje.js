@@ -313,7 +313,8 @@ const ModalEditarViaje = ({ viaje, choferes, clientes, onClose, onGuardado }) =>
                                                     <input
                                                         type="text"
                                                         value={v.lote || ""}
-                                                        onChange={(e) => actualizarVehiculo(idx, "lote", e.target.value)}
+                                                        maxLength={8}
+                                                        onChange={(e) => actualizarVehiculo(idx, "lote", e.target.value.toUpperCase().trim())}
                                                         className="w-20 px-1 py-1 border rounded text-[11px] font-mono font-bold text-center focus:border-blue-500 focus:outline-none"
                                                     />
                                                 </td>

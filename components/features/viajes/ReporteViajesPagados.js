@@ -624,7 +624,7 @@ const ReporteViajesPagados = ({ user }) => {
                 <div className="p-4">
                     <FormViaje
                         user={user}
-                        mostrarFechaManual={true}
+                        modoHistorial={true}
                         onViajeCreado={() => {
                             setVista("historial");
                             consultarViajes(periodoSeleccionado);

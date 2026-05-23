@@ -321,7 +321,7 @@ const FormDatosVehiculo = ({user, onClose}) => {
                         id="binNip"
                         value={binNip}
                         maxLength={FIELD_LIMITS.BIN_NIP}
-                        onChange={(e) => setBinNip(e.target.value)}
+                        onChange={(e) => setBinNip(e.target.value.toUpperCase().trim())}
                         className="input input-bordered w-full text-black-500 input-sm bg-white-100"
                     />
                 </div>
