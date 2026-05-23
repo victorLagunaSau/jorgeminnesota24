@@ -70,6 +70,7 @@ const ComponentToPrint = React.forwardRef(({pagoData}, ref) => {
         <div ref={ref} className="m-4" style={{maxWidth: "90%", marginLeft: "auto", marginRight: "auto"}}>
             <Recibo title="Copia: Cliente"/>
             <Recibo title="Copia: Oficina"/>
+            <Recibo title="Copia: Archivo"/>
         </div>
     );
 });
@@ -96,19 +97,17 @@ const Recibo = ({
     const componentRef = useRef(null);
 
     return (
-        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center z-50 bg-black-500">
-    <div className="rounded shadow-lg w-3/4 bg-white-500">
-        <div className="navbar bg-neutral text-neutral-content">
+        <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center z-50">
+    <div className="rounded shadow-lg w-3/4 max-h-[90vh] flex flex-col bg-white">
+        <div className="navbar bg-neutral text-neutral-content shrink-0">
             <div className="flex justify-between items-center w-full px-4">
-                {/* Botón de Cerrar a la izquierda */}
                 <button
                     className="btn btn-sm btn-ghost"
-                    onClick={onClose} // Vinculando correctamente onClose
+                    onClick={onClose}
                 >
                     Cerrar
                 </button>
 
-                {/* Botón de Imprimir a la derecha */}
                 <ReactToPrint
                     trigger={() => (
                         <button className="btn btn-sm btn-ghost">
@@ -119,7 +118,9 @@ const Recibo = ({
                 />
             </div>
         </div>
-        <ComponentToPrint ref={componentRef} pagoData={pagoData} />
+        <div className="overflow-y-auto flex-1">
+            <ComponentToPrint ref={componentRef} pagoData={pagoData} />
+        </div>
     </div>
 </div>
     );

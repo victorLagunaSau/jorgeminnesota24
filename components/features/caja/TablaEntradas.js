@@ -4,6 +4,21 @@ import { COLLECTIONS } from "../../../constants";
 
 const TablaEntradas = ({ entradasData, totalRecibido, isAdminMaster, onDataChange }) => {
   const [cambiando, setCambiando] = useState(null);
+  const [eliminando, setEliminando] = useState(null);
+
+  const eliminarMovimiento = async (entrada) => {
+    if (eliminando) return;
+    if (!window.confirm(`¿Estás seguro de eliminar esta entrada de $${parseFloat(entrada.cajaRecibo || 0).toFixed(2)}? Esta acción no se puede deshacer.`)) return;
+    setEliminando(entrada.id);
+    try {
+      await firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(entrada.id).delete();
+      if (onDataChange) onDataChange();
+    } catch (e) {
+      alert("Error al eliminar: " + e.message);
+    } finally {
+      setEliminando(null);
+    }
+  };
 
   const cambiarASalida = async (entrada) => {
     if (cambiando) return;
@@ -103,13 +118,20 @@ const TablaEntradas = ({ entradasData, totalRecibido, isAdminMaster, onDataChang
                           ${recibo.toFixed(2).toLocaleString('en-US')}
                         </td>
                         {isAdminMaster && (
-                          <td className="px-2 py-1 border text-center">
+                          <td className="px-2 py-1 border text-center space-x-1">
                             <button
                               onClick={() => cambiarASalida(entrada)}
                               disabled={cambiando === entrada.id}
                               className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
                             >
                               {cambiando === entrada.id ? '...' : '→ Salida'}
+                            </button>
+                            <button
+                              onClick={() => eliminarMovimiento(entrada)}
+                              disabled={eliminando === entrada.id}
+                              className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-gray-100 text-gray-700 border-gray-400 hover:bg-red-200 hover:text-red-700"
+                            >
+                              {eliminando === entrada.id ? '...' : 'Eliminar'}
                             </button>
                           </td>
                         )}

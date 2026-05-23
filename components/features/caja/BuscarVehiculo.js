@@ -13,7 +13,7 @@ const BuscarVehiculo = ({ onVehiculoEncontrado, initialBinNip, onBinNipConsumed 
         try {
             setCargando(true);
             setMensajeError("");
-            const vehiculoSnapshot = await firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip).get();
+            const vehiculoSnapshot = await firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip.toUpperCase().trim()).get();
 
             if (!vehiculoSnapshot.exists) {
                 setMensajeError("Vehículo no encontrado");
@@ -63,7 +63,7 @@ const BuscarVehiculo = ({ onVehiculoEncontrado, initialBinNip, onBinNipConsumed 
 
     // Manejo del evento de entrada de texto
     const handleInputChange = (event) => {
-        setBinNip(event.target.value);
+        setBinNip(event.target.value.toUpperCase().trim());
     };
 
     // Manejo del botón de buscar

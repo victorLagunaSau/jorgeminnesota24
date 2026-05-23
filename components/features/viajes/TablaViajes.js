@@ -1129,7 +1129,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                                             type="text"
                                                             value={v.lote || ""}
                                                             maxLength={8}
-                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase())}
+                                                            onChange={(e) => handleLocalEdit(viaje.id, idx, 'lote', e.target.value.toUpperCase().trim())}
                                                             className={`w-24 text-center bg-gray-50 rounded border border-gray-200 outline-none text-xs font-black font-mono py-1 focus:border-blue-500 ${user.admin && v.yaPagado ? 'text-yellow-700 border-yellow-500' : 'text-blue-700'}`}
                                                         />
                                                         {user.admin && v.yaPagado && (

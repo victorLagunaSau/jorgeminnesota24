@@ -14,7 +14,7 @@ import Alert from "../../ui/Alert";
 
 const DRAFTS_KEY = "formViaje_borradores";
 
-const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas, mostrarFechaManual}) => {
+const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, solicitudesPrecargadas, mostrarFechaManual, modoHistorial}) => {
     // --- DATOS DEL CONTEXTO COMPARTIDO ---
     const { choferes: choferesRaw, clientes: clientesRaw } = useAdminData();
 
@@ -68,6 +68,23 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
     });
 
     const [vehiculos, setVehiculos] = useState([]);
+
+    // --- LOTES YA ASIGNADOS A VIAJES PENDIENTES (para validación) ---
+    const [lotesEnViajes, setLotesEnViajes] = useState(new Set());
+
+    useEffect(() => {
+        const unsub = firestore().collection(COLLECTIONS.VIAJES_PENDIENTES)
+            .onSnapshot(snap => {
+                const lotes = new Set();
+                snap.docs.forEach(doc => {
+                    (doc.data().vehiculos || []).forEach(v => {
+                        if (v.lote) lotes.add(v.lote.toUpperCase().trim());
+                    });
+                });
+                setLotesEnViajes(lotes);
+            });
+        return () => unsub();
+    }, []);
 
     // --- BORRADOR / AUTO-GUARDADO ---
     const borradorCargado = useRef(false);
@@ -557,6 +574,11 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
 
                 let actualizacion = {...v, [field]: valorFinal};
 
+                // Limpiar error de lote al cambiar el número
+                if (field === 'lote') {
+                    actualizacion.loteError = false;
+                }
+
                 // Auto-sync: campos cliente siguen al chofer cuando no estan editados manualmente
                 if (!v.preciosClienteEditados) {
                     if (field === 'storage') actualizacion.storageCliente = valorFinal;
@@ -609,11 +631,16 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
             setTimeout(() => setAlertMessage({ msg: '', tipo: '' }), 4000);
             return;
         }
+        // Validar si el lote ya está en otro viaje pendiente
+        if (lotesEnViajes.has(loteLimpio)) {
+            setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito en otro viaje`, tipo: 'error'});
+            setVehiculos(vehiculos.map(v => v.id === id ? { ...v, loteError: "transito" } : v));
+            setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+            return;
+        }
+
         try {
-            const [docV, docT] = await Promise.all([
-                firestore().collection(COLLECTIONS.VEHICULOS).doc(loteLimpio).get(),
-                firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteLimpio).get()
-            ]);
+            const docV = await firestore().collection(COLLECTIONS.VEHICULOS).doc(loteLimpio).get();
 
             if (docV.exists) {
                 const docData = docV.data();
@@ -622,38 +649,18 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                     setVehiculos(vehiculos.map(v => v.id === id ? { ...v, yaPagado: false, esPA: true } : v));
                     setAlertMessage({msg: `Lote ${loteLimpio} tiene pago adelantado de $${docData.anticipoPago}.`, tipo: 'success'});
                     setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
+                } else if (modoHistorial) {
+                    // Modo historial — permitir lotes ya registrados, solo informar
+                    setVehiculos(vehiculos.map(v => v.id === id ? { ...v, yaPagado: true, loteError: false } : v));
                 } else {
-                // Lote YA PAGADO - Permitir pero marcar como advertencia
-                // Solo mostrar alerta visual si es admin
-                if (user.admin) {
-                    setAlertMessage({msg: `⚠️ ADVERTENCIA: Lote ${loteLimpio} ya está pagado. Se registrará para actualizar precios.`, tipo: 'warning'});
-                    setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
-                }
-                setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: true} : v));
-                }
-            } else if (docT.exists) {
-                // Validar si el viaje asignado realmente sigue existiendo; si no, es huérfano
-                const viajeAsignadoId = docT.data()?.viajeAsignado;
-                let huerfano = false;
-                if (!viajeAsignadoId) {
-                    huerfano = true;
-                } else {
-                    const viajeDoc = await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeAsignadoId).get();
-                    if (!viajeDoc.exists) huerfano = true;
-                }
-
-                if (huerfano) {
-                    await firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(loteLimpio).delete();
-                    setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
-                } else {
-                    // Lote en tránsito - No permitir
-                    setAlertMessage({msg: `Lote ${loteLimpio} ya está en tránsito`, tipo: 'error'});
-                    setVehiculos(vehiculos.map(v => v.id === id ? {...v, lote: ""} : v));
+                    // Lote ya registrado en el sistema — marcar en rojo, no permitir finalizar
+                    setAlertMessage({msg: `Lote ${loteLimpio} ya está registrado en el sistema`, tipo: 'error'});
+                    setVehiculos(vehiculos.map(v => v.id === id ? { ...v, loteError: true } : v));
                     setTimeout(() => setAlertMessage({msg: '', tipo: ''}), 5000);
                 }
             } else {
                 // Lote nuevo - Limpiar marca de pagado si existía
-                setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false} : v));
+                setVehiculos(vehiculos.map(v => v.id === id ? {...v, yaPagado: false, loteError: false} : v));
             }
         } catch (e) {
             console.error(e);
@@ -661,8 +668,8 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
     };
 
     const esValido = vehiculos.length > 0 && vehiculos.every(v =>
-        v.lote.trim().length === FIELD_LIMITS.LOT && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && (user?.admin ? v.clienteConfirmado : true) && parseFloat(v.flete) > 0
-    );
+        v.lote.trim().length === FIELD_LIMITS.LOT && !v.loteError && v.marca.trim() !== "" && v.clienteAlt.trim() !== "" && (user?.admin ? v.clienteConfirmado : true) && parseFloat(v.flete) > 0
+    ) && (!modoHistorial || (encabezado.numViajeManual && encabezado.fechaInput));
 
     const getClientesFiltrados = (vehiculoId) => {
         const vehiculoActual = vehiculos.find(v => v.id === vehiculoId);
@@ -694,9 +701,6 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
         if (!esValido) return;
         setGuardando(true);
         try {
-            // Generar un ID temporal para el documento (el número real se asigna al pagar)
-            const docId = `TEMP_${Date.now()}`;
-
             const tFlete = vehiculos.reduce((acc, v) => acc + parseFloat(v.flete || 0), 0);
 
             // Verificar si es chofer temporal (con token) o libre (masterAdmin)
@@ -715,6 +719,119 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
             } else {
                 choferData = choferes.find(c => c.id === encabezado.choferId);
             }
+
+            // === MODO HISTORIAL: guardar directo en viajesPagados + crear vehiculos ===
+            if (modoHistorial) {
+                const numViaje = encabezado.numViajeManual;
+                const fechaViaje = new Date(encabezado.fechaInput + "T12:00:00");
+                const batch = firestore().batch();
+
+                const totalStorage = vehiculos.reduce((acc, v) => acc + parseFloat(v.storage || 0), 0);
+                const totalSobrepeso = vehiculos.reduce((acc, v) => acc + parseFloat(v.sPeso || 0), 0);
+                const totalGastosExtra = vehiculos.reduce((acc, v) => acc + parseFloat(v.gExtra || 0), 0);
+
+                const viajePagado = {
+                    numViaje,
+                    folioPago: numViaje,
+                    estatus: "PAGADO",
+                    fechaCreacion: fechaViaje,
+                    fechaPago: fechaViaje,
+                    fechaRegistroSistema: new Date(),
+                    metodo: "HISTORIAL_MANUAL",
+                    chofer: choferData ? { id: choferData.id, nombre: choferData.nombre || choferData.nombreChofer, empresa: choferData.empresa || choferData.empresaNombre || "" } : null,
+                    empresaLiquidada: choferData?.empresa || choferData?.empresaNombre || "",
+                    creadoPor: { id: user?.id || "N/A", nombre: user?.nombre || "Admin" },
+                    resumenFinanciero: {
+                        totalFletes: tFlete,
+                        totalStorage,
+                        totalSobrepeso,
+                        totalGastosExtra,
+                        granTotal: tFlete + totalStorage + totalSobrepeso + totalGastosExtra,
+                        totalVehiculos: vehiculos.length
+                    },
+                    vehiculos: vehiculos.map((v, index) => ({...v, order: index + 1}))
+                };
+
+                batch.set(firestore().collection(COLLECTIONS.VIAJES_PAGADOS).doc(numViaje), viajePagado);
+
+                // Verificar cuáles vehiculos ya existen y cuáles tienen PA
+                const lotes = vehiculos.map(v => v.lote).filter(Boolean);
+                const existentes = new Map(); // lote → docData
+                for (let i = 0; i < lotes.length; i += 10) {
+                    const chunk = lotes.slice(i, i + 10);
+                    const docs = await Promise.all(chunk.map(l => firestore().collection(COLLECTIONS.VEHICULOS).doc(l).get()));
+                    docs.forEach(doc => { if (doc.exists) existentes.set(doc.id, doc.data()); });
+                }
+
+                vehiculos.forEach(v => {
+                    const vehiculoRef = firestore().collection(COLLECTIONS.VEHICULOS).doc(v.lote);
+                    const datosViaje = {
+                        binNip: v.lote,
+                        marca: v.marca || "",
+                        modelo: v.modelo || "",
+                        estado: v.estado || "",
+                        ciudad: v.ciudad || "",
+                        almacen: v.almacen || "",
+                        tipoVehiculo: v.tipoVehiculo || "A",
+                        titulo: v.titulo || "NO",
+                        flete: parseFloat(v.flete) || 0,
+                        storage: parseFloat(v.storage) || 0,
+                        sobrePeso: parseFloat(v.sPeso) || 0,
+                        gastosExtra: parseFloat(v.gExtra) || 0,
+                        price: String(v.flete || "0"),
+                        clienteNombre: v.clienteAlt || v.clienteNombre || "",
+                        cliente: v.clienteAlt || v.clienteNombre || "",
+                        clienteId: v.clienteId || "",
+                        estatus: "PR",
+                        numViaje,
+                        folioPago: numViaje,
+                        asignado: true,
+                        comentarioRegistro: v.comentarioRegistro || "",
+                        registro: {
+                            usuario: user?.nombre || "Admin",
+                            idUsuario: user?.id || "N/A",
+                            timestamp: fechaViaje
+                        },
+                    };
+
+                    if (existentes.has(v.lote)) {
+                        const docData = existentes.get(v.lote);
+                        if (docData.estatus === "PA") {
+                            // PA — merge para conservar campos de anticipo
+                            batch.set(vehiculoRef, datosViaje, { merge: true });
+                        } else {
+                            // Ya existe con otro estatus — solo actualizar datos del viaje
+                            batch.update(vehiculoRef, {
+                                numViaje,
+                                folioPago: numViaje,
+                            });
+                        }
+                    } else {
+                        // No existe — crear doc completo
+                        batch.set(vehiculoRef, datosViaje);
+                    }
+                });
+
+                await batch.commit();
+                limpiarBorrador();
+
+                if (onViajeCreado) {
+                    setAlertMessage({msg: `Viaje #${numViaje} registrado en historial`, tipo: 'success'});
+                    setGuardando(false);
+                    setTimeout(() => {
+                        setVehiculos([]);
+                        setEncabezado({numViaje: "", choferId: "", choferManual: "", fecha: new Date().toLocaleDateString(), numViajeManual: "", fechaInput: ""});
+                        setViajeIniciado(false);
+                        setBusquedaChofer("");
+                        setAlertMessage({msg: '', tipo: ''});
+                        onViajeCreado();
+                    }, 1500);
+                }
+                return;
+            }
+
+            // === MODO NORMAL: guardar en viajesPendientes ===
+            const docId = `TEMP_${Date.now()}`;
 
             const viajeData = {
                 numViaje: "",
@@ -1125,14 +1242,25 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                     <label className="block text-[10px] md:text-[10px] font-black text-gray-400 uppercase mb-1 italic">
                         Núm. Viaje
                     </label>
-                    <input
-                        type="text"
-                        disabled
-                        className="input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] bg-gray-100"
-                        value={encabezado.numViaje}
-                        placeholder="Se asigna al pagar"
-                        style={{fontSize: '16px'}}
-                    />
+                    {modoHistorial ? (
+                        <input
+                            type="text"
+                            className="input input-bordered input-md md:input-sm w-full text-red-600 font-black uppercase text-center text-[16px] md:text-[14px]"
+                            value={encabezado.numViajeManual || ""}
+                            onChange={(e) => setEncabezado({...encabezado, numViajeManual: e.target.value.toUpperCase().trim()})}
+                            placeholder="Ej: 850"
+                            style={{fontSize: '16px'}}
+                        />
+                    ) : (
+                        <input
+                            type="text"
+                            disabled
+                            className="input input-bordered input-md md:input-sm w-full text-black font-bold uppercase text-center text-[16px] md:text-[14px] bg-gray-100"
+                            value={encabezado.numViaje}
+                            placeholder="Se asigna al pagar"
+                            style={{fontSize: '16px'}}
+                        />
+                    )}
                 </div>
                 <div className="relative">
                     <div className="flex items-center justify-between mb-1">
@@ -1252,7 +1380,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                     )}
                     </div>
                 <div className="text-center">
-                    {mostrarFechaManual ? (
+                    {mostrarFechaManual || modoHistorial ? (
                         <input
                             type="date"
                             value={encabezado.fechaInput || ""}
@@ -1308,7 +1436,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                         </thead>
                         <tbody className="bg-white">
                         {vehiculos.map((v, i) => (
-                            <tr key={v.id} className={`${user.admin && v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
+                            <tr key={v.id} className={`${v.loteError ? 'bg-red-100 border-l-4 border-red-500' : user.admin && v.yaPagado ? 'bg-yellow-100 border-l-4 border-yellow-500' : 'bg-gray-200'}`}>
                                 <td className="font-mono text-[12px] md:text-[10px] text-gray-400 italic p-2">{i + 1}</td>
                                 <td className="p-1">
                                     <input
@@ -1316,15 +1444,21 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                                         value={v.lote}
                                         maxLength={FIELD_LIMITS.LOT}
                                         onBlur={(e) => validarLoteUnico(v.id, e.target.value)}
-                                        onChange={(e) => handleTableChange(v.id, 'lote', e.target.value)}
+                                        onChange={(e) => handleTableChange(v.id, 'lote', e.target.value.toUpperCase().trim())}
                                         className={`input input-sm md:input-xs w-full font-black text-[14px] md:text-[12px] ${
+                                            v.loteError ? 'text-red-600 bg-red-50 border-red-400' :
                                             user.admin && v.yaPagado ? 'text-yellow-700 bg-yellow-50' :
                                             v.lote.length === FIELD_LIMITS.LOT ? 'text-blue-700' : 'text-red-600'
                                         }`}
                                         placeholder="8 dígitos"
                                         style={{fontSize: '16px'}}
                                     />
-                                    {user.admin && v.yaPagado && (
+                                    {v.loteError && (
+                                        <span className="text-[8px] font-black text-red-600 uppercase italic block mt-1">
+                                            {v.loteError === "transito" ? "EN TRÁNSITO" : "YA REGISTRADO"}
+                                        </span>
+                                    )}
+                                    {user.admin && v.yaPagado && !v.loteError && (
                                         <span className="text-[8px] font-black text-yellow-700 uppercase italic block mt-1">YA PAGADO</span>
                                     )}
                                 </td>
