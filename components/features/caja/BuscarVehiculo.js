@@ -13,6 +13,8 @@ const BuscarVehiculo = ({ onVehiculoEncontrado, initialBinNip, onBinNipConsumed 
         try {
             setCargando(true);
             setMensajeError("");
+            setEstatus("");
+            onVehiculoEncontrado(null, "", "");
             const vehiculoSnapshot = await firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip.toUpperCase().trim()).get();
 
             if (!vehiculoSnapshot.exists) {
