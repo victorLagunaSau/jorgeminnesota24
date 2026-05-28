@@ -26,6 +26,7 @@ const OperacionEntrada = ({ user }) => {
     };
 
     const handleSubmit = async () => {
+        if (loading) return;
         if (!tipoPago || monto <= 0 || !conceptoPago || !nombreReceptor) {
             setError('Todos los campos son obligatorios, excepto Motivo de Pago.');
             setShowConfirm(false);
@@ -166,8 +167,9 @@ const OperacionEntrada = ({ user }) => {
                                 <button
                                     className="btn btn-success"
                                     onClick={handleSubmit}
+                                    disabled={loading}
                                 >
-                                    Confirmar
+                                    {loading ? "Procesando..." : "Confirmar"}
                                 </button>
                             </div>
                         </div>

@@ -12,7 +12,7 @@ const PagoAdelantado = ({ user }) => {
     const [marca, setMarca] = useState('');
     const [modelo, setModelo] = useState('');
     const [cliente, setCliente] = useState('');
-    const [telefonoCliente] = useState('');
+    const [telefonoCliente, setTelefonoCliente] = useState('');
     const [estado, setEstado] = useState('');
     const [ciudad, setCiudad] = useState('');
     const [price, setPrice] = useState(0);
@@ -109,7 +109,7 @@ const PagoAdelantado = ({ user }) => {
         setBuscando(true);
         setVehiculoExistente(null);
         try {
-            const doc = await firestore().collection("vehiculos").doc(binNip.trim()).get();
+            const doc = await firestore().collection("vehiculos").doc(binNip.toUpperCase().trim()).get();
             if (doc.exists) {
                 const data = doc.data();
                 if (data.estatus === "PA") {
@@ -168,7 +168,7 @@ const PagoAdelantado = ({ user }) => {
 
         try {
             const timestamp = moment().toDate();
-            const lote = binNip.trim();
+            const lote = binNip.toUpperCase().trim();
 
             if (vehiculoExistente) {
                 // Vehículo ya existe → actualizar con datos de anticipo
@@ -321,7 +321,7 @@ const PagoAdelantado = ({ user }) => {
                         <input
                             type="text"
                             value={binNip}
-                            onChange={(e) => setBinNip(e.target.value)}
+                            onChange={(e) => setBinNip(e.target.value.toUpperCase().trim())}
                             onKeyDown={(e) => { if (e.key === 'Enter') buscarLote(); }}
                             className="input input-bordered w-full bg-white text-black"
                             placeholder="Ingresa el lote..."

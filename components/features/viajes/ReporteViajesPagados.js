@@ -688,10 +688,10 @@ const ReporteViajesPagados = ({ user }) => {
                                                 <td className="border border-gray-200 px-1 py-1 text-center font-black whitespace-nowrap">
                                                     {idx === 0 ? (
                                                         enEdicion ? (
-                                                            <input type="text" className="w-16 px-1 py-0.5 border border-blue-300 rounded text-center text-[11px] font-black focus:outline-none bg-white" value={edicionInline.numViaje} onChange={(e) => setEdicionInline(prev => ({ ...prev, numViaje: e.target.value }))} />
+                                                            <input type="text" className="w-16 px-1 py-0.5 border border-blue-300 rounded text-center text-[11px] font-black focus:outline-none bg-white" value={edicionInline.numViaje} onChange={(e) => setEdicionInline(prev => ({ ...prev, numViaje: e.target.value.toUpperCase().trim() }))} />
                                                         ) : puedeEditarNumViaje && editandoViaje === viaje.docId ? (
                                                             <div className="flex items-center gap-1 justify-center">
-                                                                <input type="text" className="w-16 border-2 border-blue-500 rounded text-center text-[11px] font-black px-1 py-1 focus:outline-none" value={nuevoNumViaje} onChange={(e) => setNuevoNumViaje(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') cambiarNumeroViaje(viaje, nuevoNumViaje); if (e.key === 'Escape') setEditandoViaje(null); }} autoFocus />
+                                                                <input type="text" className="w-16 border-2 border-blue-500 rounded text-center text-[11px] font-black px-1 py-1 focus:outline-none" value={nuevoNumViaje} onChange={(e) => setNuevoNumViaje(e.target.value.toUpperCase().trim())} onKeyDown={(e) => { if (e.key === 'Enter') cambiarNumeroViaje(viaje, nuevoNumViaje); if (e.key === 'Escape') setEditandoViaje(null); }} autoFocus />
                                                                 <button onClick={() => cambiarNumeroViaje(viaje, nuevoNumViaje)} className="w-5 h-5 flex items-center justify-center rounded-full bg-green-600 text-white shadow-sm"><FaCheck size={8}/></button>
                                                                 <button onClick={() => setEditandoViaje(null)} className="w-5 h-5 flex items-center justify-center rounded-full bg-gray-400 text-white shadow-sm"><FaTimes size={8}/></button>
                                                             </div>
@@ -789,7 +789,7 @@ const ReporteViajesPagados = ({ user }) => {
                                                 {/* LOTE */}
                                                 <td className="border border-gray-200 px-1 py-1 font-mono font-black text-blue-700">
                                                     {enEdicion ? (
-                                                        <input type="text" value={v.lote || ""} onChange={(e) => actualizarVehiculoEdicion(idx, "lote", e.target.value)} className="w-20 px-1 py-0.5 border border-blue-300 rounded text-[11px] font-mono font-bold text-center focus:outline-none bg-white" />
+                                                        <input type="text" value={v.lote || ""} onChange={(e) => actualizarVehiculoEdicion(idx, "lote", e.target.value.toUpperCase().trim())} className="w-20 px-1 py-0.5 border border-blue-300 rounded text-[11px] font-mono font-bold text-center focus:outline-none bg-white" />
                                                     ) : (
                                                         <>{v.lote}{tieneNota && <button type="button" onClick={() => setModalNota({ show: true, lote: v.lote, notaRegistro, notaRecepcion, notaImportada })} className="text-blue-400 hover:text-blue-600 ml-1"><FaCommentDots size={9} /></button>}</>
                                                     )}

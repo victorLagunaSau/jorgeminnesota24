@@ -3,6 +3,7 @@ import { firestore } from "../../../firebase/firebaseIni";
 import { COLLECTIONS } from "../../../constants";
 import Pagado from './Pagado';
 import moment from 'moment';
+import { redondearDinero, parseNumberOrZero } from "../../../utils";
 
 const PagoVehiculo = ({ vehiculo, user }) => {
     const {
@@ -40,26 +41,27 @@ const PagoVehiculo = ({ vehiculo, user }) => {
     const [cobrado, setCobrado] = useState(false);
     const [vehiculoActualizado, setVehiculoActualizado] = useState([]);
 
-    const total =
-        parseFloat(sobrePesoState) +
-        parseFloat(gastosExtraState) +
-        parseFloat(storageState) +
-        parseFloat(pago);
-    const totalConAnticipo = total - montoAnticipo;
+    const total = redondearDinero(
+        parseNumberOrZero(sobrePesoState) +
+        parseNumberOrZero(gastosExtraState) +
+        parseNumberOrZero(storageState) +
+        parseNumberOrZero(pago)
+    );
+    const totalConAnticipo = redondearDinero(total - montoAnticipo);
     const restante = totalConAnticipo > 0 ? totalConAnticipo : 0;
     const anticipoExcedente = totalConAnticipo < 0 ? Math.abs(totalConAnticipo) : 0;
     const montoACubrir = tieneAnticipo ? restante : total;
 
-    const pEfectivo = parseFloat(recibo) || 0;
-    const pCC = parseFloat(reciboCC) || 0;
-    const pCredito = parseFloat(credito) || 0;
-    const cubierto = pEfectivo + pCC + pCredito;
+    const pEfectivo = redondearDinero(recibo);
+    const pCC = redondearDinero(reciboCC);
+    const pCredito = redondearDinero(credito);
+    const cubierto = redondearDinero(pEfectivo + pCC + pCredito);
 
     // Si hay crédito, no puede haber cambio (efectivo+CC no debe exceder total)
     // Si no hay crédito, el cambio se calcula como sobra de efectivo+CC
     const cajaCambio = pCredito > 0
         ? 0
-        : (pEfectivo + pCC - montoACubrir);
+        : redondearDinero(pEfectivo + pCC - montoACubrir);
 
     const esFiado = pCredito > 0;
 
@@ -69,7 +71,7 @@ const PagoVehiculo = ({ vehiculo, user }) => {
     const handleDarSalida = async () => {
         if (cargando || movimientoGuardado) return;
 
-        if (pCredito > 0 && pEfectivo + pCC + pCredito !== montoACubrir) {
+        if (pCredito > 0 && cubierto !== montoACubrir) {
             setMensajeError(
                 `Si hay crédito, la suma de Efectivo + CC + Crédito debe ser exactamente $${montoACubrir.toFixed(
                     2
@@ -87,82 +89,94 @@ const PagoVehiculo = ({ vehiculo, user }) => {
         try {
             const totalPago = total;
             let nuevoFolio = null;
+            const binNip = vehiculo[0].binNip;
 
+            // TODO en una sola transacción atómica: si algo falla, NADA se guarda.
+            // Esto evita que un vehículo quede "pagado/entregado" sin su movimiento
+            // de caja (pérdida silenciosa de dinero) y previene el doble cobro.
             await firestore().runTransaction(async (transaction) => {
                 const folioRef = firestore().collection(COLLECTIONS.CONFIG).doc("consecutivos");
+                const vehiculoRef = firestore().collection(COLLECTIONS.VEHICULOS).doc(binNip);
+                const movimientoRef = firestore().collection(COLLECTIONS.MOVIMIENTOS).doc();
+
+                // --- LECTURAS (todas antes de cualquier escritura, requisito de Firestore) ---
                 const folioDoc = await transaction.get(folioRef);
+                const vehiculoDoc = await transaction.get(vehiculoRef);
 
                 if (!folioDoc.exists) {
                     throw "Documento de consecutivos no existe";
                 }
+                if (!vehiculoDoc.exists) {
+                    throw "El vehículo ya no existe en el sistema.";
+                }
+                if (vehiculoDoc.data().estatus === "EN") {
+                    throw "Este vehículo ya fue cobrado y entregado.";
+                }
 
-                const data = folioDoc.data();
-                const folioActual = data.folioventa || 0;
+                const folioActual = folioDoc.data().folioventa || 0;
                 nuevoFolio = folioActual + 1;
 
+                const payload = {
+                    estatus: "EN",
+                    timestamp: new Date(),
+                    pago: redondearDinero(pago),
+                    storage: redondearDinero(storageState),
+                    totalPago: redondearDinero(totalPago),
+                    totalPagoNeto: montoACubrir,
+                    cajaRecibo: pEfectivo,
+                    cajaCC: pCC,
+                    cajaCambio: cajaCambio,
+                    sobrePeso: redondearDinero(sobrePesoState),
+                    gastosExtra: redondearDinero(gastosExtraState),
+                    folioVenta: nuevoFolio,
+                    anticipoPago: redondearDinero(montoAnticipo),
+                    anticipoExcedente: redondearDinero(anticipoExcedente),
+                    estadoPago: esFiado ? "fiado" : "pagado",
+                    creditoOtorgado: pCredito,
+                    saldoFiado: pCredito,
+                    abonosFiado: [],
+                    pagosPendientes: false,
+                    usuarioCobro: user.nombre || "Admin",
+                    ...(esFiado ? { usuarioFiado: user.nombre, usuarioFiadoId: user.id } : {}),
+                };
+
+                const movimientoData = {
+                    tipo: "Salida",
+                    binNip: binNip,
+                    marca: vehiculo[0].marca,
+                    modelo: vehiculo[0].modelo,
+                    cliente: vehiculo[0].cliente,
+                    telefonoCliente: vehiculo[0].telefonoCliente,
+                    descripcion: vehiculo[0].descripcion || "",
+                    estado: vehiculo[0].estado,
+                    ciudad: vehiculo[0].ciudad,
+                    price: vehiculo[0].price,
+                    estatus: "EN",
+                    usuario: user.nombre,
+                    idUsuario: user.id,
+                    timestamp: new Date(),
+                    pago: redondearDinero(pago),
+                    storage: redondearDinero(storageState),
+                    totalPago: redondearDinero(totalPago),
+                    totalPagoNeto: montoACubrir,
+                    cajaRecibo: pEfectivo,
+                    cajaCambio: cajaCambio,
+                    cajaCC: pCC,
+                    sobrePeso: redondearDinero(sobrePesoState),
+                    gastosExtra: redondearDinero(gastosExtraState),
+                    folioVenta: nuevoFolio,
+                    anticipoPago: redondearDinero(montoAnticipo),
+                    anticipoExcedente: redondearDinero(anticipoExcedente),
+                    estadoPago: esFiado ? "fiado" : "pagado",
+                    creditoOtorgado: pCredito,
+                    saldoFiado: pCredito,
+                    pagosPendientes: false,
+                };
+
+                // --- ESCRITURAS (atómicas: o todas o ninguna) ---
                 transaction.update(folioRef, { folioventa: nuevoFolio });
-            });
-
-            const payload = {
-                estatus: "EN",
-                timestamp: new Date(),
-                pago: parseFloat(pago) || 0,
-                storage: parseFloat(storageState) || 0,
-                totalPago: parseFloat(totalPago) || 0,
-                totalPagoNeto: montoACubrir,
-                cajaRecibo: pEfectivo,
-                cajaCC: pCC,
-                cajaCambio: parseFloat(cajaCambio) || 0,
-                sobrePeso: parseFloat(sobrePesoState) || 0,
-                gastosExtra: parseFloat(gastosExtraState) || 0,
-                folioVenta: nuevoFolio,
-                anticipoPago: montoAnticipo || 0,
-                anticipoExcedente: anticipoExcedente,
-                estadoPago: esFiado ? "fiado" : "pagado",
-                creditoOtorgado: pCredito,
-                saldoFiado: pCredito,
-                abonosFiado: [],
-                pagosPendientes: false,
-                usuarioCobro: user.nombre || "Admin",
-                ...(esFiado ? { usuarioFiado: user.nombre, usuarioFiadoId: user.id } : {}),
-            };
-
-            await firestore()
-                .collection(COLLECTIONS.VEHICULOS)
-                .doc(vehiculo[0].binNip)
-                .update(payload);
-
-            await firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
-                tipo: "Salida",
-                binNip: vehiculo[0].binNip,
-                marca: vehiculo[0].marca,
-                modelo: vehiculo[0].modelo,
-                cliente: vehiculo[0].cliente,
-                telefonoCliente: vehiculo[0].telefonoCliente,
-                descripcion: vehiculo[0].descripcion || "",
-                estado: vehiculo[0].estado,
-                ciudad: vehiculo[0].ciudad,
-                price: vehiculo[0].price,
-                estatus: "EN",
-                usuario: user.nombre,
-                idUsuario: user.id,
-                timestamp: new Date(),
-                pago: parseFloat(pago) || 0,
-                storage: parseFloat(storageState) || 0,
-                totalPago: parseFloat(totalPago) || 0,
-                totalPagoNeto: montoACubrir,
-                cajaRecibo: pEfectivo,
-                cajaCambio: parseFloat(cajaCambio) || 0,
-                cajaCC: pCC,
-                sobrePeso: parseFloat(sobrePesoState) || 0,
-                gastosExtra: parseFloat(gastosExtraState) || 0,
-                folioVenta: nuevoFolio,
-                anticipoPago: montoAnticipo || 0,
-                anticipoExcedente: anticipoExcedente,
-                estadoPago: esFiado ? "fiado" : "pagado",
-                creditoOtorgado: pCredito,
-                saldoFiado: pCredito,
-                pagosPendientes: false,
+                transaction.update(vehiculoRef, payload);
+                transaction.set(movimientoRef, movimientoData);
             });
 
             setVehiculoActualizado([

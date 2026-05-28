@@ -15,6 +15,18 @@ export const parseNumberOrZero = (value) => {
 };
 
 /**
+ * Round a money amount to 2 decimals (cents), removing floating-point drift.
+ * Use for ALL stored/compared money values so totals and saldos don't
+ * accumulate sub-cent errors (e.g. 0.1 + 0.2 !== 0.3).
+ * @param {any} value - Value to round
+ * @returns {number} Amount rounded to 2 decimals
+ */
+export const redondearDinero = (value) => {
+  const num = parseNumberOrZero(value);
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+};
+
+/**
  * Convert number to words in Spanish format for currency
  * @param {number} amount - Amount to convert
  * @param {string} currency - Currency suffix (default: "DLL")
