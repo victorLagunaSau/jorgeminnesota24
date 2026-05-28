@@ -19,6 +19,34 @@ const SolicitarPage = () => {
     const [searching, setSearching] = useState(false);
     const [vehicleResult, setVehicleResult] = useState(null);
     const [searchError, setSearchError] = useState("");
+    const [searchProgress, setSearchProgress] = useState(0);
+
+    const PROGRESS_SEGMENTS = 20;
+    const SEARCH_PHASES = [
+        { until: 30, label: "Conectando con subasta..." },
+        { until: 60, label: "Obteniendo información del vehículo..." },
+        { until: 90, label: "Verificando datos..." },
+        { until: 101, label: "Finalizando..." }
+    ];
+    const currentPhaseLabel = SEARCH_PHASES.find(p => searchProgress < p.until)?.label || SEARCH_PHASES[SEARCH_PHASES.length - 1].label;
+
+    // Simula progreso mientras dura la búsqueda (sin feedback real del scraper)
+    useEffect(() => {
+        if (!searching) {
+            setSearchProgress(0);
+            return;
+        }
+
+        const startTime = Date.now();
+        const interval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            // Curva asintótica que se acerca a 95% (nunca llega hasta tener respuesta)
+            const pct = Math.min(95, Math.round(95 * (1 - Math.exp(-elapsed / 4000))));
+            setSearchProgress(pct);
+        }, 80);
+
+        return () => clearInterval(interval);
+    }, [searching]);
 
     // Estados para lista de solicitudes
     const [solicitudes, setSolicitudes] = useState([]);
@@ -449,13 +477,70 @@ const SolicitarPage = () => {
 
                             {/* Indicador de búsqueda */}
                             {searching && (
-                                <div className="mt-4 flex flex-col items-center gap-3 py-4">
-                                    <div className="relative">
-                                        <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"></div>
-                                        <FaSearch className="absolute inset-0 m-auto text-blue-600 text-sm" />
+                                <div className="mt-4 relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 border border-blue-100 p-5">
+                                    {/* Halo decorativo de fondo */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-40 h-40 rounded-full bg-blue-200/40 blur-2xl animate-halo"></div>
                                     </div>
-                                    <p className="text-sm font-medium text-gray-600">Buscando en subastas...</p>
-                                    <p className="text-[10px] text-gray-400">Esto puede tomar unos segundos</p>
+
+                                    <div className="relative flex flex-col items-center">
+                                        {/* Lupita orbitando */}
+                                        <div className="relative w-24 h-24 flex items-center justify-center mb-3">
+                                            {/* Lupita que orbita (no rota sobre su eje) */}
+                                            <div className="absolute animate-lupita-orbit">
+                                                <FaSearch className="text-blue-600 text-4xl drop-shadow-lg"/>
+                                            </div>
+                                        </div>
+
+                                        {/* Etiqueta con fade al cambiar */}
+                                        <p
+                                            key={currentPhaseLabel}
+                                            className="text-sm sm:text-base font-black text-gray-800 text-center uppercase tracking-wide animate-fade-in-up px-2"
+                                        >
+                                            {currentPhaseLabel}
+                                        </p>
+
+                                        {/* Porcentaje con gradiente */}
+                                        <span className="text-3xl font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 bg-clip-text text-transparent tabular-nums mt-1 mb-3">
+                                            {searchProgress}%
+                                        </span>
+
+                                        {/* Barra segmentada */}
+                                        <div className="flex gap-[3px] w-full">
+                                            {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => {
+                                                const segmentThreshold = ((i + 1) / PROGRESS_SEGMENTS) * 100;
+                                                const filled = searchProgress >= segmentThreshold;
+                                                const partial = !filled && searchProgress > (i / PROGRESS_SEGMENTS) * 100;
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className="relative flex-1 h-3 bg-blue-100/60 rounded-sm overflow-hidden"
+                                                    >
+                                                        <div
+                                                            className={`h-full rounded-sm transition-all duration-200 ease-out ${
+                                                                filled
+                                                                    ? 'bg-gradient-to-b from-blue-500 to-indigo-600 shadow-[0_0_4px_rgba(59,130,246,0.6)]'
+                                                                    : partial
+                                                                        ? 'bg-blue-400'
+                                                                        : ''
+                                                            }`}
+                                                            style={{
+                                                                width: filled
+                                                                    ? '100%'
+                                                                    : partial
+                                                                        ? `${((searchProgress - (i / PROGRESS_SEGMENTS) * 100) / (100 / PROGRESS_SEGMENTS)) * 100}%`
+                                                                        : '0%'
+                                                            }}
+                                                        ></div>
+                                                        {/* Shimmer encima del segmento activo */}
+                                                        {partial && (
+                                                            <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
