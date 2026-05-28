@@ -257,11 +257,11 @@ const SolicitarPage = () => {
 
     const getEstadoBadge = (estado) => {
         const badges = {
-            pendiente: "bg-yellow-100 text-yellow-800",
+            pendiente: "bg-sky-100 text-sky-800",
             aprobado: "bg-blue-100 text-blue-800",
             asignado: "bg-indigo-100 text-indigo-800",
-            en_proceso: "bg-purple-100 text-purple-800",
-            completado: "bg-green-100 text-green-800"
+            en_proceso: "bg-blue-100 text-blue-800",
+            completado: "bg-emerald-100 text-emerald-800"
         };
         const labels = {
             pendiente: "Pendiente",
@@ -288,10 +288,10 @@ const SolicitarPage = () => {
     // Cuenta no aprobada
     if (user && user.datosCliente?.aprobado === false) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Cuenta en Revisión | Jorge Minnesota</title></Head>
                 <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 text-center">
-                    <FaClock className="text-4xl text-amber-500 mx-auto mb-3"/>
+                    <FaClock className="text-4xl text-indigo-500 mx-auto mb-3"/>
                     <h2 className="text-lg font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
                     <p className="text-sm text-gray-500 mb-4">Tu cuenta aún no ha sido aprobada. No puedes solicitar vehículos hasta que sea revisada.</p>
                     <Link href="/clients">
@@ -305,9 +305,9 @@ const SolicitarPage = () => {
     // Login Form
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
-                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
+                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100">
                     <div className="text-center mb-8">
                         <img src="/assets/Logo.png" className="w-24 mx-auto mb-4" alt="Logo"/>
                         <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">
@@ -339,7 +339,7 @@ const SolicitarPage = () => {
                                 required
                             />
                         </div>
-                        <button type="submit" className="btn btn-primary w-full text-white font-black uppercase shadow-lg">
+                        <button type="submit" className="btn w-full text-white font-black uppercase shadow-lg border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
                             Entrar
                         </button>
                     </form>
@@ -357,7 +357,7 @@ const SolicitarPage = () => {
     const clienteData = user.datosCliente || {};
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
 
             {/* Pull-to-refresh indicator */}
@@ -368,7 +368,7 @@ const SolicitarPage = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white safe-area-top border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
+            <header className="bg-white/80 backdrop-blur-md safe-area-top border-b border-blue-100 sticky top-0 z-[60] shadow-sm">
                 <div className="flex justify-between items-center px-3 py-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <Link href="/clients">
@@ -401,7 +401,7 @@ const SolicitarPage = () => {
             </header>
 
             {/* User Info */}
-            <section className="bg-white px-3 py-2 border-b border-gray-200">
+            <section className="bg-white/70 backdrop-blur-sm px-3 py-2 border-b border-blue-100">
                 <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -412,9 +412,9 @@ const SolicitarPage = () => {
                             <p className="text-[9px] text-gray-400 truncate">{user.email}</p>
                         </div>
                     </div>
-                    <div className="bg-orange-50 px-2 py-1 rounded-lg text-center flex-shrink-0">
-                        <span className="text-[8px] text-orange-600 font-bold uppercase">Solicitudes</span>
-                        <p className="text-base font-black text-orange-700 leading-tight">{solicitudes.length}</p>
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 px-2 py-1 rounded-lg text-center flex-shrink-0 shadow-sm">
+                        <span className="text-[8px] text-blue-600 font-bold uppercase">Solicitudes</span>
+                        <p className="text-base font-black bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent leading-tight tabular-nums">{solicitudes.length}</p>
                     </div>
                 </div>
             </section>
@@ -424,7 +424,7 @@ const SolicitarPage = () => {
 
                     {/* Panel de Búsqueda */}
                     <div className="space-y-3">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+                        <div className="bg-white rounded-xl shadow-sm border border-blue-100 p-3">
                             <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
                                 <FaSearch className="text-blue-600 text-xs"/> Buscar Vehículo
                             </h2>
@@ -439,7 +439,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: 43874580"
                                             value={lotNumber}
                                             onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
-                                            className="input input-bordered input-sm w-full bg-white text-black"
+                                            className="input input-bordered input-sm w-full bg-white text-black border-blue-100 focus:border-blue-400"
                                             disabled={searching}
                                         />
                                     </div>
@@ -452,7 +452,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: A1B2"
                                             value={gatePass}
                                             onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
-                                            className="input input-bordered input-sm w-full bg-white text-black uppercase"
+                                            className="input input-bordered input-sm w-full bg-white text-black uppercase border-blue-100 focus:border-blue-400"
                                             disabled={searching}
                                             maxLength={5}
                                         />
@@ -461,7 +461,7 @@ const SolicitarPage = () => {
                                 <button
                                     type="submit"
                                     disabled={searching || !lotNumber.trim() || gatePass.length < 4}
-                                    className="btn btn-primary btn-sm w-full text-white font-bold"
+                                    className="btn btn-sm w-full text-white font-bold border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
                                 >
                                     {searching ? (
                                         <>
@@ -553,7 +553,7 @@ const SolicitarPage = () => {
 
                         {/* Resultado de búsqueda */}
                         {vehicleResult && (
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
                                 {vehicleResult.imageUrl && (
                                     <div className="relative w-full h-40 bg-gray-100">
                                         <img
@@ -606,7 +606,7 @@ const SolicitarPage = () => {
                                     <button
                                         onClick={handleAgregarSolicitud}
                                         disabled={guardando}
-                                        className="btn btn-success w-full text-white font-bold"
+                                        className="btn w-full text-white font-bold border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg"
                                     >
                                         {guardando ? (
                                             <><FaSpinner className="animate-spin mr-2"/> Guardando...</>
@@ -620,33 +620,33 @@ const SolicitarPage = () => {
                     </div>
 
                     {/* Panel de Solicitudes / Historial */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-200">
+                        <div className="flex border-b border-blue-100">
                             <button
                                 onClick={() => setTabSolicitudes("solicitudes")}
                                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
                                     tabSolicitudes === "solicitudes"
-                                        ? "text-orange-700 border-b-2 border-orange-600 bg-orange-50/50"
+                                        ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50/60"
                                         : "text-gray-400 hover:text-gray-600"
                                 }`}
                             >
                                 <FaClock className="text-[10px]"/> Solicitudes
                                 {solicitudes.length > 0 && (
-                                    <span className="bg-orange-200 text-orange-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
+                                    <span className="bg-blue-200 text-blue-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
                                 )}
                             </button>
                             <button
                                 onClick={() => setTabSolicitudes("historial")}
                                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
                                     tabSolicitudes === "historial"
-                                        ? "text-green-700 border-b-2 border-green-600 bg-green-50/50"
+                                        ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/60"
                                         : "text-gray-400 hover:text-gray-600"
                                 }`}
                             >
                                 <FaHistory className="text-[10px]"/> Historial
                                 {(solicitudesCompletadas.length + vehiculosEntregados.length) > 0 && (
-                                    <span className="bg-green-200 text-green-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
+                                    <span className="bg-indigo-200 text-indigo-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
                                 )}
                             </button>
                         </div>
@@ -669,7 +669,7 @@ const SolicitarPage = () => {
                                     {solicitudes.map((sol) => {
                                         const badge = getEstadoBadge(sol.estado);
                                         return (
-                                            <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                            <div key={sol.id} className="border border-blue-100 rounded-lg p-2">
                                                 <div className="flex gap-2 items-start">
                                                     {sol.imageUrl && (
                                                         <img
@@ -752,7 +752,7 @@ const SolicitarPage = () => {
                                     ))}
                                     {/* Solicitudes completadas */}
                                     {solicitudesCompletadas.map((sol) => (
-                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
+                                        <div key={sol.id} className="border border-blue-100 rounded-lg p-2">
                                             <div className="flex gap-2 items-start">
                                                 {sol.imageUrl ? (
                                                     <img

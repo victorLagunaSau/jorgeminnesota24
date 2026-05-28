@@ -386,7 +386,7 @@ const ClientsPage = () => {
     // === Helpers ===
     const getSolicitudBadge = (estado) => {
         const config = {
-            pendiente: { className: "bg-amber-100 text-amber-800", label: "En Progreso" },
+            pendiente: { className: "bg-sky-100 text-sky-800", label: "En Progreso" },
             asignado: { className: "bg-indigo-100 text-indigo-800", label: "Asignado" },
             en_proceso: { className: "bg-blue-100 text-blue-800", label: "En Camino" },
         };
@@ -395,14 +395,14 @@ const ClientsPage = () => {
 
     const getStatusColor = (status) => {
         const colors = {
-            'PR': 'bg-gray-200 text-gray-700',
-            'IN': 'bg-yellow-200 text-yellow-800',
+            'PR': 'bg-slate-200 text-slate-700',
+            'IN': 'bg-sky-200 text-sky-800',
             'TR': 'bg-blue-200 text-blue-800',
-            'EB': 'bg-purple-200 text-purple-800',
-            'DS': 'bg-orange-200 text-orange-800',
-            'EN': 'bg-green-200 text-green-800',
+            'EB': 'bg-indigo-200 text-indigo-800',
+            'DS': 'bg-cyan-200 text-cyan-800',
+            'EN': 'bg-emerald-200 text-emerald-800',
         };
-        return colors[status] || 'bg-gray-200 text-gray-700';
+        return colors[status] || 'bg-slate-200 text-slate-700';
     };
 
     const getStatusLabel = (status) => {
@@ -427,11 +427,11 @@ const ClientsPage = () => {
     // Registro exitoso — mostrar directo sin esperar reload
     if (registroExitoso) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Cuenta en Revisión | Jorge Minnesota INC</title></Head>
-                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 text-center">
-                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                        <FaClock className="text-3xl text-amber-600"/>
+                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100 text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+                        <FaClock className="text-3xl text-indigo-600"/>
                     </div>
                     <h2 className="text-xl font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
                     <p className="text-sm text-gray-500 mb-6">
@@ -473,9 +473,9 @@ const ClientsPage = () => {
     // ============================================================
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Portal Clientes | Jorge Minnesota INC</title></Head>
-                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
+                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100">
                     <div className="text-center mb-6">
                         <img src="/assets/Logo.png" className="w-20 mx-auto mb-3" alt="Logo"/>
                         <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">
@@ -487,7 +487,7 @@ const ClientsPage = () => {
                     </div>
 
                     {/* Tabs Login / Registro */}
-                    <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
+                    <div className="flex mb-6 bg-blue-50 rounded-lg p-1">
                         <button
                             onClick={() => { setModoAuth("login"); setError(""); }}
                             className={`flex-1 py-2 text-xs font-black uppercase rounded-md transition-all ${modoAuth === "login" ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
@@ -535,7 +535,7 @@ const ClientsPage = () => {
                             <button
                                 type="submit"
                                 disabled={loadingAuth}
-                                className="btn btn-primary w-full text-white font-black uppercase shadow-lg"
+                                className="btn w-full text-white font-black uppercase shadow-lg border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                             >
                                 {loadingAuth ? <span className="loading loading-spinner loading-sm"></span> : "Entrar"}
                             </button>
@@ -613,7 +613,7 @@ const ClientsPage = () => {
                             </div>
                             {/* Foto de licencia */}
                             <div>
-                                <label className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors border-2 border-dashed border-gray-300">
+                                <label className="flex items-center gap-3 px-4 py-3 bg-blue-50/40 rounded-lg cursor-pointer hover:bg-blue-50 transition-colors border-2 border-dashed border-blue-200">
                                     <FaCamera className="text-gray-400 text-lg flex-shrink-0"/>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-bold text-gray-600">
@@ -622,7 +622,7 @@ const ClientsPage = () => {
                                         <p className="text-[10px] text-gray-400">Toma una foto o sube una imagen</p>
                                     </div>
                                     {regLicenciaPreview && (
-                                        <img src={regLicenciaPreview} alt="Licencia" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-gray-200"/>
+                                        <img src={regLicenciaPreview} alt="Licencia" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-blue-100"/>
                                     )}
                                     <input
                                         type="file"
@@ -677,7 +677,7 @@ const ClientsPage = () => {
                             <button
                                 type="submit"
                                 disabled={loadingAuth}
-                                className="btn btn-primary w-full text-white font-black uppercase shadow-lg"
+                                className="btn w-full text-white font-black uppercase shadow-lg border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                             >
                                 {loadingAuth ? <span className="loading loading-spinner loading-sm"></span> : (
                                     <span className="flex items-center gap-2"><FaUserPlus/> Crear Cuenta</span>
@@ -687,7 +687,7 @@ const ClientsPage = () => {
                     )}
                     <div className="mt-6 text-center">
                         <Link href="/driver">
-                            <a className="text-sm text-gray-500 hover:text-red-600 transition-colors font-medium">
+                            <a className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium">
                                 ← Soy Chofer
                             </a>
                         </Link>
@@ -702,17 +702,17 @@ const ClientsPage = () => {
     // ============================================================
     if (clienteData.aprobado === false || user?.datosCliente?.aprobado === false) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Cuenta en Revisión | Jorge Minnesota INC</title></Head>
-                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100 text-center">
-                    <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                        <FaClock className="text-3xl text-amber-600"/>
+                <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100 text-center">
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+                        <FaClock className="text-3xl text-indigo-600"/>
                     </div>
                     <h2 className="text-xl font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
                     <p className="text-sm text-gray-500 mb-6">
                         Tu cuenta está siendo revisada por nuestro equipo. Te notificaremos cuando sea aprobada.
                     </p>
-                    <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2 mb-6">
+                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 text-left space-y-2 mb-6">
                         <p className="text-xs text-gray-600"><span className="font-bold">Nombre:</span> {clienteData.cliente}</p>
                         <p className="text-xs text-gray-600"><span className="font-bold">Email:</span> {clienteData.emailAcceso || user.email}</p>
                         <p className="text-xs text-gray-600"><span className="font-bold">Teléfono:</span> {clienteData.telefonoCliente}</p>
@@ -732,16 +732,25 @@ const ClientsPage = () => {
     // ============================================================
     // PORTAL (usuario autenticado y aprobado)
     // ============================================================
-    const vehiculosFiltrados = vehiculos.filter(v =>
-        v.estatus !== "EN" && (
-            v.binNip?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            v.marca?.toLowerCase().includes(busqueda.toLowerCase()) ||
-            v.modelo?.toLowerCase().includes(busqueda.toLowerCase())
-        )
+    const q = busqueda.trim().toLowerCase();
+    const matchVehiculo = (v) =>
+        !q ||
+        (v.binNip || "").toString().trim().toLowerCase().includes(q) ||
+        (v.lote || "").toString().trim().toLowerCase().includes(q) ||
+        (v.marca || "").toLowerCase().includes(q) ||
+        (v.modelo || "").toLowerCase().includes(q);
+
+    const vehiculosFiltrados = vehiculos.filter(v => v.estatus !== "EN" && matchVehiculo(v));
+
+    const solicitudesFiltradas = solicitudes.filter(s =>
+        !q ||
+        (s.lotNumber || "").toString().trim().toLowerCase().includes(q) ||
+        (s.make || "").toLowerCase().includes(q) ||
+        (s.model || "").toLowerCase().includes(q)
     );
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-10 safe-area-bottom font-sans text-black">
             <Head><title>Portal | Jorge Minnesota INC</title></Head>
 
             {/* Pull-to-refresh indicator */}
@@ -752,7 +761,7 @@ const ClientsPage = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white p-4 safe-area-top flex justify-between items-center border-b-2 border-gray-100 sticky top-0 z-[60] shadow-sm">
+            <header className="bg-white/80 backdrop-blur-md p-4 safe-area-top flex justify-between items-center border-b border-blue-100 sticky top-0 z-[60] shadow-sm">
                 <div className="flex items-center gap-4">
                     {vista === "perfil" ? (
                         <button onClick={() => setVista("vehiculos")} className="text-blue-600 p-2">
@@ -779,7 +788,7 @@ const ClientsPage = () => {
                                 <span className="hidden md:inline">Mi Perfil</span>
                             </button>
                             <Link href="/solicitar">
-                                <a className="flex items-center gap-2 text-[10px] font-black text-green-600 uppercase border border-green-600 px-3 py-1 rounded-lg hover:bg-green-50">
+                                <a className="flex items-center gap-2 text-[10px] font-black text-white uppercase px-3 py-1.5 rounded-lg shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all">
                                     <FaPlus className="text-base md:text-sm"/>
                                     <span className="hidden md:inline">Solicitar Vehículo</span>
                                 </a>
@@ -799,9 +808,10 @@ const ClientsPage = () => {
             {vista === "perfil" ? (
                 /* ============ VISTA PERFIL (READ-ONLY) ============ */
                 <main className="max-w-2xl mx-auto px-4 py-6">
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-white rounded-2xl shadow-md border border-blue-100 overflow-hidden">
                         {/* Cabecera perfil */}
-                        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-6 text-white">
+                        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 px-6 py-6 text-white overflow-hidden">
+                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
                             <div className="flex items-center gap-4">
                                 <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
                                     <FaUser className="text-2xl text-white"/>
@@ -822,7 +832,7 @@ const ClientsPage = () => {
                             </div>
                         </div>
 
-                        <div className="px-6 py-3 flex items-center gap-2 text-xs font-bold bg-blue-50 text-blue-700">
+                        <div className="px-6 py-3 flex items-center gap-2 text-xs font-bold bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-b border-blue-100">
                             <FaCheckCircle/>
                             <span>Para cambios en tu información, contacta a la oficina.</span>
                         </div>
@@ -839,7 +849,7 @@ const ClientsPage = () => {
                             ].map((campo, i) => (
                                 <div key={i}>
                                     <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">{campo.label}</label>
-                                    <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                                    <div className="flex items-center gap-3 bg-blue-50/50 rounded-xl px-4 py-3 border border-blue-100">
                                         {campo.icon}
                                         <span className="text-sm font-medium text-gray-700">{campo.value || "-"}</span>
                                     </div>
@@ -850,7 +860,7 @@ const ClientsPage = () => {
                             {(clienteData.licenciaBase64 || clienteData.licenciaUrl) && (
                                 <div>
                                     <label className="text-[10px] font-black text-gray-500 uppercase mb-1 block">Licencia</label>
-                                    <img src={clienteData.licenciaBase64 || clienteData.licenciaUrl} alt="Licencia" className="w-full max-w-xs rounded-lg border border-gray-200 shadow-sm"/>
+                                    <img src={clienteData.licenciaBase64 || clienteData.licenciaUrl} alt="Licencia" className="w-full max-w-xs rounded-lg border border-blue-100 shadow-sm"/>
                                 </div>
                             )}
                         </div>
@@ -860,7 +870,7 @@ const ClientsPage = () => {
                 /* ============ VISTA VEHÍCULOS ============ */
                 <>
                     {/* User Info */}
-                    <section className="bg-white px-6 py-4 border-b shadow-sm">
+                    <section className="bg-white/70 backdrop-blur-sm px-6 py-4 border-b border-blue-100 shadow-sm">
                         <div className="max-w-6xl mx-auto flex flex-wrap justify-between items-center gap-4">
                             <div>
                                 <h2 className="text-2xl font-black text-gray-900 uppercase italic tracking-tighter">
@@ -874,14 +884,14 @@ const ClientsPage = () => {
                                     )}
                                     {clienteData.ciudadCliente && (
                                         <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                                            <FaMapMarkerAlt className="text-red-500"/> {clienteData.ciudadCliente}, {clienteData.estadoCliente}
+                                            <FaMapMarkerAlt className="text-indigo-500"/> {clienteData.ciudadCliente}, {clienteData.estadoCliente}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <div className="bg-blue-50 px-4 py-2 rounded-lg">
+                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 px-4 py-2 rounded-xl shadow-sm">
                                 <span className="text-[10px] text-blue-600 font-bold uppercase">Total Vehículos</span>
-                                <p className="text-3xl font-black text-blue-700">{vehiculos.length}</p>
+                                <p className="text-3xl font-black bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent tabular-nums">{vehiculos.length}</p>
                             </div>
                         </div>
                     </section>
@@ -889,33 +899,33 @@ const ClientsPage = () => {
                     {/* Search */}
                     <div className="max-w-6xl mx-auto px-4 py-4">
                         <div className="relative">
-                            <FaSearch className="absolute left-4 top-3.5 text-gray-400"/>
+                            <FaSearch className="absolute left-4 top-3.5 text-blue-400"/>
                             <input
                                 type="text"
-                                placeholder="Buscar por BIN, marca o modelo..."
+                                placeholder="Buscar por lote, marca o modelo..."
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-white text-black"
+                                className="input input-bordered w-full pl-12 bg-white border-blue-100 focus:border-blue-400 text-black shadow-sm"
                             />
                         </div>
                     </div>
 
                     {/* Solicitudes activas */}
-                    {solicitudes.length > 0 && (
+                    {solicitudesFiltradas.length > 0 && (
                         <div className="max-w-6xl mx-auto px-4 mb-4">
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+                            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+                                <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
                                     <div className="flex items-center gap-2">
-                                        <FaTruck className="text-amber-600" />
-                                        <span className="text-sm font-black text-amber-800 uppercase">Mis Solicitudes</span>
-                                        <span className="bg-amber-200 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{solicitudes.length}</span>
+                                        <FaTruck className="text-blue-600" />
+                                        <span className="text-sm font-black text-blue-800 uppercase">Mis Solicitudes</span>
+                                        <span className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">{solicitudesFiltradas.length}</span>
                                     </div>
                                 </div>
-                                <div className="divide-y divide-gray-100">
-                                    {solicitudes.map(sol => {
+                                <div className="divide-y divide-blue-50">
+                                    {solicitudesFiltradas.map(sol => {
                                         const badge = getSolicitudBadge(sol.estado);
                                         return (
-                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-amber-50/50 transition-colors">
+                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-blue-50/60 transition-colors">
                                                 {sol.imageUrl ? (
                                                     <img src={sol.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-gray-100" />
                                                 ) : (
@@ -952,18 +962,18 @@ const ClientsPage = () => {
                                 <span className="loading loading-spinner loading-lg text-blue-600"></span>
                             </div>
                         ) : vehiculosFiltrados.length === 0 ? (
-                            solicitudes.length === 0 && (
+                            solicitudesFiltradas.length === 0 && (
                                 <div className="text-center py-20">
                                     <FaCar className="text-6xl text-gray-300 mx-auto mb-4"/>
                                     <p className="text-gray-500">
-                                        {busqueda ? "No se encontraron vehículos con esa búsqueda" : "No tienes vehículos registrados"}
+                                        {busqueda ? "No se encontraron coincidencias con esa búsqueda" : "No tienes vehículos registrados"}
                                     </p>
                                 </div>
                             )
                         ) : (
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-white rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
                                 {/* Header de la tabla */}
-                                <div className="hidden md:grid md:grid-cols-12 gap-2 px-4 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-black text-gray-500 uppercase">
+                                <div className="hidden md:grid md:grid-cols-12 gap-2 px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100 text-[10px] font-black text-blue-700 uppercase">
                                     <div className="col-span-3">Vehículo</div>
                                     <div className="col-span-2">Origen</div>
                                     <div className="col-span-2">Almacén</div>
@@ -972,12 +982,12 @@ const ClientsPage = () => {
                                 </div>
 
                                 {/* Lista de vehículos */}
-                                <div className="divide-y divide-gray-100">
+                                <div className="divide-y divide-blue-50">
                                     {vehiculosFiltrados.map((v, index) => (
                                         <div
                                             key={v.id}
                                             onClick={() => setVehiculoDetalle(v)}
-                                            className={`p-4 hover:bg-blue-50 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                                            className={`p-4 hover:bg-blue-50/70 transition-colors cursor-pointer ${index % 2 === 0 ? 'bg-white' : 'bg-blue-50/30'}`}
                                         >
                                             {/* Vista móvil */}
                                             <div className="md:hidden space-y-3">
@@ -1053,19 +1063,20 @@ const ClientsPage = () => {
                 <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={() => setVehiculoDetalle(null)}>
                     <div className="bg-white rounded-2xl max-w-md w-full max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
                         {/* Header con status */}
-                        <div className="relative bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl p-5">
-                            <button onClick={() => setVehiculoDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white">
+                        <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-t-2xl p-5 overflow-hidden">
+                            <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+                            <button onClick={() => setVehiculoDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-white/10 hover:bg-white/20 rounded-full text-white z-10">
                                 <FaTimes size={12} />
                             </button>
-                            <p className="text-gray-400 text-xs font-bold uppercase">Vehículo</p>
-                            <h3 className="text-white text-xl font-black uppercase mt-1">{vehiculoDetalle.binNip}</h3>
-                            <p className="text-gray-300 text-sm">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</p>
-                            <div className="flex items-center gap-2 mt-3">
+                            <p className="text-blue-200 text-xs font-bold uppercase relative">Vehículo</p>
+                            <h3 className="text-white text-xl font-black uppercase mt-1 relative">{vehiculoDetalle.binNip}</h3>
+                            <p className="text-blue-100 text-sm relative">{vehiculoDetalle.marca} {vehiculoDetalle.modelo}</p>
+                            <div className="flex items-center gap-2 mt-3 relative">
                                 <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${getStatusColor(vehiculoDetalle.estatus)}`}>
                                     {getStatusLabel(vehiculoDetalle.estatus)}
                                 </span>
                                 {vehiculoDetalle.estatus === 'TR' && (
-                                    <span className="flex items-center gap-1 text-blue-300 text-[10px] font-bold">
+                                    <span className="flex items-center gap-1 text-blue-200 text-[10px] font-bold">
                                         <FaTruck className="animate-pulse"/> En tránsito
                                     </span>
                                 )}
@@ -1073,7 +1084,7 @@ const ClientsPage = () => {
                         </div>
 
                         {/* Status Steps */}
-                        <div className="px-5 py-4 border-b border-gray-100">
+                        <div className="px-5 py-4 border-b border-blue-100">
                             <div className="flex items-center justify-between">
                                 {['PR', 'IN', 'TR', 'EB', 'DS', 'EN'].map((step, i) => {
                                     const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
@@ -1153,15 +1164,15 @@ const ClientsPage = () => {
                             {solicitudDetalle.imageUrl ? (
                                 <img src={solicitudDetalle.imageUrl} alt="" className="w-full h-44 object-cover rounded-t-2xl"/>
                             ) : (
-                                <div className="w-full h-32 bg-gradient-to-br from-gray-800 to-gray-900 rounded-t-2xl flex items-center justify-center">
-                                    <FaCar className="text-4xl text-gray-600"/>
+                                <div className="w-full h-32 bg-gradient-to-br from-blue-600 to-indigo-800 rounded-t-2xl flex items-center justify-center">
+                                    <FaCar className="text-4xl text-white/60"/>
                                 </div>
                             )}
                             <button onClick={() => setSolicitudDetalle(null)} className="absolute top-3 right-3 p-1.5 bg-black/40 hover:bg-black/60 rounded-full text-white">
                                 <FaTimes size={12}/>
                             </button>
                             <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                                <span className="bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded">{solicitudDetalle.source}</span>
+                                <span className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">{solicitudDetalle.source}</span>
                                 {(() => {
                                     const badge = getSolicitudBadge(solicitudDetalle.estado);
                                     return <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.className}`}>{badge.label}</span>;
