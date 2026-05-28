@@ -18,12 +18,13 @@ body.capacitor-app textarea {
   font-size: 16px !important;
 }
 
-/* Capacitor safe-area helpers */
+/* Capacitor safe-area helpers — usan max() para que web/Android (sin notch)
+   conserven un padding mínimo en vez de quedar pegados al borde */
 .safe-area-top {
-  padding-top: env(safe-area-inset-top);
+  padding-top: max(env(safe-area-inset-top), 1rem);
 }
 .safe-area-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom), 1rem);
 }
 p {
   @apply text-black-500;
