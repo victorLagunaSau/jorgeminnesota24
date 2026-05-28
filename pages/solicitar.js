@@ -5,9 +5,9 @@ import { useAuthContext } from "../context/auth";
 import { firestore } from "../firebase/firebaseIni";
 import { COLLECTIONS } from "../constants";
 import {
-    FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus, FaTrash,
+    FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
-    FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse
+    FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse, FaTimes, FaIdCard
 } from "react-icons/fa";
 
 const SolicitarPage = () => {
@@ -19,6 +19,34 @@ const SolicitarPage = () => {
     const [searching, setSearching] = useState(false);
     const [vehicleResult, setVehicleResult] = useState(null);
     const [searchError, setSearchError] = useState("");
+    const [searchProgress, setSearchProgress] = useState(0);
+
+    const PROGRESS_SEGMENTS = 20;
+    const SEARCH_PHASES = [
+        { until: 30, label: "Conectando con subasta..." },
+        { until: 60, label: "Obteniendo información del vehículo..." },
+        { until: 90, label: "Verificando datos..." },
+        { until: 101, label: "Finalizando..." }
+    ];
+    const currentPhaseLabel = SEARCH_PHASES.find(p => searchProgress < p.until)?.label || SEARCH_PHASES[SEARCH_PHASES.length - 1].label;
+
+    // Simula progreso mientras dura la búsqueda (sin feedback real del scraper)
+    useEffect(() => {
+        if (!searching) {
+            setSearchProgress(0);
+            return;
+        }
+
+        const startTime = Date.now();
+        const interval = setInterval(() => {
+            const elapsed = Date.now() - startTime;
+            // Curva asintótica que se acerca a 95% (nunca llega hasta tener respuesta)
+            const pct = Math.min(95, Math.round(95 * (1 - Math.exp(-elapsed / 4000))));
+            setSearchProgress(pct);
+        }, 80);
+
+        return () => clearInterval(interval);
+    }, [searching]);
 
     // Estados para lista de solicitudes
     const [solicitudes, setSolicitudes] = useState([]);
@@ -27,6 +55,31 @@ const SolicitarPage = () => {
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
     const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
+
+    // Modales de detalle
+    const [solicitudDetalle, setSolicitudDetalle] = useState(null);
+    const [vehiculoDetalle, setVehiculoDetalle] = useState(null);
+
+    // Helpers de status para modal de vehículo
+    const VEHICLE_STATUS_COLORS = {
+        'PR': 'bg-slate-200 text-slate-700',
+        'IN': 'bg-sky-200 text-sky-800',
+        'TR': 'bg-blue-200 text-blue-800',
+        'EB': 'bg-indigo-200 text-indigo-800',
+        'DS': 'bg-cyan-200 text-cyan-800',
+        'EN': 'bg-emerald-200 text-emerald-800',
+    };
+    const VEHICLE_STATUS_LABELS = {
+        'PR': 'Registrado', 'IN': 'Cargando', 'TR': 'En Viaje',
+        'EB': 'En Brownsville', 'DS': 'Descargado', 'EN': 'Entregado'
+    };
+    const getVStatusColor = (s) => VEHICLE_STATUS_COLORS[s] || 'bg-slate-200 text-slate-700';
+    const getVStatusLabel = (s) => VEHICLE_STATUS_LABELS[s] || s;
+    const formatVDate = (ts) => {
+        if (!ts) return '-';
+        const d = ts.toDate ? ts.toDate() : new Date(ts);
+        return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
     // Login form
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
@@ -217,23 +270,13 @@ const SolicitarPage = () => {
         }
     };
 
-    const handleEliminarSolicitud = async (id) => {
-        if (!confirm("¿Estás seguro de eliminar esta solicitud?")) return;
-
-        try {
-            await firestore().collection("solicitudesVehiculos").doc(id).delete();
-        } catch (error) {
-            console.error("Error eliminando:", error);
-        }
-    };
-
     const getEstadoBadge = (estado) => {
         const badges = {
-            pendiente: "bg-yellow-100 text-yellow-800",
+            pendiente: "bg-sky-100 text-sky-800",
             aprobado: "bg-blue-100 text-blue-800",
             asignado: "bg-indigo-100 text-indigo-800",
-            en_proceso: "bg-purple-100 text-purple-800",
-            completado: "bg-green-100 text-green-800"
+            en_proceso: "bg-blue-100 text-blue-800",
+            completado: "bg-emerald-100 text-emerald-800"
         };
         const labels = {
             pendiente: "Pendiente",
@@ -260,10 +303,10 @@ const SolicitarPage = () => {
     // Cuenta no aprobada
     if (user && user.datosCliente?.aprobado === false) {
         return (
-            <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center items-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Cuenta en Revisión | Jorge Minnesota</title></Head>
                 <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-6 text-center">
-                    <FaClock className="text-4xl text-amber-500 mx-auto mb-3"/>
+                    <FaClock className="text-4xl text-indigo-500 mx-auto mb-3"/>
                     <h2 className="text-lg font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
                     <p className="text-sm text-gray-500 mb-4">Tu cuenta aún no ha sido aprobada. No puedes solicitar vehículos hasta que sea revisada.</p>
                     <Link href="/clients">
@@ -277,9 +320,9 @@ const SolicitarPage = () => {
     // Login Form
     if (!user) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
                 <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
-                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
+                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-blue-100">
                     <div className="text-center mb-8">
                         <img src="/assets/Logo.png" className="w-24 mx-auto mb-4" alt="Logo"/>
                         <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">
@@ -311,7 +354,7 @@ const SolicitarPage = () => {
                                 required
                             />
                         </div>
-                        <button type="submit" className="btn btn-primary w-full text-white font-black uppercase shadow-lg">
+                        <button type="submit" className="btn w-full text-white font-black uppercase shadow-lg border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
                             Entrar
                         </button>
                     </form>
@@ -329,7 +372,7 @@ const SolicitarPage = () => {
     const clienteData = user.datosCliente || {};
 
     return (
-        <div className="min-h-screen bg-gray-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
 
             {/* Pull-to-refresh indicator */}
@@ -340,40 +383,39 @@ const SolicitarPage = () => {
             )}
 
             {/* Header */}
-            <header className="bg-white safe-area-top border-b border-gray-200 sticky top-0 z-[60] shadow-sm">
-                <div className="flex justify-between items-center px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <Link href="/clients">
-                            <a className="text-blue-600 p-1 flex-shrink-0">
-                                <FaArrowLeft className="text-base"/>
-                            </a>
-                        </Link>
-                        <img src="/assets/Logo.png" className="w-7 h-auto flex-shrink-0" alt="Logo"/>
-                        <div className="min-w-0">
-                            <h1 className="text-xs font-black uppercase italic text-black leading-none tracking-tighter truncate">
-                                Solicitar Vehículos
-                            </h1>
-                            <p className="text-[8px] text-gray-400 truncate">Busca y solicita vehículos</p>
-                        </div>
+            <header className="bg-white/80 backdrop-blur-md p-4 safe-area-top flex justify-between items-center border-b border-blue-100 sticky top-0 z-[60] shadow-sm">
+                <div className="flex items-center gap-4 min-w-0">
+                    <Link href="/clients">
+                        <a className="text-blue-600 p-2 flex-shrink-0">
+                            <FaArrowLeft className="text-lg"/>
+                        </a>
+                    </Link>
+                    <div className="min-w-0">
+                        <h1 className="text-lg font-black uppercase italic text-black leading-none tracking-tighter truncate">
+                            Solicitar Vehículos
+                        </h1>
+                        <p className="text-[10px] text-gray-500">Jorge Minnesota Logistic LLC</p>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Link href="/clients">
-                            <a className="flex items-center gap-1 text-[9px] font-bold text-blue-600 uppercase border border-blue-200 px-2 py-1 rounded-lg bg-blue-50">
-                                <FaCar className="text-xs"/>
-                            </a>
-                        </Link>
-                        <button
-                            onClick={() => signOut()}
-                            className="flex items-center gap-1 text-[9px] font-bold text-red-600 uppercase border border-red-200 px-2 py-1 rounded-lg bg-red-50"
-                        >
-                            <FaSignOutAlt className="text-xs"/>
-                        </button>
-                    </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <Link href="/clients">
+                        <a className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase border border-blue-600 px-3 py-1 rounded-lg hover:bg-blue-50">
+                            <FaCar className="text-base md:text-sm"/>
+                            <span className="hidden md:inline">Mis Vehículos</span>
+                        </a>
+                    </Link>
+                    <button
+                        onClick={() => signOut()}
+                        className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase border border-blue-600 px-3 py-1 rounded-lg hover:bg-blue-50"
+                    >
+                        <FaSignOutAlt className="text-base md:text-sm"/>
+                        <span className="hidden md:inline">Salir</span>
+                    </button>
                 </div>
             </header>
 
             {/* User Info */}
-            <section className="bg-white px-3 py-2 border-b border-gray-200">
+            <section className="bg-white/70 backdrop-blur-sm px-4 py-3 border-b border-blue-100">
                 <div className="flex justify-between items-center gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -384,19 +426,19 @@ const SolicitarPage = () => {
                             <p className="text-[9px] text-gray-400 truncate">{user.email}</p>
                         </div>
                     </div>
-                    <div className="bg-orange-50 px-2 py-1 rounded-lg text-center flex-shrink-0">
-                        <span className="text-[8px] text-orange-600 font-bold uppercase">Solicitudes</span>
-                        <p className="text-base font-black text-orange-700 leading-tight">{solicitudes.length}</p>
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 px-2 py-1 rounded-lg text-center flex-shrink-0 shadow-sm">
+                        <span className="text-[8px] text-blue-600 font-bold uppercase">Solicitudes</span>
+                        <p className="text-base font-black bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent leading-tight tabular-nums">{solicitudes.length}</p>
                     </div>
                 </div>
             </section>
 
-            <main className="px-3 py-3">
+            <main className="px-4 py-4">
                 <div className="grid gap-3 lg:grid-cols-2">
 
                     {/* Panel de Búsqueda */}
                     <div className="space-y-3">
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+                        <div className="bg-white rounded-xl shadow-sm border border-blue-100 p-3">
                             <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
                                 <FaSearch className="text-blue-600 text-xs"/> Buscar Vehículo
                             </h2>
@@ -411,7 +453,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: 43874580"
                                             value={lotNumber}
                                             onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
-                                            className="input input-bordered input-sm w-full bg-white text-black"
+                                            className="input input-bordered input-sm w-full bg-white text-black border-blue-100 focus:border-blue-400"
                                             disabled={searching}
                                         />
                                     </div>
@@ -424,7 +466,7 @@ const SolicitarPage = () => {
                                             placeholder="Ej: A1B2"
                                             value={gatePass}
                                             onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
-                                            className="input input-bordered input-sm w-full bg-white text-black uppercase"
+                                            className="input input-bordered input-sm w-full bg-white text-black uppercase border-blue-100 focus:border-blue-400"
                                             disabled={searching}
                                             maxLength={5}
                                         />
@@ -433,7 +475,7 @@ const SolicitarPage = () => {
                                 <button
                                     type="submit"
                                     disabled={searching || !lotNumber.trim() || gatePass.length < 4}
-                                    className="btn btn-primary btn-sm w-full text-white font-bold"
+                                    className="btn btn-sm w-full text-white font-bold border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
                                 >
                                     {searching ? (
                                         <>
@@ -449,13 +491,70 @@ const SolicitarPage = () => {
 
                             {/* Indicador de búsqueda */}
                             {searching && (
-                                <div className="mt-4 flex flex-col items-center gap-3 py-4">
-                                    <div className="relative">
-                                        <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-blue-600 animate-spin"></div>
-                                        <FaSearch className="absolute inset-0 m-auto text-blue-600 text-sm" />
+                                <div className="mt-4 relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 border border-blue-100 p-5">
+                                    {/* Halo decorativo de fondo */}
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                        <div className="w-40 h-40 rounded-full bg-blue-200/40 blur-2xl animate-halo"></div>
                                     </div>
-                                    <p className="text-sm font-medium text-gray-600">Buscando en subastas...</p>
-                                    <p className="text-[10px] text-gray-400">Esto puede tomar unos segundos</p>
+
+                                    <div className="relative flex flex-col items-center">
+                                        {/* Lupita orbitando */}
+                                        <div className="relative w-24 h-24 flex items-center justify-center mb-3">
+                                            {/* Lupita que orbita (no rota sobre su eje) */}
+                                            <div className="absolute animate-lupita-orbit">
+                                                <FaSearch className="text-blue-600 text-4xl drop-shadow-lg"/>
+                                            </div>
+                                        </div>
+
+                                        {/* Etiqueta con fade al cambiar */}
+                                        <p
+                                            key={currentPhaseLabel}
+                                            className="text-sm sm:text-base font-black text-gray-800 text-center uppercase tracking-wide animate-fade-in-up px-2"
+                                        >
+                                            {currentPhaseLabel}
+                                        </p>
+
+                                        {/* Porcentaje con gradiente */}
+                                        <span className="text-3xl font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 bg-clip-text text-transparent tabular-nums mt-1 mb-3">
+                                            {searchProgress}%
+                                        </span>
+
+                                        {/* Barra segmentada */}
+                                        <div className="flex gap-[3px] w-full">
+                                            {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => {
+                                                const segmentThreshold = ((i + 1) / PROGRESS_SEGMENTS) * 100;
+                                                const filled = searchProgress >= segmentThreshold;
+                                                const partial = !filled && searchProgress > (i / PROGRESS_SEGMENTS) * 100;
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className="relative flex-1 h-3 bg-blue-100/60 rounded-sm overflow-hidden"
+                                                    >
+                                                        <div
+                                                            className={`h-full rounded-sm transition-all duration-200 ease-out ${
+                                                                filled
+                                                                    ? 'bg-gradient-to-b from-blue-500 to-indigo-600 shadow-[0_0_4px_rgba(59,130,246,0.6)]'
+                                                                    : partial
+                                                                        ? 'bg-blue-400'
+                                                                        : ''
+                                                            }`}
+                                                            style={{
+                                                                width: filled
+                                                                    ? '100%'
+                                                                    : partial
+                                                                        ? `${((searchProgress - (i / PROGRESS_SEGMENTS) * 100) / (100 / PROGRESS_SEGMENTS)) * 100}%`
+                                                                        : '0%'
+                                                            }}
+                                                        ></div>
+                                                        {/* Shimmer encima del segmento activo */}
+                                                        {partial && (
+                                                            <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -466,102 +565,36 @@ const SolicitarPage = () => {
                             )}
                         </div>
 
-                        {/* Resultado de búsqueda */}
-                        {vehicleResult && (
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                {vehicleResult.imageUrl && (
-                                    <div className="relative w-full h-40 bg-gray-100">
-                                        <img
-                                            src={vehicleResult.imageUrl}
-                                            alt={`${vehicleResult.year} ${vehicleResult.make} ${vehicleResult.model}`}
-                                            className="w-full h-full object-contain"
-                                        />
-                                        <span className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-[10px] font-bold">
-                                            {vehicleResult.source}
-                                        </span>
-                                    </div>
-                                )}
-                                <div className="p-4">
-                                    <h3 className="text-xl font-black text-gray-800 uppercase">
-                                        {vehicleResult.year} {vehicleResult.make} {vehicleResult.model}
-                                    </h3>
-                                    <p className="text-sm text-gray-500 mb-4">Lote: {vehicleResult.lotNumber}</p>
-
-                                    <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-                                        <div className="flex items-start gap-2">
-                                            <FaBarcode className="text-gray-400 mt-1"/>
-                                            <div>
-                                                <p className="text-[10px] text-gray-500 uppercase">VIN</p>
-                                                <p className="font-mono text-xs">{vehicleResult.vin || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <FaMapMarkerAlt className="text-gray-400 mt-1"/>
-                                            <div>
-                                                <p className="text-[10px] text-gray-500 uppercase">Ubicación</p>
-                                                <p className="text-xs">{vehicleResult.location || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <FaKey className="text-gray-400 mt-1"/>
-                                            <div>
-                                                <p className="text-[10px] text-gray-500 uppercase">Gate Pass</p>
-                                                <p className="font-mono text-xs">{vehicleResult.gatePass}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-start gap-2">
-                                            <FaCalendarAlt className="text-gray-400 mt-1"/>
-                                            <div>
-                                                <p className="text-[10px] text-gray-500 uppercase">Subasta</p>
-                                                <p className="text-xs">{vehicleResult.auctionDate || 'N/A'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={handleAgregarSolicitud}
-                                        disabled={guardando}
-                                        className="btn btn-success w-full text-white font-bold"
-                                    >
-                                        {guardando ? (
-                                            <><FaSpinner className="animate-spin mr-2"/> Guardando...</>
-                                        ) : (
-                                            <><FaPlus className="mr-2"/> Agregar a Mis Solicitudes</>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     {/* Panel de Solicitudes / Historial */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-200">
+                        <div className="flex border-b border-blue-100">
                             <button
                                 onClick={() => setTabSolicitudes("solicitudes")}
                                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
                                     tabSolicitudes === "solicitudes"
-                                        ? "text-orange-700 border-b-2 border-orange-600 bg-orange-50/50"
+                                        ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50/60"
                                         : "text-gray-400 hover:text-gray-600"
                                 }`}
                             >
                                 <FaClock className="text-[10px]"/> Solicitudes
                                 {solicitudes.length > 0 && (
-                                    <span className="bg-orange-200 text-orange-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
+                                    <span className="bg-blue-200 text-blue-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
                                 )}
                             </button>
                             <button
                                 onClick={() => setTabSolicitudes("historial")}
                                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
                                     tabSolicitudes === "historial"
-                                        ? "text-green-700 border-b-2 border-green-600 bg-green-50/50"
+                                        ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/60"
                                         : "text-gray-400 hover:text-gray-600"
                                 }`}
                             >
                                 <FaHistory className="text-[10px]"/> Historial
                                 {(solicitudesCompletadas.length + vehiculosEntregados.length) > 0 && (
-                                    <span className="bg-green-200 text-green-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
+                                    <span className="bg-indigo-200 text-indigo-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
                                 )}
                             </button>
                         </div>
@@ -584,28 +617,26 @@ const SolicitarPage = () => {
                                     {solicitudes.map((sol) => {
                                         const badge = getEstadoBadge(sol.estado);
                                         return (
-                                            <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
-                                                <div className="flex gap-2 items-start">
+                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="border border-blue-100 rounded-lg p-2.5 cursor-pointer hover:bg-blue-50/60 transition-colors">
+                                                <div className="flex gap-2.5 items-start">
                                                     {sol.imageUrl && (
                                                         <img
                                                             src={sol.imageUrl}
                                                             alt={`${sol.year} ${sol.make}`}
-                                                            className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
+                                                            className="w-16 h-14 object-cover rounded bg-gray-100 flex-shrink-0"
                                                         />
                                                     )}
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-start justify-between gap-1">
-                                                            <p className="font-bold text-xs text-gray-800 uppercase truncate">
-                                                                {sol.year} {sol.make} {sol.model}
-                                                            </p>
-                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 ${badge.className}`}>
-                                                                {badge.label}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-[9px] text-gray-500">
+                                                        <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
+                                                            {sol.year} {sol.make}
+                                                        </p>
+                                                        <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
+                                                            {sol.model}
+                                                        </p>
+                                                        <p className="text-[10px] text-gray-500 mt-1">
                                                             Lote: {sol.lotNumber} • {sol.source}
                                                         </p>
-                                                        <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                        <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
                                                             <span className="flex items-center gap-0.5 truncate">
                                                                 <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
                                                             </span>
@@ -613,15 +644,12 @@ const SolicitarPage = () => {
                                                                 <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
                                                             </span>
                                                         </div>
+                                                        <div className="mt-2">
+                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${badge.className}`}>
+                                                                {badge.label}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    {sol.estado === "pendiente" && (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleEliminarSolicitud(sol.id); }}
-                                                            className="text-red-400 p-1 flex-shrink-0"
-                                                        >
-                                                            <FaTrash className="text-xs"/>
-                                                        </button>
-                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -639,26 +667,29 @@ const SolicitarPage = () => {
                                 <div className="space-y-2 max-h-[500px] overflow-y-auto">
                                     {/* Vehículos entregados */}
                                     {vehiculosEntregados.map((v) => (
-                                        <div key={v.id} className="border border-green-100 rounded-lg p-2 bg-green-50/30">
-                                            <div className="flex gap-2 items-start">
-                                                <div className="w-14 h-12 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
-                                                    <FaCheckCircle className="text-green-500 text-lg"/>
+                                        <div key={v.id} onClick={() => setVehiculoDetalle(v)} className="border border-green-100 rounded-lg p-2.5 bg-green-50/30 cursor-pointer hover:bg-green-50/60 transition-colors">
+                                            <div className="flex gap-2.5 items-start">
+                                                <div className="w-16 h-14 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
+                                                    <FaCheckCircle className="text-green-500 text-xl"/>
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-start justify-between gap-1">
-                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
-                                                            {v.marca} {v.modelo}
-                                                        </p>
-                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-200 text-green-800">
-                                                            Entregado
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-[9px] text-gray-500">
+                                                    <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
+                                                        {v.marca}
+                                                    </p>
+                                                    <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
+                                                        {v.modelo}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500 mt-1">
                                                         Lote: {v.binNip} • {v.almacen || '-'}
                                                     </p>
-                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
                                                         <span className="flex items-center gap-0.5 truncate">
                                                             <FaMapMarkerAlt className="flex-shrink-0"/> {v.ciudad}, {v.estado}
+                                                        </span>
+                                                    </div>
+                                                    <div className="mt-2">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-green-200 text-green-800">
+                                                            Entregado
                                                         </span>
                                                     </div>
                                                 </div>
@@ -667,42 +698,45 @@ const SolicitarPage = () => {
                                     ))}
                                     {/* Solicitudes completadas */}
                                     {solicitudesCompletadas.map((sol) => (
-                                        <div key={sol.id} className="border border-gray-100 rounded-lg p-2">
-                                            <div className="flex gap-2 items-start">
+                                        <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="border border-blue-100 rounded-lg p-2.5 cursor-pointer hover:bg-blue-50/60 transition-colors">
+                                            <div className="flex gap-2.5 items-start">
                                                 {sol.imageUrl ? (
                                                     <img
                                                         src={sol.imageUrl}
                                                         alt={`${sol.year} ${sol.make}`}
-                                                        className="w-14 h-12 object-cover rounded bg-gray-100 flex-shrink-0"
+                                                        className="w-16 h-14 object-cover rounded bg-gray-100 flex-shrink-0"
                                                     />
                                                 ) : (
-                                                    <div className="w-14 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                    <div className="w-16 h-14 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
                                                         <FaCar className="text-gray-300"/>
                                                     </div>
                                                 )}
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-start justify-between gap-1">
-                                                        <p className="font-bold text-xs text-gray-800 uppercase truncate">
-                                                            {sol.year} {sol.make} {sol.model}
-                                                        </p>
-                                                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase flex-shrink-0 bg-green-100 text-green-800">
-                                                            Completado
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-[9px] text-gray-500">
+                                                    <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
+                                                        {sol.year} {sol.make}
+                                                    </p>
+                                                    <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
+                                                        {sol.model}
+                                                    </p>
+                                                    <p className="text-[10px] text-gray-500 mt-1">
                                                         Lote: {sol.lotNumber} • {sol.source}
                                                     </p>
-                                                    <div className="flex items-center gap-2 mt-1 text-[9px] text-gray-400">
+                                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
                                                         <span className="flex items-center gap-0.5 truncate">
                                                             <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
                                                         </span>
                                                     </div>
                                                     {sol.fechaCompletado && (
-                                                        <p className="text-[9px] text-green-600 font-bold mt-1">
-                                                            <FaCheckCircle className="inline mr-0.5 text-[8px]"/>
+                                                        <p className="text-[10px] text-green-600 font-bold mt-1">
+                                                            <FaCheckCircle className="inline mr-0.5 text-[9px]"/>
                                                             {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                                                         </p>
                                                     )}
+                                                    <div className="mt-2">
+                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-green-100 text-green-800">
+                                                            Completado
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -714,6 +748,335 @@ const SolicitarPage = () => {
                     </div>
                 </div>
             </main>
+
+            {/* Modal Preview de Búsqueda */}
+            {vehicleResult && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex sm:items-center justify-center p-0 sm:p-4 animate-fade-in-up" onClick={() => setVehicleResult(null)}>
+                    <div className="bg-white rounded-none sm:rounded-2xl w-full h-full sm:h-auto sm:max-w-md sm:max-h-[90vh] overflow-y-auto shadow-2xl safe-area-bottom flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        {/* Imagen */}
+                        <div className="relative flex-shrink-0">
+                            {vehicleResult.imageUrl ? (
+                                <div className="w-full bg-gradient-to-br from-slate-900 to-slate-800 sm:rounded-t-2xl flex items-center justify-center" style={{ minHeight: '420px' }}>
+                                    <img
+                                        src={vehicleResult.imageUrl}
+                                        alt={`${vehicleResult.year} ${vehicleResult.make} ${vehicleResult.model}`}
+                                        className="w-full h-auto max-h-[60vh] object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-full h-96 bg-gradient-to-br from-blue-600 to-indigo-800 sm:rounded-t-2xl flex items-center justify-center">
+                                    <FaCar className="text-6xl text-white/60"/>
+                                </div>
+                            )}
+                            <button
+                                onClick={() => setVehicleResult(null)}
+                                className="absolute right-3 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-full text-white transition-all z-10"
+                                style={{ top: 'max(env(safe-area-inset-top), 0.75rem)' }}
+                                aria-label="Cerrar"
+                            >
+                                <FaTimes size={14}/>
+                            </button>
+                            <div className="absolute bottom-3 left-3">
+                                <span className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-xs font-bold px-2.5 py-1 rounded shadow">
+                                    {vehicleResult.source}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-5 sm:p-6 flex-1 flex flex-col">
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Vehículo Encontrado</p>
+                            <p className="text-base font-bold text-gray-500 uppercase tracking-wide leading-tight">
+                                {vehicleResult.year} {vehicleResult.make}
+                            </p>
+                            <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-tight">
+                                {vehicleResult.model}
+                            </h3>
+
+                            <div className="mt-5 space-y-3.5 text-base text-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <FaBarcode className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Lote</span>
+                                    <span className="font-mono font-bold text-gray-900">{vehicleResult.lotNumber}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <FaKey className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Gate Pass</span>
+                                    <span className="font-mono font-bold text-gray-900">{vehicleResult.gatePass}</span>
+                                </div>
+                                {vehicleResult.vin && (
+                                    <div className="flex items-center gap-3">
+                                        <FaBarcode className="text-blue-500 text-sm flex-shrink-0"/>
+                                        <span className="text-gray-500 text-sm font-medium w-24">VIN</span>
+                                        <span className="font-mono text-gray-900 text-sm">{vehicleResult.vin}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3">
+                                    <FaMapMarkerAlt className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Ubicación</span>
+                                    <span className="text-gray-900 font-medium">{vehicleResult.location || 'N/A'}</span>
+                                </div>
+                                {vehicleResult.auctionDate && (
+                                    <div className="flex items-center gap-3">
+                                        <FaCalendarAlt className="text-blue-500 text-sm flex-shrink-0"/>
+                                        <span className="text-gray-500 text-sm font-medium w-24">Subasta</span>
+                                        <span className="text-gray-900 font-medium">{vehicleResult.auctionDate}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Acciones */}
+                            <div className="mt-6 pt-4 border-t border-blue-100 space-y-2">
+                                <button
+                                    onClick={handleAgregarSolicitud}
+                                    disabled={guardando}
+                                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-black uppercase text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2"
+                                >
+                                    {guardando ? (
+                                        <><FaSpinner className="animate-spin"/> Guardando...</>
+                                    ) : (
+                                        <><FaPlus/> Agregar a Mis Solicitudes</>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => setVehicleResult(null)}
+                                    disabled={guardando}
+                                    className="w-full py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold uppercase text-xs tracking-wide transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle Solicitud */}
+            {solicitudDetalle && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex sm:items-center justify-center p-0 sm:p-4 animate-fade-in-up" onClick={() => setSolicitudDetalle(null)}>
+                    <div className="bg-white rounded-none sm:rounded-2xl w-full h-full sm:h-auto sm:max-w-md sm:max-h-[90vh] overflow-y-auto shadow-2xl safe-area-bottom" onClick={(e) => e.stopPropagation()}>
+                        <div className="relative">
+                            {solicitudDetalle.imageUrl ? (
+                                <div className="w-full bg-gradient-to-br from-slate-900 to-slate-800 sm:rounded-t-2xl flex items-center justify-center" style={{ minHeight: '420px' }}>
+                                    <img
+                                        src={solicitudDetalle.imageUrl}
+                                        alt=""
+                                        className="w-full h-auto max-h-[72vh] object-contain"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="w-full h-96 bg-gradient-to-br from-blue-600 to-indigo-800 sm:rounded-t-2xl flex items-center justify-center">
+                                    <FaCar className="text-6xl text-white/60"/>
+                                </div>
+                            )}
+                            <button onClick={() => setSolicitudDetalle(null)} className="absolute right-3 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-full text-white transition-all z-10" style={{ top: 'max(env(safe-area-inset-top), 0.75rem)' }}>
+                                <FaTimes size={14}/>
+                            </button>
+                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                                <span className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-xs font-bold px-2.5 py-1 rounded shadow">{solicitudDetalle.source}</span>
+                                {(() => {
+                                    const badge = getEstadoBadge(solicitudDetalle.estado);
+                                    return <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${badge.className}`}>{badge.label}</span>;
+                                })()}
+                            </div>
+                        </div>
+
+                        <div className="p-5 sm:p-6">
+                            <p className="text-base font-bold text-gray-500 uppercase tracking-wide leading-tight">
+                                {solicitudDetalle.year} {solicitudDetalle.make}
+                            </p>
+                            <h4 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-tight">
+                                {solicitudDetalle.model}
+                            </h4>
+
+                            <div className="mt-5 space-y-3.5 text-base text-gray-700">
+                                <div className="flex items-center gap-3">
+                                    <FaBarcode className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Lote</span>
+                                    <span className="font-mono font-bold text-gray-900">{solicitudDetalle.lotNumber}</span>
+                                </div>
+                                {solicitudDetalle.vin && (
+                                    <div className="flex items-center gap-3">
+                                        <FaKey className="text-blue-500 text-sm flex-shrink-0"/>
+                                        <span className="text-gray-500 text-sm font-medium w-24">VIN</span>
+                                        <span className="font-mono text-gray-900 text-sm">{solicitudDetalle.vin}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3">
+                                    <FaMapMarkerAlt className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Ubicación</span>
+                                    <span className="text-gray-900 font-medium">{solicitudDetalle.location || '-'}</span>
+                                </div>
+                                {solicitudDetalle.auctionDate && (
+                                    <div className="flex items-center gap-3">
+                                        <FaCalendarAlt className="text-blue-500 text-sm flex-shrink-0"/>
+                                        <span className="text-gray-500 text-sm font-medium w-24">Comprado</span>
+                                        <span className="text-gray-900 font-medium">{solicitudDetalle.auctionDate}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-3">
+                                    <FaCalendarAlt className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Solicitado</span>
+                                    <span className="text-gray-900 font-medium">
+                                        {solicitudDetalle.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || '-'}
+                                    </span>
+                                </div>
+                                {solicitudDetalle.fechaCompletado && (
+                                    <div className="flex items-center gap-3">
+                                        <FaCheckCircle className="text-emerald-500 text-sm flex-shrink-0"/>
+                                        <span className="text-gray-500 text-sm font-medium w-24">Completado</span>
+                                        <span className="text-emerald-700 font-bold">
+                                            {solicitudDetalle.fechaCompletado?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || new Date(solicitudDetalle.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detalle Vehículo (entregado) */}
+            {vehiculoDetalle && (() => {
+                const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
+                const currentIndex = statusOrder.indexOf(vehiculoDetalle.estatus);
+                const InfoCard = ({ icon, label, value, mono }) => (
+                    <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 hover:bg-blue-50/70 transition-colors">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-blue-500 text-xs">{icon}</span>
+                            <span className="text-[10px] font-black text-blue-700 uppercase tracking-wide">{label}</span>
+                        </div>
+                        <p className={`text-sm text-gray-800 ${mono ? 'font-mono font-bold' : 'font-semibold'} break-words`}>
+                            {value || '-'}
+                        </p>
+                    </div>
+                );
+                return (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex sm:items-center justify-center p-0 sm:p-4 animate-fade-in-up" onClick={() => setVehiculoDetalle(null)}>
+                        <div className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] overflow-y-auto shadow-2xl safe-area-bottom" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 sm:rounded-t-3xl px-6 pb-8 overflow-hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 1.5rem)' }}>
+                                <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+                                <div className="absolute -bottom-16 -left-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                                <div className="relative flex items-start justify-between gap-3 mb-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-blue-200 text-[10px] font-black uppercase tracking-widest">Vehículo</p>
+                                        <p className="text-blue-100 text-sm sm:text-base font-bold uppercase mt-0.5 leading-tight tracking-wide truncate">
+                                            {vehiculoDetalle.marca}
+                                        </p>
+                                        <h3 className="text-white text-2xl sm:text-3xl font-black uppercase leading-tight tracking-tight truncate">
+                                            {vehiculoDetalle.modelo}
+                                        </h3>
+                                        <div className="inline-flex items-center gap-1.5 mt-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-lg">
+                                            <FaBarcode className="text-blue-200 text-xs"/>
+                                            <span className="text-white font-mono font-bold text-sm">{vehiculoDetalle.binNip}</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setVehiculoDetalle(null)} className="p-2 bg-white/15 hover:bg-white/30 rounded-full text-white transition-all flex-shrink-0">
+                                        <FaTimes size={14}/>
+                                    </button>
+                                </div>
+
+                                <div className="relative flex flex-wrap items-center gap-2 mt-4">
+                                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm ${getVStatusColor(vehiculoDetalle.estatus)}`}>
+                                        {getVStatusLabel(vehiculoDetalle.estatus)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Pipeline */}
+                            <div className="px-5 sm:px-6 py-5 border-b border-blue-100 bg-gradient-to-b from-blue-50/40 to-white">
+                                <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-4">Seguimiento</p>
+                                <div className="relative">
+                                    <div className="absolute top-3.5 left-3 right-3 h-0.5 bg-blue-100 rounded-full"></div>
+                                    <div
+                                        className="absolute top-3.5 left-3 h-0.5 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-full transition-all duration-500"
+                                        style={{ width: currentIndex > 0 ? `calc((100% - 1.5rem) * ${currentIndex / (statusOrder.length - 1)})` : '0%' }}
+                                    ></div>
+                                    <div className="relative flex items-start justify-between">
+                                        {statusOrder.map((step, i) => {
+                                            const isActive = i <= currentIndex;
+                                            const isCurrent = step === vehiculoDetalle.estatus;
+                                            const isPast = isActive && !isCurrent;
+                                            return (
+                                                <div key={step} className="flex flex-col items-center gap-1.5 flex-1 max-w-[60px]">
+                                                    <div className={`relative w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-black border-2 transition-all ${
+                                                        isCurrent
+                                                            ? "bg-blue-600 text-white border-blue-300 ring-4 ring-blue-100 scale-110 shadow-md"
+                                                            : isPast
+                                                                ? "bg-emerald-500 text-white border-emerald-300"
+                                                                : "bg-white text-gray-400 border-blue-100"
+                                                    }`}>
+                                                        {isPast ? <FaCheckCircle className="text-[11px]"/> : step}
+                                                    </div>
+                                                    <span className={`text-[8px] sm:text-[9px] font-bold uppercase text-center leading-tight ${
+                                                        isCurrent ? "text-blue-700" : isPast ? "text-emerald-700" : "text-gray-400"
+                                                    }`}>
+                                                        {getVStatusLabel(step)}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Info */}
+                            <div className="p-5 sm:p-6 space-y-5">
+                                <section>
+                                    <div className="flex items-center gap-2 mb-2.5">
+                                        <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
+                                        <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Información del Vehículo</h4>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <InfoCard icon={<FaBarcode/>} label="Lote" value={vehiculoDetalle.binNip} mono/>
+                                        <InfoCard icon={<FaCar/>} label="Marca / Modelo" value={`${vehiculoDetalle.marca || ''} ${vehiculoDetalle.modelo || ''}`.trim()}/>
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <div className="flex items-center gap-2 mb-2.5">
+                                        <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
+                                        <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Logística</h4>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <InfoCard icon={<FaMapMarkerAlt/>} label="Origen" value={[vehiculoDetalle.ciudad, vehiculoDetalle.estado].filter(Boolean).join(', ')}/>
+                                        <InfoCard icon={<FaWarehouse/>} label="Almacén" value={vehiculoDetalle.almacen}/>
+                                        <InfoCard icon={<FaCalendarAlt/>} label="Fecha de Registro" value={formatVDate(vehiculoDetalle.registro?.timestamp)}/>
+                                        <InfoCard icon={<FaTruck/>} label="Estatus" value={getVStatusLabel(vehiculoDetalle.estatus)}/>
+                                    </div>
+                                </section>
+
+                                {(vehiculoDetalle.cliente || vehiculoDetalle.referencia) && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-2.5">
+                                            <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
+                                            <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Detalles</h4>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                            {vehiculoDetalle.cliente && (
+                                                <InfoCard icon={<FaUser/>} label="Cliente" value={vehiculoDetalle.cliente}/>
+                                            )}
+                                            {vehiculoDetalle.referencia && (
+                                                <InfoCard icon={<FaIdCard/>} label="Referencia" value={vehiculoDetalle.referencia}/>
+                                            )}
+                                        </div>
+                                    </section>
+                                )}
+
+                                <div className="pt-2">
+                                    <button
+                                        onClick={() => setVehiculoDetalle(null)}
+                                        className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black uppercase text-xs tracking-wide shadow-md transition-all"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Footer */}
             <footer className="mt-6 pb-4 text-center text-[10px] text-gray-400 uppercase">
