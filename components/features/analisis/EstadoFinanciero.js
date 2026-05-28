@@ -117,6 +117,7 @@ const EstadoFinanciero = () => {
     const [gastosAll, setGastosAll] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalData, setModalData] = useState(null);
+    const [error, setError] = useState(null);
     const printRef = useRef();
 
     const mesesDisponibles = useMemo(() => getMesesDisponibles(), []);
@@ -151,8 +152,17 @@ const EstadoFinanciero = () => {
     useEffect(() => {
         setLoading(true);
         setModalData(null);
+        setError(null);
         let loadedCount = 0;
         const checkDone = () => { loadedCount++; if (loadedCount >= 4) setLoading(false); };
+        // No tragarse el error: si una consulta falla, esa categoría queda vacía y
+        // el balance saldría MAL sin avisar. Avisamos para que nadie tome decisiones
+        // sobre números incompletos (típicamente falta un índice compuesto en Firestore).
+        const onError = (label) => (err) => {
+            console.error(`Error cargando ${label}:`, err);
+            setError(`No se pudieron cargar todos los datos (${label}). El reporte puede estar INCOMPLETO — no lo tomes como definitivo. Revisa la consola/índices de Firestore y reintenta.`);
+            checkDone();
+        };
 
         const unsub1 = firestore()
             .collection(COLLECTIONS.MOVIMIENTOS)
@@ -161,7 +171,7 @@ const EstadoFinanciero = () => {
             .onSnapshot((snap) => {
                 setMovimientos(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 checkDone();
-            }, () => checkDone());
+            }, onError("movimientos de caja"));
 
         const unsub2 = firestore()
             .collection(COLLECTIONS.VIAJES_PAGADOS)
@@ -170,7 +180,7 @@ const EstadoFinanciero = () => {
             .onSnapshot((snap) => {
                 setViajesPagados(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 checkDone();
-            }, () => checkDone());
+            }, onError("viajes pagados"));
 
         const unsub3 = firestore()
             .collection(COLLECTIONS.PAGOS_NOMINA)
@@ -179,7 +189,7 @@ const EstadoFinanciero = () => {
             .onSnapshot((snap) => {
                 setPagosNomina(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 checkDone();
-            }, () => checkDone());
+            }, onError("pagos de nómina"));
 
         // Gastos: fechaGasto es string "YYYY-MM-DD", no Timestamp — cargar todos los revisados y filtrar en cliente
         const unsub4 = firestore()
@@ -188,7 +198,7 @@ const EstadoFinanciero = () => {
             .onSnapshot((snap) => {
                 setGastosAll(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 checkDone();
-            }, () => checkDone());
+            }, onError("gastos"));
 
         return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
     }, [fechaInicio, fechaFin]);
@@ -370,6 +380,12 @@ const EstadoFinanciero = () => {
 
     return (
         <div className="w-full">
+            {/* Aviso de datos incompletos: nunca mostrar un balance como definitivo si una consulta falló */}
+            {error && (
+                <div className="alert alert-warning mb-4 shadow-md font-bold">
+                    <span>⚠️ {error}</span>
+                </div>
+            )}
             {/* Header */}
             <div className="mb-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">

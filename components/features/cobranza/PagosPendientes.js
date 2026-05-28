@@ -4,6 +4,7 @@ import { COLLECTIONS } from "../../../constants";
 import Alert from "../../ui/Alert";
 import ReciboPP from "./ReciboPP";
 import ReactToPrint from "react-to-print";
+import { redondearDinero } from "../../../utils";
 
 // Calcula el saldo pendiente soportando el modelo nuevo (saldoFiado/abonosFiado)
 // y el legacy (pagoTotalPendiente/pagos001..005).
@@ -29,7 +30,15 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
     const componentRef = useRef();
     const [pagoExitoso, setPagoExitoso] = useState(false);
     const reactToPrintRef = useRef();
+    const printTimeoutRef = useRef(null);
     const [ultimoAbono, setUltimoAbono] = useState(null);
+
+    // Cancela la impresión pendiente si el modal se cierra antes de los 500ms
+    useEffect(() => {
+        return () => {
+            if (printTimeoutRef.current) clearTimeout(printTimeoutRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         const fetchVehiculo = async () => {
@@ -53,8 +62,8 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
         setTimeout(() => setAlertMessage(null), 3000);
     };
 
-    const saldoActual = vehiculo ? obtenerSaldo(vehiculo) : 0;
-    const abonoTotal = (parseFloat(montoEfectivo) || 0) + (parseFloat(montoCC) || 0);
+    const saldoActual = vehiculo ? redondearDinero(obtenerSaldo(vehiculo)) : 0;
+    const abonoTotal = redondearDinero((parseFloat(montoEfectivo) || 0) + (parseFloat(montoCC) || 0));
 
     const handlePago = async () => {
         if (abonoTotal <= 0) {
@@ -68,13 +77,13 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
 
         setLoading(true);
         try {
-            const nuevoSaldo = parseFloat((saldoActual - abonoTotal).toFixed(2));
+            const nuevoSaldo = redondearDinero(saldoActual - abonoTotal);
             const liquidado = nuevoSaldo <= 0;
 
             const abono = {
                 monto: abonoTotal,
-                efectivo: parseFloat(montoEfectivo) || 0,
-                cc: parseFloat(montoCC) || 0,
+                efectivo: redondearDinero(montoEfectivo),
+                cc: redondearDinero(montoCC),
                 fecha: new Date(),
                 usuario: user.nombre,
                 idUsuario: user.id,
@@ -131,8 +140,8 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                 usuario: user.nombre,
                 idUsuario: user.id,
                 timestamp: new Date(),
-                cajaRecibo: parseFloat(montoEfectivo) || 0,
-                cajaCC: parseFloat(montoCC) || 0,
+                cajaRecibo: redondearDinero(montoEfectivo),
+                cajaCC: redondearDinero(montoCC),
                 cajaCambio: 0,
                 montoAbono: abonoTotal,
                 saldoFiadoAntes: saldoActual,
@@ -150,7 +159,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                 "success"
             );
 
-            setTimeout(() => {
+            printTimeoutRef.current = setTimeout(() => {
                 if (reactToPrintRef.current) {
                     reactToPrintRef.current.handlePrint();
                 }

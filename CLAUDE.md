@@ -19,7 +19,7 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 
 **Stack:** Next.js 12.3.1, React 17, Tailwind CSS 3 + DaisyUI 4, Firebase v7 (Auth, Firestore, Storage, Functions), Puppeteer (auction scraping), Framer Motion (animations), moment.js (dates)
 
-**Deployment:** Main app on **Vercel**. Auction scraper on a **Digital Ocean VPS** (see `vps-scraper/`).
+**Deployment:** Main app on **Vercel**. Auction scraper on a **Digital Ocean VPS** — code lives in a separate repo: `github.com/Nova-studia/vps-scraper`.
 
 **Firebase config:** Loaded from `NEXT_PUBLIC_FIREBASE_*` env vars in `firebase/firebaseIni.js`. Client-side only init (guarded by `typeof window`). `next.config.js` sets `images.unoptimized = true` for static export compatibility. Additional server-side env vars: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN` (used in API routes only), `SCRAPER_URL` + `SCRAPER_API_KEY` (VPS scraper connection), `FCM_SERVER_KEY` (push notifications).
 
@@ -30,7 +30,7 @@ Vehicle logistics system for **Jorge Minnesota Logistic LLC**. Manages vehicles 
 - **Authorization system:** The `historialAutorizaciones` module (`components/features/analisis/HistorialAutorizaciones.js`) tracks pending authorizations for vehicle edits (`edicion`), deletions (`eliminacion`), and lot changes (`cambioLote`). It also appears in the header nav via `HeaderPanel.js` as a notification badge. This is an audit/approval workflow — not to be confused with auth/login.
 - **Firebase services:** All Firestore CRUD is centralized in `services/firebaseService.js` (re-exported via `services/index.js`). Import from `services/` barrel export. Use it instead of direct Firestore calls. Key exports: `addDocument`, `updateDocument`, `deleteDocument`, `setDocument` (with optional merge), `getDocument`, `getCollection`, `queryDocuments` (multi-where), `batchWrite`, `subscribeToDocument`, `subscribeToCollection`, and the raw `firestore` instance. Includes a **sequential ID system** (`getNextConsecutive`, `runTransactionWithConsecutive`, `updateConsecutive`) for generating incrementing IDs stored in the `config` collection under keys defined in `CONFIG_KEYS`. **Important:** `addDocument` auto-injects `createdAt` and `updateDocument` auto-injects `updatedAt` — don't add these manually in calling code. **Gotcha:** `CONFIG_KEYS` has inconsistent naming — most are camelCase but `"Viajes pagados"` has a space.
 - **Constants as single source of truth:** `constants/index.js` exports all enums and config: collection names (`COLLECTIONS`), vehicle/trip statuses, payment methods, user roles (`USER_TYPES`), admin module names (`ADMIN_MODULES`), company info for receipts, field validation limits, and helper functions (`getStatusLabel`, `getStatusIndex`, `formatFirestoreTimestamp`). Use `formatFirestoreTimestamp` for all timestamp rendering — it handles both Firestore Timestamp objects and plain JS Dates. There is also a `utils/constants.js` with overlapping vehicle status definitions — prefer `constants/index.js` as the canonical source. **Gotcha:** the `VEHICLE_STATUS` shape differs between the two files: `constants/index.js` uses objects `{ code, label }` while `utils/constants.js` uses plain strings (`"Registrado"`). Code importing from the wrong source will get a different data structure.
-- **Admin impersonation:** `useAuth` exposes `startImpersonating(user)`, `stopImpersonating()`, `isImpersonating`, and `realUser` — a "View As" feature allowing admin users to see the app as another user. Added in the `Auths` commit.
+- **Admin impersonation:** `useAuth` exposes `startImpersonating(targetUserId)` (takes a user ID, not a user object), `stopImpersonating()`, `isImpersonating`, and `realUser` — a "View As" feature allowing admin users to see the app as another user. Added in the `Auths` commit.
 - **Custom hooks:** Located in `hooks/` (with barrel export via `hooks/index.js`) — `useFirestoreCollection` (real-time subscriptions), `useAuth`, `useAlert`, `usePagination`, `useCopyToClipboard`. Note: some components still implement their own Firestore listeners.
 - **Utilities:** `utils/index.js` exports push notification helpers (`notificarCambioEstatus`, `notificarViajeAsignado`, `notificarCambioSolicitud`), numeric helpers (`parseNumberOrZero`, `formatCurrency`, `formatNumber`, `numberToWords`), date helpers (`formatFirestoreDate`, `formatDate`, `getTodayRange`), array utilities (`filterBySearch`, `sortByField`, `groupByField`), and validators (`isValidEmail`, `isValidPhone`, `isEmpty`). Note: `formatFirestoreDate` in utils is distinct from `formatFirestoreTimestamp` in constants — the latter handles Firestore Timestamp objects. Audit logging via `utils/auditLog.js`.
 
@@ -75,19 +75,21 @@ All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
 - **Role-specific portals:** `carriers` + `loads` + `carrier-mapa` (empresa), `misviajes` + `driver` + `driver-mapa` (chofer), `clients` + `solicitar` (cliente)
 - **Other:** `privacy` (privacy policy page)
 - **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients), `api/send-push-chofer` (FCM push notifications to drivers)
-- **Maintenance scripts:** `scripts/` contains `debugViajes.js` (trip debugging), `generarAnalisisPDF.js` (financial analysis PDF), `generarCobranzaPDF.js` (collections PDF), `generarComisionesPDF.js` (commissions PDF)
+- **Maintenance scripts:** `scripts/` holds one-off data-fix/audit scripts (e.g. `corregirBinNips.js`, `auditChoferes.js`, `resetFolios.js`) that are written, run once against Firestore, then deleted — so the directory is usually empty. PDF output is generated in-app via `react-to-print`, not by standalone scripts. The `pdf/` directory is likewise scratch space (no tracked source).
 
-### VPS Scraper (`vps-scraper/`)
+### VPS Scraper (separate repo)
 
-Standalone Express + Puppeteer microservice deployed on a Digital Ocean VPS. Vercel can't run Puppeteer (serverless limits), so auction scraping is offloaded here.
+Standalone Express + Puppeteer microservice deployed on a Digital Ocean VPS. Vercel can't run Puppeteer (serverless limits), so auction scraping is offloaded here. **Source lives in a separate repo:** `github.com/Nova-studia/vps-scraper` — clone it if you need to touch the scraper.
 
 ```
 Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars → response
 ```
 
-- `vps-scraper/server.js` — Express server, persistent browser instance, ephemeral contexts per request
+Note: the `/solicitar` page calls the VPS **directly** at `https://jorgeminnesota.duckdns.org/api/scrape`, bypassing the Vercel proxy. The `x-api-key` is hardcoded client-side in `pages/solicitar.js`, so for that flow the key is effectively public.
+
+- Express server, persistent browser instance, ephemeral contexts per request
 - Requires `x-api-key` header matching `SCRAPER_API_KEY` env var
-- Has its own `CLAUDE.md` with setup/deployment instructions
+- The scraper repo has its own `CLAUDE.md` with setup/deployment instructions
 
 ### User Roles and Permissions
 
@@ -111,6 +113,7 @@ Client → Vercel (/api/scrape-vehicle) → VPS (:4000/api/scrape) → bid.cars 
 ## Other Notes
 
 - **README.md is outdated** — it's from the original landing page template and does not reflect the current app. Ignore it.
+- **`Historial.md`** is a running audit/correction log (in Spanish) documenting data-integrity investigations and fixes (e.g. inconsistent `binNip` values with trailing spaces causing exact doc-ID lookups to fail). Consult it before touching `viajesPagados`/`vehiculos` reconciliation logic; it records which one-off scripts were already run.
 
 ## Known Issues to Be Aware Of
 
