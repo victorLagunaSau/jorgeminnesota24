@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import firebase from "firebase/app";
 import { firestore } from "../../../firebase/firebaseIni";
+import { COLLECTIONS } from "../../../constants";
 import {
     FaCar, FaUser, FaMapMarkerAlt, FaSearch,
     FaTruck, FaEye, FaTimes, FaChevronDown, FaChevronRight,
-    FaGavel, FaBarcode, FaCalendarAlt, FaCheck, FaCheckCircle, FaPlus, FaTrash, FaIdCard
+    FaGavel, FaBarcode, FaCalendarAlt, FaCheck, FaCheckCircle, FaPlus, FaTrash, FaIdCard, FaUndo
 } from "react-icons/fa";
 
 const US_STATES_MAP = {
@@ -141,6 +143,63 @@ const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
             });
         } catch (error) {
             console.error("Error actualizando estado:", error);
+        } finally {
+            setActualizando(null);
+        }
+    };
+
+    // Devolver una solicitud "asignado" a "pendiente":
+    // quita el vehículo del viaje, borra el lote en tránsito y limpia los campos de asignación.
+    const desasignarSolicitud = async (sol) => {
+        if (sol.estado !== "asignado") return;
+        if (!confirm("¿Devolver esta solicitud a Pendiente? Se quitará del viaje asignado.")) return;
+
+        setActualizando(sol.id);
+        try {
+            const batch = firestore().batch();
+            const viajeId = sol.viajeId;
+
+            // 1. Quitar el vehículo del viaje (si todavía existe)
+            if (viajeId) {
+                const viajeRef = firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId);
+                const viajeDoc = await viajeRef.get();
+                if (viajeDoc.exists) {
+                    const viajeData = viajeDoc.data();
+                    const vehiculos = viajeData.vehiculos || [];
+                    const vehiculoIdx = vehiculos.findIndex(v => v.solicitudId === sol.id);
+                    if (vehiculoIdx !== -1) {
+                        const vehiculoQuitado = vehiculos[vehiculoIdx];
+                        const nuevosVehiculos = vehiculos.filter((_, i) => i !== vehiculoIdx);
+
+                        if (nuevosVehiculos.length === 0) {
+                            // Era el último vehículo del viaje → borrar el viaje completo
+                            batch.delete(viajeRef);
+                        } else {
+                            batch.update(viajeRef, { vehiculos: nuevosVehiculos });
+                        }
+
+                        // Borrar el lote en tránsito asociado
+                        if (vehiculoQuitado.lote) {
+                            batch.delete(firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(vehiculoQuitado.lote));
+                        }
+                    }
+                }
+            }
+
+            // 2. Revertir la solicitud a "pendiente"
+            batch.update(firestore().collection("solicitudesVehiculos").doc(sol.id), {
+                estado: "pendiente",
+                viajeId: firebase.firestore.FieldValue.delete(),
+                fechaAsignado: firebase.firestore.FieldValue.delete(),
+                asignadoPor: firebase.firestore.FieldValue.delete(),
+                empresaAsignada: firebase.firestore.FieldValue.delete()
+            });
+
+            await batch.commit();
+            if (modalDetalle?.id === sol.id) setModalDetalle(null);
+        } catch (error) {
+            console.error("Error desasignando solicitud:", error);
+            alert("Error al devolver la solicitud: " + error.message);
         } finally {
             setActualizando(null);
         }
@@ -357,6 +416,16 @@ const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
                         >
                             <FaEye size={12} />
                         </button>
+                        {sol.estado === "asignado" && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); desasignarSolicitud(sol); }}
+                                disabled={actualizando === sol.id}
+                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all disabled:opacity-50"
+                                title="Devolver a Pendiente"
+                            >
+                                <FaUndo size={11} />
+                            </button>
+                        )}
                         <button
                             onClick={(e) => { e.stopPropagation(); eliminarSolicitud(sol.id); }}
                             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
@@ -577,7 +646,31 @@ const SolicitudesCarrier = ({ user, onCrearViaje, estadosAutorizados }) => {
                                     <span className="text-gray-400 text-xs w-16">Ordenado</span>
                                     <span className="text-gray-800">{formatDate(modalDetalle.fechaSolicitud, true)}</span>
                                 </div>
+                                {modalDetalle.estado === "asignado" && modalDetalle.empresaAsignada && (
+                                    <div className="flex items-center gap-2">
+                                        <FaTruck className="text-indigo-400 text-xs flex-shrink-0" />
+                                        <span className="text-gray-400 text-xs w-16">Asignado a</span>
+                                        <span className="font-medium text-gray-800">{modalDetalle.empresaAsignada}</span>
+                                    </div>
+                                )}
                             </div>
+
+                            {/* Acción: devolver a pendiente */}
+                            {modalDetalle.estado === "asignado" && (
+                                <div className="mt-4 pt-3 border-t border-gray-100">
+                                    <button
+                                        onClick={() => desasignarSolicitud(modalDetalle)}
+                                        disabled={actualizando === modalDetalle.id}
+                                        className="w-full py-2.5 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                                    >
+                                        <FaUndo size={12} />
+                                        Devolver a Pendiente
+                                    </button>
+                                    <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                                        Esto quitará el vehículo del viaje y la solicitud volverá a estar disponible.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
