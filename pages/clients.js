@@ -19,6 +19,7 @@ import {
 
 const ClientsPage = () => {
     const { user, loading, isCliente, signIn, signOut } = useAuthContext();
+    const router = useRouter();
     const [vehiculos, setVehiculos] = useState([]);
     const [solicitudes, setSolicitudes] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(true);
@@ -245,14 +246,58 @@ const ClientsPage = () => {
     }, [user?.datosCliente?.id, user?.id]);
 
     // === Auth handlers ===
+    // Login unificado: si el input parece email → cliente (Firebase Auth);
+    // si es numérico → folio de chofer (consulta a colección choferes).
     const handleLogin = async (e) => {
         e.preventDefault();
         setError("");
+        const id = email.trim();
+        if (!id || !pass) { setError("Ingresa tus credenciales."); return; }
+
+        const esEmail = id.includes("@");
+        const esFolio = /^\d+$/.test(id);
+
+        if (!esEmail && !esFolio) {
+            setError("Ingresa un email válido o un folio numérico.");
+            return;
+        }
+
         setLoadingAuth(true);
         try {
-            await signIn(email, pass);
+            if (esEmail) {
+                await signIn(id.toLowerCase(), pass);
+            } else {
+                // Login como chofer por folio + clave
+                const snap = await firestore()
+                    .collection(COLLECTIONS.CHOFERES)
+                    .where("folio", "==", parseInt(id, 10))
+                    .get();
+
+                if (snap.empty) {
+                    setError("Folio no encontrado.");
+                    setLoadingAuth(false);
+                    return;
+                }
+                const doc = snap.docs[0];
+                const data = doc.data();
+                if (!data.clave) {
+                    setError("Sin clave asignada. Contacta al administrador.");
+                    setLoadingAuth(false);
+                    return;
+                }
+                if (data.clave !== pass) {
+                    setError("Contraseña incorrecta.");
+                    setLoadingAuth(false);
+                    return;
+                }
+
+                const choferData = { id: doc.id, ...data };
+                localStorage.setItem(DRIVER_SESSION_KEY, JSON.stringify(choferData));
+                router.push("/driver");
+            }
         } catch (err) {
-            setError("Credenciales incorrectas.");
+            console.error("Error login:", err);
+            setError(esEmail ? "Credenciales incorrectas." : "Error de conexión. Intenta de nuevo.");
         } finally {
             setLoadingAuth(false);
         }
@@ -486,7 +531,7 @@ const ClientsPage = () => {
                             Portal de Clientes
                         </h1>
                         <p className="text-sm text-gray-500 mt-1">
-                            {modoAuth === "login" ? "Inicia sesión para ver tus vehículos" : "Crea tu cuenta para comenzar"}
+                            {modoAuth === "login" ? "Inicia sesión" : "Crea tu cuenta para comenzar"}
                         </p>
                     </div>
 
@@ -509,13 +554,16 @@ const ClientsPage = () => {
                     {error && <p className="text-red-500 text-center mb-4 text-sm">{error}</p>}
 
                     {modoAuth === "login" ? (
-                        /* --- LOGIN --- */
+                        /* --- LOGIN (cliente: email / chofer: folio) --- */
                         <form onSubmit={handleLogin} className="space-y-4">
                             <div className="relative">
                                 <FaUser className="absolute left-4 top-4 text-gray-300"/>
                                 <input
-                                    type="email"
-                                    placeholder="Email"
+                                    type="text"
+                                    inputMode="email"
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    placeholder="Email o Folio"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black"
@@ -689,13 +737,9 @@ const ClientsPage = () => {
                             </button>
                         </form>
                     )}
-                    <div className="mt-6 text-center">
-                        <Link href="/driver">
-                            <a className="text-sm text-gray-500 hover:text-indigo-600 transition-colors font-medium">
-                                ← Soy Chofer
-                            </a>
-                        </Link>
-                    </div>
+                    <p className="mt-6 text-center text-[11px] text-gray-400">
+                        Clientes: usa tu email · Choferes: usa tu folio
+                    </p>
                 </div>
             </div>
         );

@@ -89,10 +89,11 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
     }, [user]);
 
     const handleLocalEdit = async (viajeId, vehiculoIdx, field, value) => {
-        // Verificar si el usuario tiene permisos (admin o líder de ruta)
+        // Verificar si el usuario tiene permisos (admin, líder de ruta o empresa creadora)
         const viaje = viajes.find(v => v.id === viajeId);
         const esLiderRuta = viaje && viaje.empresaLiderId === user.id;
-        if (!user.admin && !esLiderRuta) return;
+        const esEmpresaCreadora = viaje && viaje.empresaId === user.id;
+        if (!user.admin && !esLiderRuta && !esEmpresaCreadora) return;
 
         const nuevosViajes = viajes.map(viaje => {
             if (viaje.id === viajeId) {
@@ -243,17 +244,43 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
         if (!viaje) return;
 
         try {
-            // Eliminar viaje de viajesPendientes
-            await firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId).delete();
-
-            // Eliminar todos los lotes en tránsito asociados
             const batch = firestore().batch();
-            viaje.vehiculos.forEach(v => {
-                const loteRef = firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote);
-                batch.delete(loteRef);
-            });
-            await batch.commit();
 
+            // Borrar el viaje
+            batch.delete(firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(viajeId));
+
+            // Borrar lotes en tránsito asociados
+            viaje.vehiculos.forEach(v => {
+                if (v.lote) {
+                    const loteRef = firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote);
+                    batch.delete(loteRef);
+                }
+            });
+
+            // Revertir solicitudes a "pendiente" si seguían asignadas a este viaje
+            const solicitudIds = viaje.vehiculos.map(v => v.solicitudId).filter(Boolean);
+            if (solicitudIds.length > 0) {
+                const snaps = await Promise.all(
+                    solicitudIds.map(id =>
+                        firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(id).get()
+                    )
+                );
+                snaps.forEach(snap => {
+                    if (!snap.exists) return;
+                    const data = snap.data();
+                    if (data.estado === "asignado" && data.viajeId === viajeId) {
+                        batch.update(snap.ref, {
+                            estado: "pendiente",
+                            viajeId: firebase.firestore.FieldValue.delete(),
+                            fechaAsignado: firebase.firestore.FieldValue.delete(),
+                            asignadoPor: firebase.firestore.FieldValue.delete(),
+                            empresaAsignada: firebase.firestore.FieldValue.delete()
+                        });
+                    }
+                });
+            }
+
+            await batch.commit();
             setModal({show: false});
         } catch (error) {
             console.error("Error al eliminar viaje:", error);
@@ -313,6 +340,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
             return;
         }
 
+        const vehiculoEliminado = viaje.vehiculos[vehiculoIdx];
         const nuevosVehiculos = viaje.vehiculos.filter((_, idx) => idx !== vehiculoIdx);
 
         try {
@@ -324,6 +352,24 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
             // Si el lote tenía un número, eliminar de lotesEnTransito
             if (lote && lote.trim() !== "") {
                 await firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(lote).delete();
+            }
+
+            // Si el vehículo venía de una solicitud, revertirla a "pendiente"
+            if (vehiculoEliminado?.solicitudId) {
+                const solRef = firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(vehiculoEliminado.solicitudId);
+                const solDoc = await solRef.get();
+                if (solDoc.exists) {
+                    const data = solDoc.data();
+                    if (data.estado === "asignado" && data.viajeId === viajeId) {
+                        await solRef.update({
+                            estado: "pendiente",
+                            viajeId: firebase.firestore.FieldValue.delete(),
+                            fechaAsignado: firebase.firestore.FieldValue.delete(),
+                            asignadoPor: firebase.firestore.FieldValue.delete(),
+                            empresaAsignada: firebase.firestore.FieldValue.delete()
+                        });
+                    }
+                }
             }
 
             setModal({show: false});
@@ -828,7 +874,8 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
             {modalComentario.show && (() => {
                 const viajeModal = viajes.find(vj => vj.id === modalComentario.viajeId);
                 const esLiderRutaModal = viajeModal && viajeModal.empresaLiderId === user.id;
-                const puedeEditarModal = user.admin || esLiderRutaModal;
+                const esEmpresaCreadoraModal = viajeModal && viajeModal.empresaId === user.id;
+                const puedeEditarModal = user.admin || esLiderRutaModal || esEmpresaCreadoraModal;
 
                 return (
                     <div
@@ -1099,7 +1146,8 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                 <tbody>
                                 {viaje.vehiculos.map((v, idx) => {
                                     const esLiderRuta = viaje.empresaLiderId === user.id;
-                                    const puedeEditar = user.admin || esLiderRuta;
+                                    const esEmpresaCreadora = viaje.empresaId === user.id;
+                                    const puedeEditar = user.admin || esLiderRuta || esEmpresaCreadora;
                                     const tieneComentarios = (v.comentarioRegistro && v.comentarioRegistro !== "") || (v.comentarioRecepcion && v.comentarioRecepcion !== "");
 
                                     return (
@@ -1458,7 +1506,7 @@ const TablaViajes = ({user, borradores, onEditarBorrador, onDescartarBorrador}) 
                                     );
                                 })}
                                 {/* Fila para agregar vehículo */}
-                                {(user.admin || viaje.empresaLiderId === user.id) && (
+                                {(user.admin || viaje.empresaLiderId === user.id || viaje.empresaId === user.id) && (
                                     <tr className="bg-gray-50 border-t-2 border-dashed border-gray-200">
                                         <td className="p-1 text-center">
                                             <button

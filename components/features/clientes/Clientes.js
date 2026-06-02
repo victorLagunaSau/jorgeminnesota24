@@ -6,9 +6,10 @@ import { firestore } from "../../../firebase/firebaseIni";
 import FormCliente from "./FormCliente";
 import {
     FaTimes, FaSearch, FaChevronLeft, FaChevronRight,
-    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus, FaPrint, FaClock
+    FaPhone, FaMapMarkerAlt, FaEdit, FaUserPlus, FaPrint, FaClock, FaSitemap
 } from "react-icons/fa";
 import ClientesNuevos from "./ClientesNuevos";
+import FusionarClientes from "./FusionarClientes";
 
 const Clientes = ({ user }) => {
     const { clientes: clientesRaw, loading } = useAdminData();
@@ -21,8 +22,10 @@ const Clientes = ({ user }) => {
     const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
     const [vehiculosCliente, setVehiculosCliente] = useState([]);
     const [loadingVehiculos, setLoadingVehiculos] = useState(false);
+    const [histPagina, setHistPagina] = useState(1);
     const [vistaActual, setVistaActual] = useState("lista"); // "lista" | "nuevos"
     const [pendientesCount, setPendientesCount] = useState(0);
+    const [showFusionar, setShowFusionar] = useState(false);
 
     // Vehículos no entregados + entregados con fiado pendiente (nuevo o legacy)
     const [todosVehiculos, setTodosVehiculos] = useState([]);
@@ -120,6 +123,7 @@ const Clientes = ({ user }) => {
 
     const clientes = useMemo(() => {
         return [...clientesRaw]
+            .filter(c => c.activo !== false) // ocultar clientes fusionados (inactivos)
             .map(c => ({
                 ...c,
                 ...getDeudaCliente(c.cliente),
@@ -163,6 +167,7 @@ const Clientes = ({ user }) => {
         }
 
         setLoadingVehiculos(true);
+        setHistPagina(1);
 
         const unsubVehiculos = firestore()
             .collection("vehiculos")
@@ -466,6 +471,80 @@ const Clientes = ({ user }) => {
                     )}
                 </div>
 
+                {/* Historial — todos los carros que ha pedido (cargado solo al entrar al cliente) */}
+                <div className="mb-10">
+                    <p className="text-xs font-black text-gray-500 uppercase tracking-wide mb-3">
+                        Historial — Carros Pedidos ({vehiculosCliente.length})
+                    </p>
+                    {loadingVehiculos ? (
+                        <span className="loading loading-spinner loading-sm text-gray-300"></span>
+                    ) : vehiculosCliente.length === 0 ? (
+                        <p className="text-gray-300 text-sm">Sin carros registrados</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="table table-sm w-full">
+                                <thead>
+                                    <tr className="border-b border-gray-200 text-[10px] text-gray-400 font-bold uppercase">
+                                        <th className="py-2">Fecha</th>
+                                        <th>Lote</th>
+                                        <th>Vehículo</th>
+                                        <th>Origen</th>
+                                        <th className="text-center">Estatus</th>
+                                        <th className="text-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm">
+                                    {[...vehiculosCliente]
+                                        .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))
+                                        .slice((histPagina - 1) * 20, histPagina * 20)
+                                        .map((v) => {
+                                            const fecha = v.timestamp?.seconds
+                                                ? new Date(v.timestamp.seconds * 1000).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                : '-';
+                                            const entregado = v.estatus === "EN";
+                                            return (
+                                                <tr key={v.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                                                    <td className="text-gray-500 text-xs whitespace-nowrap">{fecha}</td>
+                                                    <td className="font-mono font-bold text-blue-600">{v.binNip}</td>
+                                                    <td className="text-gray-700">{v.marca} {v.modelo}</td>
+                                                    <td className="text-gray-400">{v.ciudad}, {v.estado}</td>
+                                                    <td className="text-center">
+                                                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${entregado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {v.estatus}
+                                                        </span>
+                                                    </td>
+                                                    <td className="text-right text-gray-600">${calcularPrecioVehiculo(v).toFixed(2)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+
+                            {vehiculosCliente.length > 20 && (
+                                <div className="flex items-center justify-between mt-3">
+                                    <button
+                                        className="btn btn-sm bg-white hover:bg-gray-100 text-gray-600 border border-gray-200 font-bold rounded-lg gap-1"
+                                        disabled={histPagina === 1}
+                                        onClick={() => setHistPagina(p => p - 1)}
+                                    >
+                                        <FaChevronLeft /> Anterior
+                                    </button>
+                                    <span className="text-xs font-bold text-gray-500">
+                                        Página {histPagina} de {Math.ceil(vehiculosCliente.length / 20)}
+                                    </span>
+                                    <button
+                                        className="btn btn-sm bg-white hover:bg-gray-100 text-gray-600 border border-gray-200 font-bold rounded-lg gap-1"
+                                        disabled={histPagina >= Math.ceil(vehiculosCliente.length / 20)}
+                                        onClick={() => setHistPagina(p => p + 1)}
+                                    >
+                                        Siguiente <FaChevronRight />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Modal Editar */}
                 <AnimatePresence>
                     {showFormModal && (
@@ -542,6 +621,14 @@ const Clientes = ({ user }) => {
                             </span>
                         )}
                     </button>
+                    {user?.adminMaster && (
+                        <button
+                            onClick={() => setShowFusionar(true)}
+                            className="btn bg-gray-800 hover:bg-gray-900 text-white border-none font-black uppercase gap-2 rounded-xl"
+                        >
+                            <FaSitemap /> Fusionar
+                        </button>
+                    )}
                     <button
                         onClick={handleNuevoCliente}
                         className="btn bg-red-600 hover:bg-red-700 text-white border-none font-black uppercase gap-2 rounded-xl"
@@ -653,6 +740,13 @@ const Clientes = ({ user }) => {
                             </div>
                         </motion.div>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal Fusionar Clientes (solo masterAdmin) */}
+            <AnimatePresence>
+                {showFusionar && user?.adminMaster && (
+                    <FusionarClientes onClose={() => setShowFusionar(false)} />
                 )}
             </AnimatePresence>
         </motion.div>

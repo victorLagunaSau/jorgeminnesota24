@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import dynamic from "next/dynamic";
 import { firestore } from "../firebase/firebaseIni";
 import { COLLECTIONS } from "../constants";
@@ -23,6 +24,7 @@ const MAX_FOTOS = 10;
 const MIN_FOTOS_LEVANTADO = 2;
 
 const DriverPage = () => {
+    const router = useRouter();
     const [chofer, setChofer] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -112,6 +114,13 @@ const DriverPage = () => {
         } catch (_) {}
         setLoading(false);
     }, []);
+
+    // Si no hay sesión de chofer, redirigir al login unificado en /clients
+    useEffect(() => {
+        if (!loading && !chofer) {
+            router.replace("/clients");
+        }
+    }, [loading, chofer, router]);
 
     // Cargar viajes (con cache offline)
     useEffect(() => {
@@ -266,6 +275,8 @@ const DriverPage = () => {
         setFolio("");
         setClave("");
         setVista("pendientes");
+        // Login unificado vive en /clients
+        router.push("/clients");
     };
 
     // === Marcar levantado ===
@@ -457,68 +468,11 @@ const DriverPage = () => {
         </div>
     );
 
-    // ============================================================
-    // LOGIN
-    // ============================================================
+    // Sin sesión → redirige al login unificado (/clients). Mostrar spinner mientras tanto.
     if (!chofer) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex flex-col justify-center p-6 safe-area-top safe-area-bottom">
-                <Head><title>Portal Choferes | Jorge Minnesota INC</title></Head>
-                <div className="max-w-md mx-auto w-full bg-white rounded-3xl shadow-2xl p-8 border border-gray-100">
-                    <div className="text-center mb-6">
-                        <img src="/assets/Logo.png" className="w-20 mx-auto mb-3" alt="Logo"/>
-                        <h1 className="text-2xl font-black uppercase italic tracking-tighter text-gray-800">
-                            Portal de Choferes
-                        </h1>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Ingresa tu folio y clave para ver tus cargas
-                        </p>
-                    </div>
-
-                    {error && <p className="text-red-500 text-center mb-4 text-sm">{error}</p>}
-
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="relative">
-                            <FaHashtag className="absolute left-4 top-4 text-gray-300"/>
-                            <input
-                                type="number"
-                                placeholder="Folio (Ej: 12)"
-                                value={folio}
-                                onChange={(e) => setFolio(e.target.value)}
-                                className="input input-bordered w-full pl-12 bg-gray-50 border-none text-black font-bold text-center text-lg"
-                                style={{ fontSize: '16px' }}
-                                required
-                            />
-                        </div>
-                        <div className="relative">
-                            <FaLock className="absolute left-4 top-4 text-gray-300"/>
-                            <input
-                                type={mostrarClave ? "text" : "password"}
-                                placeholder="Clave"
-                                value={clave}
-                                onChange={(e) => setClave(e.target.value)}
-                                className="input input-bordered w-full pl-12 pr-12 bg-gray-50 border-none text-black font-bold text-center text-lg tracking-widest"
-                                style={{ fontSize: '16px' }}
-                                maxLength={6}
-                                required
-                            />
-                            <button type="button" onClick={() => setMostrarClave(!mostrarClave)} className="absolute right-4 top-4 text-gray-400">
-                                {mostrarClave ? <FaEyeSlash /> : <FaEye />}
-                            </button>
-                        </div>
-                        <button type="submit" disabled={loadingAuth} className="btn btn-error w-full text-white font-black uppercase shadow-lg">
-                            {loadingAuth ? <span className="loading loading-spinner loading-sm"></span> : "Entrar"}
-                        </button>
-                    </form>
-
-                    <div className="mt-6 text-center">
-                        <Link href="/clients">
-                            <a className="text-sm text-gray-500 hover:text-red-600 transition-colors font-medium">
-                                Soy Cliente →
-                            </a>
-                        </Link>
-                    </div>
-                </div>
+            <div className="h-screen flex flex-col justify-center items-center bg-white">
+                <span className="loading loading-ring loading-lg text-blue-600"></span>
             </div>
         );
     }

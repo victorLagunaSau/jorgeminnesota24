@@ -15,3 +15,5 @@
 /mobile/ios/
 /mobile/android/
 /mobile/node_modules/
+# Firebase service account (NUNCA subir)
+serviceAccount.json

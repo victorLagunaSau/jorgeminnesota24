@@ -5,6 +5,40 @@ import { COLLECTIONS } from "../../../constants";
 const TablaEntradas = ({ entradasData, totalRecibido, isAdminMaster, onDataChange }) => {
   const [cambiando, setCambiando] = useState(null);
   const [eliminando, setEliminando] = useState(null);
+  const [editando, setEditando] = useState(null);
+  const [nuevoMonto, setNuevoMonto] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const iniciarEdicion = (entrada) => {
+    setEditando(entrada.id);
+    setNuevoMonto(String(parseFloat(entrada.cajaRecibo || 0)));
+  };
+
+  const cancelarEdicion = () => {
+    setEditando(null);
+    setNuevoMonto("");
+  };
+
+  const guardarMonto = async (entrada) => {
+    const monto = parseFloat(nuevoMonto);
+    if (isNaN(monto) || monto < 0) {
+      alert("Ingresa una cantidad válida.");
+      return;
+    }
+    if (guardando) return;
+    setGuardando(true);
+    try {
+      await firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(entrada.id).update({
+        cajaRecibo: monto,
+      });
+      cancelarEdicion();
+      if (onDataChange) onDataChange();
+    } catch (e) {
+      alert("Error al editar la cantidad: " + e.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
 
   const eliminarMovimiento = async (entrada) => {
     if (eliminando) return;
@@ -115,24 +149,62 @@ const TablaEntradas = ({ entradasData, totalRecibido, isAdminMaster, onDataChang
                         <td className="px-2 py-1 border">{entrada.entradaCajaMotivoPago}</td>
                         <td className="px-2 py-1 border">{entrada.entradaCajaTipo}</td>
                         <td className="px-2 py-1 border text-right">
-                          ${recibo.toFixed(2).toLocaleString('en-US')}
+                          {editando === entrada.id ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={nuevoMonto}
+                              onChange={(e) => setNuevoMonto(e.target.value)}
+                              autoFocus
+                              className="w-24 border border-blue-400 rounded px-1 py-0.5 text-right text-xs"
+                            />
+                          ) : (
+                            `$${recibo.toFixed(2).toLocaleString('en-US')}`
+                          )}
                         </td>
                         {isAdminMaster && (
-                          <td className="px-2 py-1 border text-center space-x-1">
-                            <button
-                              onClick={() => cambiarASalida(entrada)}
-                              disabled={cambiando === entrada.id}
-                              className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
-                            >
-                              {cambiando === entrada.id ? '...' : '→ Salida'}
-                            </button>
-                            <button
-                              onClick={() => eliminarMovimiento(entrada)}
-                              disabled={eliminando === entrada.id}
-                              className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-gray-100 text-gray-700 border-gray-400 hover:bg-red-200 hover:text-red-700"
-                            >
-                              {eliminando === entrada.id ? '...' : 'Eliminar'}
-                            </button>
+                          <td className="px-2 py-1 border text-center space-x-1 whitespace-nowrap">
+                            {editando === entrada.id ? (
+                              <>
+                                <button
+                                  onClick={() => guardarMonto(entrada)}
+                                  disabled={guardando}
+                                  className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-green-50 text-green-700 border-green-300 hover:bg-green-100"
+                                >
+                                  {guardando ? '...' : 'Guardar'}
+                                </button>
+                                <button
+                                  onClick={cancelarEdicion}
+                                  disabled={guardando}
+                                  className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-gray-100 text-gray-700 border-gray-400 hover:bg-gray-200"
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => iniciarEdicion(entrada)}
+                                  className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => cambiarASalida(entrada)}
+                                  disabled={cambiando === entrada.id}
+                                  className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
+                                >
+                                  {cambiando === entrada.id ? '...' : '→ Salida'}
+                                </button>
+                                <button
+                                  onClick={() => eliminarMovimiento(entrada)}
+                                  disabled={eliminando === entrada.id}
+                                  className="text-[9px] font-black uppercase px-2 py-1 rounded border transition-colors bg-gray-100 text-gray-700 border-gray-400 hover:bg-red-200 hover:text-red-700"
+                                >
+                                  {eliminando === entrada.id ? '...' : 'Eliminar'}
+                                </button>
+                              </>
+                            )}
                           </td>
                         )}
                       </tr>

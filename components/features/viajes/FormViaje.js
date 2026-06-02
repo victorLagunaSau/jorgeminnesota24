@@ -718,6 +718,11 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                 };
             } else {
                 choferData = choferes.find(c => c.id === encabezado.choferId);
+                if (!choferData) {
+                    setAlertMessage({ msg: "No se pudo identificar al chofer seleccionado. Vuelve a seleccionarlo de la lista.", tipo: 'error' });
+                    setGuardando(false);
+                    return;
+                }
             }
 
             // === MODO HISTORIAL: guardar directo en viajesPagados + crear vehiculos ===

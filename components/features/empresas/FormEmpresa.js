@@ -7,46 +7,36 @@ import { FaCloudUploadAlt, FaUserLock, FaExclamationTriangle } from "react-icons
 import { PHONE_CONFIG, COLLECTIONS, FIELD_LIMITS } from "../../../constants";
 import Alert from "../../ui/Alert";
 
+const ESTADO_INICIAL = {
+    nombreEmpresa: "",
+    taxId: "",
+    mcNumber: "",
+    direccion: "",
+    zipCode: "",
+    taxClassification: "Individual",
+    ciudadEmpresa: "",
+    estadoEmpresa: "",
+    paisEmpresa: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
+    representante: "",
+    telefonoEmpresa: "",
+    emailAcceso: "",
+    passwordAcceso: ""
+};
+
 const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
     const [loading, setLoading] = useState(false);
     const [alerta, setAlerta] = useState({ mostrar: false, mensaje: "", tipo: "" });
     const [archivo, setArchivo] = useState(null);
 
-    const [datos, setDatos] = useState({
-        nombreEmpresa: "",
-        taxId: "",
-        mcNumber: "",
-        direccion: "",
-        zipCode: "",
-        taxClassification: "Individual",
-        ciudadEmpresa: "",
-        estadoEmpresa: "",
-        paisEmpresa: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
-        representante: "",
-        telefonoEmpresa: "",
-        emailAcceso: "",
-        passwordAcceso: ""
-    });
+    const [datos, setDatos] = useState(ESTADO_INICIAL);
 
     useEffect(() => {
         if (empresaAEditar) {
-            setDatos({ ...empresaAEditar });
+            // Mezclamos sobre ESTADO_INICIAL para que los campos ausentes en empresas
+            // legacy queden como "" (string) y los inputs no pasen de controlados a no-controlados.
+            setDatos({ ...ESTADO_INICIAL, ...empresaAEditar });
         } else {
-            setDatos({
-                nombreEmpresa: "",
-                taxId: "",
-                mcNumber: "",
-                direccion: "",
-                zipCode: "",
-                taxClassification: "Individual",
-                ciudadEmpresa: "",
-                estadoEmpresa: "",
-                paisEmpresa: PHONE_CONFIG.DEFAULT_COUNTRY_NAME,
-                representante: "",
-                telefonoEmpresa: "",
-                emailAcceso: "",
-                passwordAcceso: ""
-            });
+            setDatos(ESTADO_INICIAL);
             setArchivo(null);
         }
     }, [empresaAEditar]);
@@ -74,8 +64,14 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
     };
 
     const ejecutarGuardado = async () => {
-        if (!datos.nombreEmpresa || !datos.taxId || !datos.telefonoEmpresa || !datos.emailAcceso || !datos.passwordAcceso) {
-            mostrarAviso("Faltan campos obligatorios", "error");
+        const faltantes = [];
+        if (!datos.nombreEmpresa) faltantes.push("Company Name");
+        if (!datos.taxId) faltantes.push("Tax ID");
+        if (!datos.telefonoEmpresa) faltantes.push("Phone");
+        if (!datos.emailAcceso) faltantes.push("Email de Acceso");
+        if (!datos.passwordAcceso) faltantes.push("Contraseña");
+        if (faltantes.length > 0) {
+            mostrarAviso("Faltan campos obligatorios: " + faltantes.join(", "), "error");
             return;
         }
 
@@ -91,61 +87,25 @@ const FormEmpresa = ({ user, onSuccess, empresaAEditar }) => {
 
             let empresaId = datos.id;
 
-            // Manejo de Auth (Lógica para creación y actualización de credenciales)
-            const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");
-            try {
-                if (!empresaAEditar) {
-                    // CREAR NUEVO USUARIO
+            // Auth solo al CREAR: app secundaria para no desloguear al admin actual.
+            // Al EDITAR no se toca el login de Firebase Auth; el correo/contrasena de
+            // acceso se cambian con scripts/cambiarAccesoEmpresa.js (Admin SDK).
+            if (!empresaAEditar) {
+                const secondaryApp = firebase.initializeApp(firebase.app().options, "Secondary");
+                try {
                     const userCredential = await secondaryApp.auth().createUserWithEmailAndPassword(datos.emailAcceso, datos.passwordAcceso);
                     empresaId = userCredential.user.uid;
-                } else {
-                    // ACTUALIZAR USUARIO EXISTENTE - SIN CAMBIAR EL ID
-                    empresaId = empresaAEditar.id;
-
-                    // Obtener credenciales actuales de Firestore
-                    const empresaDoc = await firestore().collection(COLLECTIONS.EMPRESAS).doc(empresaAEditar.id).get();
-                    const datosActuales = empresaDoc.data();
-                    const emailActual = datosActuales.emailAcceso;
-                    const passwordActual = datosActuales.passwordAcceso;
-
-                    try {
-                        // Intentar re-autenticar con credenciales actuales
-                        const userCredential = await secondaryApp.auth().signInWithEmailAndPassword(emailActual, passwordActual);
-                        const currentUser = userCredential.user;
-
-                        // Actualizar email si cambió
-                        if (datos.emailAcceso.toLowerCase() !== emailActual.toLowerCase()) {
-                            await currentUser.updateEmail(datos.emailAcceso.toLowerCase());
-                        }
-
-                        // Actualizar contraseña si cambió
-                        if (datos.passwordAcceso !== passwordActual) {
-                            await currentUser.updatePassword(datos.passwordAcceso);
-                        }
-                    } catch (loginError) {
-                        console.log("Error de autenticación:", loginError.code);
-
-                        // Si no existe en Auth, solo actualizar Firestore (el ID se mantiene)
-                        // El usuario podrá acceder cuando se sincronice manualmente en Firebase Console
-                        if (loginError.code === 'auth/user-not-found') {
-                            mostrarAviso("Usuario no existe en Auth. Se actualizarán solo los datos en Firestore.", "warning");
-                            // Continuar para guardar en Firestore con el mismo ID
-                        } else if (loginError.code === 'auth/wrong-password') {
-                            mostrarAviso("La contraseña actual no coincide. Se actualizarán solo los datos en Firestore.", "warning");
-                            // Continuar para guardar en Firestore con el mismo ID
-                        } else {
-                            throw loginError;
-                        }
-                    }
+                } catch (authError) {
+                    console.error("Error creando empresa en Auth:", authError);
+                    mostrarAviso("Error: " + authError.message, "error");
+                    setLoading(false);
+                    return;
+                } finally {
+                    await secondaryApp.auth().signOut();
+                    await secondaryApp.delete();
                 }
-            } catch (authError) {
-                console.error("Error en Auth:", authError);
-                mostrarAviso("Error: " + authError.message, "error");
-                setLoading(false);
-                return;
-            } finally {
-                await secondaryApp.auth().signOut();
-                await secondaryApp.delete();
+            } else {
+                empresaId = empresaAEditar.id;
             }
 
             const usuarioData = {
