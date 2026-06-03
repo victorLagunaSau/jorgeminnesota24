@@ -253,3 +253,30 @@ Son **carros del 2025 cargados retroactivamente** a caja en enero-febrero 2026. 
 5. **[BAJO] Revisar 57 inconsistencias de cliente** — Revisión manual
 6. **[BAJO] Revisar 4 duplicados restantes** — PRIVADOV, 44397683, 44286892, 44619935
 7. **[BAJO] Limpiar 986 binNips históricos mal formateados** — Migración masiva
+
+---
+
+## Endurecimiento de flujos (3 junio 2026)
+
+Revisión completa de los 3 flujos (solicitud del cliente → agenda de carriers → cobro admin) y corrección de problemas de concurrencia, atomicidad y validación. Todos los cambios verificados con `npm run build`. **No se ejecutaron scripts de datos** — son cambios de código de aplicación.
+
+### Flujo CLIENTE (`pages/solicitar.js`, `constants/index.js`)
+- `SOLICITUD_STATUS` ahora incluye `APROBADO` (estaba desincronizado con el código) y `solicitar.js` usa la constante en vez de strings mágicos.
+- Anti-duplicados: bloquea pedir el mismo lote si ya hay una solicitud activa del cliente.
+- Saneo de datos del scraper (`limpiarCampo`): recorta/limita longitud y exige al menos el lote antes de guardar.
+- Toast de confirmación al registrar la solicitud (antes se limpiaba el form en silencio).
+
+### Flujo CARRIERS (`pages/carrier-mapa.js`, `components/features/viajes/FormViaje.js`, `utils/index.js`)
+- **Fuga de datos corregida:** `carrier-mapa` con `estadosAutorizados` vacío devolvía `true` (veía todo); ahora `false`, consistente con `/carriers`.
+- **Lote a prueba de concurrencia:** creación de viaje convertida de `batch` a `runTransaction` que revalida `lotesEnTransito` dentro de la transacción → dos carriers no pueden agarrar el mismo lote.
+- `notificarViajeAsignado` ahora chequea `response.ok` y devuelve booleano; `FormViaje` avisa (mensaje ámbar) si el push al chofer falla.
+
+### Flujo ADMIN/COBRO
+- **`PagosPendientes.js`:** vehículo + movimiento en un `batch` (atómico); cerrojo `useRef` + guarda `pagoExitoso` contra doble abono.
+- **`PagoAdelantado.js`:** vehículo + movimiento en un `batch`; cerrojo `useRef` + botón "Confirmar" deshabilitado mientras procesa; `redondearDinero` en el monto.
+- **`ModalLiquidacion.js`:** relee los vehículos **dentro** de `runTransaction` (cierra ventana de doble cobro); cerrojo `useRef`; `redondearDinero` en todos los totales.
+- **`Cobranza.js`:** `redondearDinero` en los totales de los reportes (sin drift de centavos).
+
+### Pendiente de esta revisión
+- **Firestore Security Rules:** no existe el archivo; toda la autorización vive en React (saltable desde la app/llamada directa). Pendiente de mapear colecciones × roles, redactar `firestore.rules` y desplegar con emulador.
+- **API key del scraper hardcodeada** en `solicitar.js` y `api/scrape-vehicle.js`: decisión diferida (enrutar por proxy / mover a env var).

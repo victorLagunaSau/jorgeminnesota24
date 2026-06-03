@@ -59,7 +59,7 @@ const CarrierMapaPage = () => {
     }, [user]);
 
     const locationEnEstadoAutorizado = useCallback((location) => {
-        if (!estadosAutorizados || estadosAutorizados.length === 0) return true;
+        if (!estadosAutorizados || estadosAutorizados.length === 0) return false; // sin estados autorizados = no ver nada (consistente con /carriers)
         if (!location) return false;
         const match = location.match(/\b([A-Z]{2})\b/);
         if (match && US_STATES_MAP[match[1]]) return estadosAutorizados.includes(match[1]);

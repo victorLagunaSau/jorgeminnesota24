@@ -31,6 +31,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
     // --- ESTADOS PARA MODAL DE ÉXITO E IMPRESIÓN ---
     const [mostrarModalExito, setMostrarModalExito] = useState(false);
     const [viajeReciente, setViajeReciente] = useState(null);
+    const [notifChoferFallida, setNotifChoferFallida] = useState(false);
 
     // --- REFERENCIAS (Para la impresión automática) ---
     const componenteRef = useRef();
@@ -859,48 +860,68 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                 vehiculos: vehiculos.map((v, index) => ({...v, order: index + 1}))
             };
 
-            const batch = firestore().batch();
-
-            batch.set(firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(docId), viajeData);
-
-            vehiculos.forEach(v => {
-                batch.set(firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote), {
-                    viajeAsignado: docId,
-                    choferNombre: choferData?.nombre || encabezado.choferManual,
-                    fechaBloqueo: new Date()
-                });
-
-                // Si el vehículo viene de una solicitud, actualizar la solicitud a "asignado"
-                if (v.solicitudId) {
-                    batch.update(firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(v.solicitudId), {
-                        estado: "asignado",
-                        viajeId: docId,
-                        fechaAsignado: new Date(),
-                        asignadoPor: user?.nombre || user?.username || "Usuario",
-                        empresaAsignada: user?.datosEmpresa?.nombreEmpresa || user?.username || ""
-                    });
-                }
-            });
+            // Transacción: revalida que ningún lote ya esté en tránsito (evita que dos
+            // carriers agarren el mismo lote a la vez) antes de escribir.
+            const lotesRefs = vehiculos.map(v =>
+                firestore().collection(COLLECTIONS.LOTES_EN_TRANSITO).doc(v.lote)
+            );
 
             await Promise.race([
-                batch.commit(),
+                firestore().runTransaction(async (tx) => {
+                    // Todas las lecturas deben ir antes de las escrituras en una transacción
+                    const snaps = await Promise.all(lotesRefs.map(ref => tx.get(ref)));
+                    const yaEnTransito = snaps
+                        .map((snap, i) => (snap.exists ? vehiculos[i].lote : null))
+                        .filter(Boolean);
+                    if (yaEnTransito.length > 0) {
+                        throw new Error(`El lote ${yaEnTransito.join(", ")} ya está en tránsito en otro viaje. Refresca y verifica.`);
+                    }
+
+                    tx.set(firestore().collection(COLLECTIONS.VIAJES_PENDIENTES).doc(docId), viajeData);
+
+                    vehiculos.forEach((v, i) => {
+                        tx.set(lotesRefs[i], {
+                            viajeAsignado: docId,
+                            choferNombre: choferData?.nombre || encabezado.choferManual,
+                            fechaBloqueo: new Date()
+                        });
+
+                        // Si el vehículo viene de una solicitud, actualizar la solicitud a "asignado"
+                        if (v.solicitudId) {
+                            tx.update(firestore().collection(COLLECTIONS.SOLICITUDES_VEHICULOS).doc(v.solicitudId), {
+                                estado: "asignado",
+                                viajeId: docId,
+                                fechaAsignado: new Date(),
+                                asignadoPor: user?.nombre || user?.username || "Usuario",
+                                empresaAsignada: user?.datosEmpresa?.nombreEmpresa || user?.username || ""
+                            });
+                        }
+                    });
+                }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error("Sin conexión. Verifica tu internet e intenta de nuevo.")), 15000))
             ]);
             setViajeReciente(viajeData);
             limpiarBorrador();
 
-            // Notificar al chofer por push
+            // Notificar al chofer por push (no bloquea la creación del viaje, pero avisamos si falla)
+            let notifOk = true;
             if (choferData?.id && !esChoferTemporal) {
-                notificarViajeAsignado(
+                notifOk = await notificarViajeAsignado(
                     choferData.id,
                     vehiculos.length,
                     user?.datosEmpresa?.nombreEmpresa || user?.nombre || "Empresa"
                 );
             }
+            setNotifChoferFallida(!notifOk);
 
             // Si hay callback de redirección (modo administrativo), redirigir automáticamente
             if (onViajeCreado) {
-                setAlertMessage({msg: `Viaje creado exitosamente. Redirigiendo...`, tipo: 'success'});
+                setAlertMessage({
+                    msg: notifOk
+                        ? `Viaje creado exitosamente. Redirigiendo...`
+                        : `Viaje creado, pero NO se pudo notificar al chofer. Avísale manualmente.`,
+                    tipo: notifOk ? 'success' : 'warning'
+                });
                 setGuardando(false);
 
                 // Limpiar estados y redirigir después de un breve momento
@@ -952,6 +973,12 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                             <p className="text-[10px] font-black text-gray-400 mt-2 uppercase">{viajeReciente?.vehiculos?.length} UNIDADES
                                 EN TRÁNSITO</p>
                         </div>
+
+                        {notifChoferFallida && (
+                            <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-xs font-bold uppercase">
+                                No se pudo notificar al chofer por la app. Avísale manualmente.
+                            </div>
+                        )}
 
                         <ReactToPrint
                             trigger={() => (

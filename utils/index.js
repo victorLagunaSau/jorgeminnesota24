@@ -317,20 +317,27 @@ export const notificarCambioEstatus = async (clienteNombre, nuevoEstatus, vehicu
  * @param {number} numVehiculos - Number of vehicles in the trip
  * @param {string} empresaNombre - Carrier company name
  */
+// Devuelve true si la notificación se envió correctamente, false si falló.
 export const notificarViajeAsignado = async (choferId, numVehiculos, empresaNombre) => {
-  if (!choferId) return;
+  if (!choferId) return false;
 
   const titulo = "Nuevo viaje asignado";
   const mensaje = `${empresaNombre} te asignó un viaje con ${numVehiculos} vehículo${numVehiculos > 1 ? 's' : ''}. Abre la app para ver los detalles.`;
 
   try {
-    await fetch("/api/send-push-chofer", {
+    const res = await fetch("/api/send-push-chofer", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ choferId, titulo, mensaje }),
     });
+    if (!res.ok) {
+      console.error("Push al chofer respondió con error:", res.status);
+      return false;
+    }
+    return true;
   } catch (err) {
     console.error("Error enviando push al chofer:", err);
+    return false;
   }
 };
 

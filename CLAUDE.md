@@ -122,9 +122,9 @@ Note: the `/solicitar` page calls the VPS **directly** at `https://jorgeminnesot
 
 - `/api/scrape-vehicle` has no authentication or rate limiting
 - No Firestore security rules file exists
-- Payment writes in `PagoVehiculo.js` and `PagosPendientes.js` are not atomic (vehicle + movement written separately)
+- Payment writes: `PagoVehiculo.js` uses a transaction; `PagosPendientes.js` and `PagoAdelantado.js` now write vehicle + movement together in a `batch` (made atomic 3-jun-2026). `ModalLiquidacion.js` re-reads vehicles inside its `runTransaction` to avoid double-charge. Payment/abono handlers also use a `useRef` lock against double-click.
 - UID `"BdRfEmYfd7ZLjWQHB06uuT6w2112"` is hardcoded in `PagoVehiculo.js` and `Vehiculos.js`
-- Financial arithmetic uses floating point instead of integer cents
+- Financial arithmetic uses floating point instead of integer cents (mitigated with `redondearDinero()` on sums/totals, but storage is still float — not true integer cents)
 - `firebase` is v7 (legacy namespace API, not modular v9+). All new Firebase code must use the `import firebase from "firebase/app"` + `firebase.firestore()` pattern — do not use v9 modular imports
 - Hardcoded name-based permission in `Sidebar.js`: `puedeVerAnticipos` checks if user name includes "olivia" or "cristela" to gate access to `historialAnticipos` and related sub-modules
 - `tailwind.config.js` defines `boxShadow` at top-level `theme` (not `theme.extend`), which replaces all default Tailwind shadows with a custom set — adding new shadow utilities requires updating this config

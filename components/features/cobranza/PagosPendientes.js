@@ -31,6 +31,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
     const [pagoExitoso, setPagoExitoso] = useState(false);
     const reactToPrintRef = useRef();
     const printTimeoutRef = useRef(null);
+    const enviandoRef = useRef(false); // cerrojo síncrono contra doble-click
     const [ultimoAbono, setUltimoAbono] = useState(null);
 
     // Cancela la impresión pendiente si el modal se cierra antes de los 500ms
@@ -66,6 +67,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
     const abonoTotal = redondearDinero((parseFloat(montoEfectivo) || 0) + (parseFloat(montoCC) || 0));
 
     const handlePago = async () => {
+        if (enviandoRef.current || pagoExitoso) return; // evita doble abono por doble-click
         if (abonoTotal <= 0) {
             showAlert("Ingresa un monto a abonar.", "error");
             return;
@@ -75,6 +77,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
             return;
         }
 
+        enviandoRef.current = true;
         setLoading(true);
         try {
             const nuevoSaldo = redondearDinero(saldoActual - abonoTotal);
@@ -125,9 +128,11 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                 updateData.pagoTotalPendiente = nuevoSaldo;
             }
 
-            await firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculoId).update(updateData);
-
-            await firestore().collection(COLLECTIONS.MOVIMIENTOS).add({
+            // Vehículo + movimiento se escriben juntos (atómico): si falla uno, no queda
+            // un abono cobrado sin su registro de auditoría.
+            const batch = firestore().batch();
+            batch.update(firestore().collection(COLLECTIONS.VEHICULOS).doc(vehiculoId), updateData);
+            batch.set(firestore().collection(COLLECTIONS.MOVIMIENTOS).doc(), {
                 tipo: "Abono",
                 estatus: "AB",
                 binNip: vehiculo.binNip,
@@ -149,6 +154,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
                 estadoPago: liquidado ? "pagado" : "fiado",
                 folioVenta: vehiculo.folioVenta || null,
             });
+            await batch.commit();
 
             setUltimoAbono(abono);
             setPagoExitoso(true);
@@ -169,6 +175,7 @@ const PagosPendientes = ({ vehiculoId, onClose, user }) => {
             showAlert("Error al procesar el pago.", "error");
         } finally {
             setLoading(false);
+            enviandoRef.current = false;
         }
     };
 

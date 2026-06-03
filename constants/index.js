@@ -60,6 +60,7 @@ export const TRIP_STATUS = {
 // ===========================================
 export const SOLICITUD_STATUS = {
   PENDIENTE: "pendiente",
+  APROBADO: "aprobado",
   ASIGNADO: "asignado",
   EN_PROCESO: "en_proceso",
   COMPLETADO: "completado",
