@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import { firestore } from "../../../firebase/firebaseIni";
 import { FaMoneyBillWave, FaCheckCircle, FaExclamationTriangle, FaSearch, FaPrint, FaCreditCard } from 'react-icons/fa';
+import { redondearDinero } from "../../../utils";
 import moment from 'moment';
 import ReciboAdelanto from './ReciboAdelanto';
 
@@ -28,6 +29,7 @@ const PagoAdelantado = ({ user }) => {
     const [estados, setEstados] = useState([]);
     const [ciudades, setCiudades] = useState([]);
     const [cargando, setCargando] = useState(false);
+    const enviandoRef = useRef(false); // cerrojo síncrono contra doble-click
     const [mensajeError, setMensajeError] = useState('');
     const [mensajeExito, setMensajeExito] = useState('');
     const [vehiculoExistente, setVehiculoExistente] = useState(null);
@@ -59,7 +61,7 @@ const PagoAdelantado = ({ user }) => {
 
     // Recalcular monto adelanto cuando cambian extras o precio
     useEffect(() => {
-        setMontoAdelanto(price + sobrePeso + storage + gastosExtra);
+        setMontoAdelanto(redondearDinero(price + sobrePeso + storage + gastosExtra));
     }, [price, sobrePeso, storage, gastosExtra]);
 
     // Limpiar mensajes después de 5 segundos
@@ -162,6 +164,8 @@ const PagoAdelantado = ({ user }) => {
     };
 
     const ejecutarPagoAdelantado = async () => {
+        if (enviandoRef.current) return; // evita doble registro por doble-click
+        enviandoRef.current = true;
         setModalConfirmar(false);
         setCargando(true);
         setMensajeError('');
@@ -170,9 +174,15 @@ const PagoAdelantado = ({ user }) => {
             const timestamp = moment().toDate();
             const lote = binNip.toUpperCase().trim();
 
+            // Vehículo + movimiento se escriben juntos (atómico): si falla uno, no queda
+            // un anticipo cobrado sin su registro de auditoría (o viceversa).
+            const monto = parseFloat(montoAdelanto);
+            const batch = firestore().batch();
+            const vehiculoRef = firestore().collection("vehiculos").doc(lote);
+
             if (vehiculoExistente) {
                 // Vehículo ya existe → actualizar con datos de anticipo
-                await firestore().collection("vehiculos").doc(lote).update({
+                batch.update(vehiculoRef, {
                     anticipoPago: parseFloat(montoAdelanto),
                     anticipoMetodo: metodoPago,
                     anticipoTimestamp: timestamp,
@@ -185,7 +195,7 @@ const PagoAdelantado = ({ user }) => {
                 });
             } else {
                 // Vehículo NO existe → crear nuevo con estatus PA
-                await firestore().collection("vehiculos").doc(lote).set({
+                batch.set(vehiculoRef, {
                     binNip: lote,
                     marca: marca,
                     modelo: modelo,
@@ -215,8 +225,7 @@ const PagoAdelantado = ({ user }) => {
             }
 
             // Registrar movimiento (cajaRecibo/cajaCC para que el corte lo separe)
-            const monto = parseFloat(montoAdelanto);
-            await firestore().collection("movimientos").add({
+            batch.set(firestore().collection("movimientos").doc(), {
                 tipo: "Anticipo",
                 binNip: lote,
                 marca: marca,
@@ -240,6 +249,8 @@ const PagoAdelantado = ({ user }) => {
                 timestamp: timestamp,
             });
 
+            await batch.commit();
+
             setDatosRecibo({
                 binNip: lote,
                 marca, modelo, cliente, telefonoCliente,
@@ -257,6 +268,7 @@ const PagoAdelantado = ({ user }) => {
             setMensajeError("Error al registrar el pago adelantado: " + (error.message || error));
         } finally {
             setCargando(false);
+            enviandoRef.current = false;
         }
     };
 
@@ -553,8 +565,8 @@ const PagoAdelantado = ({ user }) => {
                             <button className="btn btn-ghost" onClick={() => setModalConfirmar(false)}>
                                 Cancelar
                             </button>
-                            <button className="btn btn-success text-white" onClick={ejecutarPagoAdelantado}>
-                                Confirmar
+                            <button className={`btn btn-success text-white ${cargando ? "loading" : ""}`} onClick={ejecutarPagoAdelantado} disabled={cargando}>
+                                {cargando ? "Procesando..." : "Confirmar"}
                             </button>
                         </div>
                     </div>

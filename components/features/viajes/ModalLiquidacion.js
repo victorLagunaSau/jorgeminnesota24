@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useRef} from "react";
 import {firestore} from "../../../firebase/firebaseIni";
 import {FaWallet, FaTimes, FaCar, FaPrint, FaCheckCircle, FaCheckDouble, FaTruck} from "react-icons/fa";
-import { notificarCambioEstatus } from "../../../utils";
+import { notificarCambioEstatus, redondearDinero } from "../../../utils";
 import ReactToPrint from "react-to-print";
 import ReciboPago from "./ReciboPago";
 
@@ -17,22 +17,25 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
 
     const reciboRef = useRef();
     const btnPrintRef = useRef();
+    const enviandoRef = useRef(false); // cerrojo síncrono contra doble-click
 
     // CÁLCULO DE TOTALES (Mantenemos tu lógica exacta)
-    const totalFletes = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.flete) || 0), 0);
-    const totalStorage = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) || 0), 0);
-    const totalSobrepeso = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.sPeso) || 0), 0);
-    const totalGastosExtra = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0);
-    const granTotalReal = totalFletes + totalStorage + totalSobrepeso + totalGastosExtra;
+    const totalFletes = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.flete) || 0), 0));
+    const totalStorage = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.storage) || 0), 0));
+    const totalSobrepeso = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.sPeso) || 0), 0));
+    const totalGastosExtra = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.gExtra) || 0), 0));
+    const granTotalReal = redondearDinero(totalFletes + totalStorage + totalSobrepeso + totalGastosExtra);
 
     // Totales lado cliente
-    const totalPrecioVenta = viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.precioVenta) || parseFloat(v.flete) || 0), 0);
-    const totalStorageCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.storageCliente) || 0) : (parseFloat(v.storage) || 0)), 0);
-    const totalSobrepesoCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.sPesoCliente) || 0) : (parseFloat(v.sPeso) || 0)), 0);
-    const totalGastosExtraCliente = viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.gExtraCliente) || 0) : (parseFloat(v.gExtra) || 0)), 0);
-    const granTotalCliente = totalPrecioVenta + totalStorageCliente + totalSobrepesoCliente + totalGastosExtraCliente;
+    const totalPrecioVenta = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (parseFloat(v.precioVenta) || parseFloat(v.flete) || 0), 0));
+    const totalStorageCliente = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.storageCliente) || 0) : (parseFloat(v.storage) || 0)), 0));
+    const totalSobrepesoCliente = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.sPesoCliente) || 0) : (parseFloat(v.sPeso) || 0)), 0));
+    const totalGastosExtraCliente = redondearDinero(viaje.vehiculos.reduce((acc, v) => acc + (v.preciosClienteEditados ? (parseFloat(v.gExtraCliente) || 0) : (parseFloat(v.gExtra) || 0)), 0));
+    const granTotalCliente = redondearDinero(totalPrecioVenta + totalStorageCliente + totalSobrepesoCliente + totalGastosExtraCliente);
 
     const ejecutarPago = async () => {
+        if (enviandoRef.current) return; // evita doble ejecución por doble-click
+        enviandoRef.current = true;
         setProcesando(true);
         // Definimos el momento exacto de la operación
         const fechaOperacionActual = new Date();
@@ -58,6 +61,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                 );
                 if (!confirmar) {
                     setProcesando(false);
+                    enviandoRef.current = false;
                     return;
                 }
             }
@@ -66,17 +70,26 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
                 const conDoc = await transaction.get(consecutivoRef);
                 if (!conDoc.exists) throw "El documento de consecutivos no existe";
 
+                // Releer los vehículos DENTRO de la transacción para decidir de forma
+                // autoritativa cuáles ya están pagados (cierra la ventana de doble cobro si
+                // otro admin pagó el mismo lote entre el pre-chequeo y este punto).
+                // Todas las lecturas deben ir antes de cualquier escritura.
+                const vehiculoRefs = viaje.vehiculos.map(v => firestore().collection("vehiculos").doc(v.lote));
+                const vehiculoSnaps = await Promise.all(vehiculoRefs.map(ref => transaction.get(ref)));
+                const yaPagadoSet = new Set();
+                vehiculoSnaps.forEach((snap, i) => { if (snap.exists) yaPagadoSet.add(viaje.vehiculos[i].lote); });
+
                 const ultimoFolio = conDoc.data()["Viajes pagados"] || 0;
                 const proximoFolio = ultimoFolio + 1;
                 const nuevoFolioContable = `PG-${proximoFolio}`;
 
                 // --- 1. ACTIVACIÓN DE VEHÍCULOS Y REGISTRO DE MOVIMIENTOS ---
-                viaje.vehiculos.forEach((v) => {
-                    const vehiculoRef = firestore().collection("vehiculos").doc(v.lote);
+                viaje.vehiculos.forEach((v, i) => {
+                    const vehiculoRef = vehiculoRefs[i];
                     const movimientoRef = firestore().collection("movimientos").doc();
 
-                    // Verificar si el lote ya está pagado
-                    const yaPagado = lotesExistentes.includes(v.lote);
+                    // Verificar si el lote ya está pagado (lectura hecha dentro de la transacción)
+                    const yaPagado = yaPagadoSet.has(v.lote);
 
                     if (yaPagado) {
                         // LOTE YA PAGADO - Actualizar precios (cliente y chofer)
@@ -238,6 +251,7 @@ const ModalLiquidacion = ({viaje, user, onClose}) => {
             alert("Error al procesar el pago: " + error);
         } finally {
             setProcesando(false);
+            enviandoRef.current = false;
         }
     };
 

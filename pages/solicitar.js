@@ -3,7 +3,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useAuthContext } from "../context/auth";
 import { firestore } from "../firebase/firebaseIni";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS, SOLICITUD_STATUS } from "../constants";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
@@ -54,6 +54,7 @@ const SolicitarPage = () => {
     const [vehiculosEntregados, setVehiculosEntregados] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
+    const [solicitudExito, setSolicitudExito] = useState(""); // mensaje de confirmación tras guardar
     const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
 
     // Modales de detalle
@@ -145,8 +146,8 @@ const SolicitarPage = () => {
                     const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
                     return fechaB - fechaA;
                 });
-                setSolicitudes(lista.filter(s => s.estado !== "completado"));
-                setSolicitudesCompletadas(lista.filter(s => s.estado === "completado"));
+                setSolicitudes(lista.filter(s => s.estado !== SOLICITUD_STATUS.COMPLETADO));
+                setSolicitudesCompletadas(lista.filter(s => s.estado === SOLICITUD_STATUS.COMPLETADO));
                 setLoadingSolicitudes(false);
             }, (error) => {
                 console.error("Error cargando solicitudes:", error);
@@ -177,6 +178,13 @@ const SolicitarPage = () => {
 
         return () => unsubscribe();
     }, [user?.datosCliente?.cliente]);
+
+    // Auto-ocultar el mensaje de éxito tras unos segundos
+    useEffect(() => {
+        if (!solicitudExito) return;
+        const t = setTimeout(() => setSolicitudExito(""), 4000);
+        return () => clearTimeout(t);
+    }, [solicitudExito]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -221,6 +229,10 @@ const SolicitarPage = () => {
         }
     };
 
+    // Limpia y recorta un campo de texto que viene del scraper antes de guardarlo
+    const limpiarCampo = (valor, maxLen = 100) =>
+        (valor === undefined || valor === null ? "" : String(valor)).trim().slice(0, maxLen);
+
     const handleAgregarSolicitud = async () => {
         if (!vehicleResult) {
             alert("No hay vehículo seleccionado");
@@ -232,6 +244,23 @@ const SolicitarPage = () => {
             return;
         }
 
+        // Validar que el scraper devolvió al menos el dato esencial (lote)
+        const lote = limpiarCampo(vehicleResult.lotNumber, 20);
+        if (!lote) {
+            alert("Los datos del vehículo están incompletos. Vuelve a buscarlo.");
+            return;
+        }
+
+        // Evitar solicitudes duplicadas del mismo lote (entre las activas del cliente)
+        const yaSolicitado = solicitudes.some(
+            (s) => limpiarCampo(s.lotNumber, 20) === lote
+        );
+        if (yaSolicitado) {
+            alert(`Ya tienes una solicitud activa para el lote ${lote}.`);
+            setVehicleResult(null);
+            return;
+        }
+
         const clienteId = user.datosCliente?.id || user.id;
 
         setGuardando(true);
@@ -240,27 +269,28 @@ const SolicitarPage = () => {
                 clienteId: clienteId,
                 clienteNombre: (user.datosCliente.cliente || user.username || "").toUpperCase().trim(),
                 clienteTelefono: user.datosCliente.telefonoCliente || "",
-                // Datos del vehículo
-                lotNumber: vehicleResult.lotNumber,
-                gatePass: vehicleResult.gatePass,
-                make: vehicleResult.make || "",
-                model: vehicleResult.model || "",
-                year: vehicleResult.year || "",
-                vin: vehicleResult.vin || "",
-                location: vehicleResult.location || "",
-                imageUrl: vehicleResult.imageUrl || "",
-                source: vehicleResult.source || "",
-                auctionDate: vehicleResult.auctionDate || "",
+                // Datos del vehículo (sanitizados)
+                lotNumber: lote,
+                gatePass: limpiarCampo(vehicleResult.gatePass, 20),
+                make: limpiarCampo(vehicleResult.make),
+                model: limpiarCampo(vehicleResult.model),
+                year: limpiarCampo(vehicleResult.year, 10),
+                vin: limpiarCampo(vehicleResult.vin, 30),
+                location: limpiarCampo(vehicleResult.location, 150),
+                imageUrl: limpiarCampo(vehicleResult.imageUrl, 1000),
+                source: limpiarCampo(vehicleResult.source, 50),
+                auctionDate: limpiarCampo(vehicleResult.auctionDate, 50),
                 // Metadatos
-                estado: "pendiente", // pendiente, aprobado, en_proceso, completado
+                estado: SOLICITUD_STATUS.PENDIENTE,
                 fechaSolicitud: new Date(),
                 notas: ""
             });
 
-            // Limpiar búsqueda
+            // Limpiar búsqueda y confirmar al cliente
             setVehicleResult(null);
             setLotNumber("");
             setGatePass("");
+            setSolicitudExito(`Solicitud del lote ${lote} registrada correctamente.`);
 
         } catch (error) {
             console.error("Error guardando solicitud:", error);
@@ -374,6 +404,19 @@ const SolicitarPage = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
+
+            {/* Toast de confirmación al agregar solicitud */}
+            {solicitudExito && (
+                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[80] w-[92%] max-w-md animate-fade-in-up">
+                    <div className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl">
+                        <FaCheckCircle className="text-lg flex-shrink-0"/>
+                        <p className="text-sm font-bold leading-tight flex-1">{solicitudExito}</p>
+                        <button onClick={() => setSolicitudExito("")} className="p-1 text-white/80 hover:text-white flex-shrink-0" aria-label="Cerrar">
+                            <FaTimes size={12}/>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Pull-to-refresh indicator */}
             {refreshing && (

@@ -5,6 +5,7 @@ import * as XLSX from "xlsx";
 import ReactToPrint from "react-to-print";
 import PagosPendientes from "./PagosPendientes";
 import ImprimeCobranza from "./ImprimeCobranza";
+import { redondearDinero } from "../../../utils";
 
 const Cobranza = ({ user }) => {
     const [vehiculos, setVehiculos] = useState([]);
@@ -88,15 +89,15 @@ const Cobranza = ({ user }) => {
         );
     });
 
-    const totalPendiente = filtrados.reduce((sum, v) => sum + (parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0), 0);
-    const totalCobrado = filtrados.reduce((sum, v) => {
+    const totalPendiente = redondearDinero(filtrados.reduce((sum, v) => sum + (parseFloat(v.saldoFiado) || parseFloat(v.pagoTotalPendiente) || 0), 0));
+    const totalCobrado = redondearDinero(filtrados.reduce((sum, v) => {
         const efectivo = (parseFloat(v.cajaRecibo) || 0) - (parseFloat(v.cajaCambio) || 0);
         const cc = parseFloat(v.cajaCC) || 0;
         return sum + efectivo + cc;
-    }, 0);
-    const totalPrecio = filtrados.reduce((sum, v) => {
+    }, 0));
+    const totalPrecio = redondearDinero(filtrados.reduce((sum, v) => {
         return sum + (parseFloat(v.price) || 0) + (parseFloat(v.storage) || 0) + (parseFloat(v.sobrePeso) || 0) + (parseFloat(v.gastosExtra) || 0);
-    }, 0);
+    }, 0));
 
     const fmt = (n) => `$${Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 
