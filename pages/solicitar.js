@@ -7,7 +7,7 @@ import { COLLECTIONS, SOLICITUD_STATUS } from "../constants";
 import {
     FaUser, FaLock, FaSignOutAlt, FaCar, FaSearch, FaPlus,
     FaMapMarkerAlt, FaCalendarAlt, FaKey, FaBarcode, FaSpinner,
-    FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse, FaTimes, FaIdCard
+    FaClock, FaArrowLeft, FaCheckCircle, FaTruck, FaTimes, FaIdCard
 } from "react-icons/fa";
 
 // Mapa de abreviaturas de estado de EE.UU. (para estimar flete desde la ubicación de la subasta)
@@ -78,39 +78,13 @@ const SolicitarPage = () => {
     // Provincias (para estimar el flete al cliente según la ubicación de la subasta)
     const [provincias, setProvincias] = useState([]);
 
-    // Estados para lista de solicitudes
+    // Solicitudes activas — solo para evitar duplicados y mostrar el contador.
+    // La lista/historial se ven en /client; aquí solo se crean.
     const [solicitudes, setSolicitudes] = useState([]);
-    const [solicitudesCompletadas, setSolicitudesCompletadas] = useState([]);
-    const [vehiculosEntregados, setVehiculosEntregados] = useState([]);
-    const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
     const [pidiendoTitulo, setPidiendoTitulo] = useState(false); // muestra el modal "¿recogerá el título?" antes de postear
-    const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
+    const [exito, setExito] = useState(null); // mensaje de confirmación tras agregar
 
-    // Modales de detalle
-    const [solicitudDetalle, setSolicitudDetalle] = useState(null);
-    const [vehiculoDetalle, setVehiculoDetalle] = useState(null);
-
-    // Helpers de status para modal de vehículo
-    const VEHICLE_STATUS_COLORS = {
-        'PR': 'bg-slate-200 text-slate-700',
-        'IN': 'bg-sky-200 text-sky-800',
-        'TR': 'bg-blue-200 text-blue-800',
-        'EB': 'bg-indigo-200 text-indigo-800',
-        'DS': 'bg-cyan-200 text-cyan-800',
-        'EN': 'bg-emerald-200 text-emerald-800',
-    };
-    const VEHICLE_STATUS_LABELS = {
-        'PR': 'Registrado', 'IN': 'Cargando', 'TR': 'En Viaje',
-        'EB': 'En Brownsville', 'DS': 'Descargado', 'EN': 'Entregado'
-    };
-    const getVStatusColor = (s) => VEHICLE_STATUS_COLORS[s] || 'bg-slate-200 text-slate-700';
-    const getVStatusLabel = (s) => VEHICLE_STATUS_LABELS[s] || s;
-    const formatVDate = (ts) => {
-        if (!ts) return '-';
-        const d = ts.toDate ? ts.toDate() : new Date(ts);
-        return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
-    };
     // Login form
     const [email, setEmail] = useState("");
     const [pass, setPass] = useState("");
@@ -157,57 +131,25 @@ const SolicitarPage = () => {
         };
     }, [handleRefresh]);
 
-    // Cargar solicitudes del cliente
+    // Cargar solicitudes activas del cliente (para dedup y contador)
     useEffect(() => {
         const clienteId = user?.datosCliente?.id || user?.id;
-
-        if (!clienteId) {
-            setLoadingSolicitudes(false);
-            return;
-        }
+        if (!clienteId) return;
 
         const unsubscribe = firestore()
             .collection("solicitudesVehiculos")
             .where("clienteId", "==", clienteId)
             .onSnapshot((snap) => {
-                const lista = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                lista.sort((a, b) => {
-                    const fechaA = a.fechaSolicitud?.toDate?.() || new Date(0);
-                    const fechaB = b.fechaSolicitud?.toDate?.() || new Date(0);
-                    return fechaB - fechaA;
-                });
-                setSolicitudes(lista.filter(s => s.estado !== SOLICITUD_STATUS.COMPLETADO));
-                setSolicitudesCompletadas(lista.filter(s => s.estado === SOLICITUD_STATUS.COMPLETADO));
-                setLoadingSolicitudes(false);
+                const lista = snap.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .filter(s => s.estado !== SOLICITUD_STATUS.COMPLETADO);
+                setSolicitudes(lista);
             }, (error) => {
                 console.error("Error cargando solicitudes:", error);
-                setLoadingSolicitudes(false);
             });
 
         return () => unsubscribe();
     }, [user]);
-
-    // Cargar vehículos entregados del cliente
-    useEffect(() => {
-        const clienteNombre = user?.datosCliente?.cliente;
-        if (!clienteNombre) return;
-
-        const unsubscribe = firestore()
-            .collection(COLLECTIONS.VEHICULOS)
-            .where("cliente", "==", clienteNombre)
-            .where("estatus", "==", "EN")
-            .onSnapshot((snap) => {
-                const lista = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                lista.sort((a, b) => {
-                    const fechaA = a.registro?.timestamp?.toDate?.() || new Date(0);
-                    const fechaB = b.registro?.timestamp?.toDate?.() || new Date(0);
-                    return fechaB - fechaA;
-                });
-                setVehiculosEntregados(lista);
-            });
-
-        return () => unsubscribe();
-    }, [user?.datosCliente?.cliente]);
 
     // Cargar provincias una vez (para estimar el flete al cliente)
     useEffect(() => {
@@ -251,6 +193,7 @@ const SolicitarPage = () => {
         setSearching(true);
         setSearchError("");
         setVehicleResult(null);
+        setExito(null);
 
         try {
             const response = await fetch("https://jorgeminnesota.duckdns.org/api/scrape", {
@@ -338,7 +281,11 @@ const SolicitarPage = () => {
                 notas: ""
             });
 
-            // Limpiar búsqueda
+            // Confirmación + limpiar búsqueda
+            setExito({
+                titulo: `${limpiarCampo(vehicleResult.year, 10)} ${limpiarCampo(vehicleResult.make)} ${limpiarCampo(vehicleResult.model)}`.trim(),
+                lote
+            });
             setVehicleResult(null);
             setPidiendoTitulo(false);
             setLotNumber("");
@@ -350,24 +297,6 @@ const SolicitarPage = () => {
         } finally {
             setGuardando(false);
         }
-    };
-
-    const getEstadoBadge = (estado) => {
-        const badges = {
-            pendiente: "bg-sky-100 text-sky-800",
-            aprobado: "bg-blue-100 text-blue-800",
-            asignado: "bg-indigo-100 text-indigo-800",
-            en_proceso: "bg-blue-100 text-blue-800",
-            completado: "bg-emerald-100 text-emerald-800"
-        };
-        const labels = {
-            pendiente: "Pendiente",
-            aprobado: "Aprobado",
-            asignado: "Asignado a transportista",
-            en_proceso: "En Camino",
-            completado: "Completado"
-        };
-        return { className: badges[estado] || badges.pendiente, label: labels[estado] || estado };
     };
 
     // Si no es cliente pero está logueado, hacer logout
@@ -498,7 +427,7 @@ const SolicitarPage = () => {
 
             {/* User Info */}
             <section className="bg-white/70 backdrop-blur-sm px-4 py-3 border-b border-blue-100">
-                <div className="flex justify-between items-center gap-2">
+                <div className="flex justify-between items-center gap-2 max-w-xl mx-auto">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-7 h-7 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                             <FaUser className="text-blue-600 text-[10px]"/>
@@ -508,326 +437,169 @@ const SolicitarPage = () => {
                             <p className="text-[9px] text-gray-400 truncate">{user.email}</p>
                         </div>
                     </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 px-2 py-1 rounded-lg text-center flex-shrink-0 shadow-sm">
-                        <span className="text-[8px] text-blue-600 font-bold uppercase">Solicitudes</span>
-                        <p className="text-base font-black bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent leading-tight tabular-nums">{solicitudes.length}</p>
-                    </div>
+                    <Link href="/client">
+                        <a className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 px-2 py-1 rounded-lg text-center flex-shrink-0 shadow-sm hover:from-blue-100 hover:to-indigo-100 transition-colors">
+                            <span className="text-[8px] text-blue-600 font-bold uppercase">Solicitudes</span>
+                            <p className="text-base font-black bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent leading-tight tabular-nums">{solicitudes.length}</p>
+                        </a>
+                    </Link>
                 </div>
             </section>
 
-            <main className="px-4 py-4">
-                <div className="grid gap-3 lg:grid-cols-2">
+            <main className="px-4 py-6">
+                <div className="max-w-xl mx-auto space-y-4">
+
+                    {/* Confirmación de solicitud agregada */}
+                    {exito && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up">
+                            <FaCheckCircle className="text-emerald-500 text-xl flex-shrink-0 mt-0.5"/>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-black text-emerald-800 uppercase leading-tight">Solicitud agregada</p>
+                                <p className="text-xs text-emerald-700 mt-0.5 truncate">{exito.titulo} — Lote {exito.lote}</p>
+                                <Link href="/client">
+                                    <a className="inline-block mt-2 text-[11px] font-bold text-blue-600 underline">Ver en Mis Vehículos →</a>
+                                </Link>
+                            </div>
+                            <button onClick={() => setExito(null)} className="text-emerald-400 hover:text-emerald-600 flex-shrink-0">
+                                <FaTimes size={14}/>
+                            </button>
+                        </div>
+                    )}
 
                     {/* Panel de Búsqueda */}
-                    <div className="space-y-3">
-                        <div className="bg-white rounded-xl shadow-sm border border-blue-100 p-3">
-                            <h2 className="text-sm font-black uppercase text-gray-800 mb-2 flex items-center gap-2">
-                                <FaSearch className="text-blue-600 text-xs"/> Buscar Vehículo
-                            </h2>
-                            <form onSubmit={handleSearch} className="space-y-2">
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                                            Número de Lote *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: 43874580"
-                                            value={lotNumber}
-                                            onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
-                                            className="input input-bordered input-sm w-full bg-white text-black border-blue-100 focus:border-blue-400"
-                                            disabled={searching}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
-                                            Gate Pass *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ej: A1B2"
-                                            value={gatePass}
-                                            onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
-                                            className="input input-bordered input-sm w-full bg-white text-black uppercase border-blue-100 focus:border-blue-400"
-                                            disabled={searching}
-                                            maxLength={5}
-                                        />
-                                    </div>
+                    <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-5">
+                        <h2 className="text-base font-black uppercase text-gray-800 mb-1 flex items-center gap-2">
+                            <FaSearch className="text-blue-600 text-sm"/> Buscar Vehículo
+                        </h2>
+                        <p className="text-xs text-gray-400 mb-4">Ingresa el lote y el gate pass de la subasta.</p>
+                        <form onSubmit={handleSearch} className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
+                                        Número de Lote *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: 43874580"
+                                        value={lotNumber}
+                                        onChange={(e) => setLotNumber(e.target.value.replace(/\D/g, ''))}
+                                        className="input input-bordered w-full bg-white text-black border-blue-100 focus:border-blue-400"
+                                        disabled={searching}
+                                    />
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={searching || !lotNumber.trim() || gatePass.length < 4}
-                                    className="btn btn-sm w-full text-white font-bold border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
-                                >
-                                    {searching ? (
-                                        <>
-                                            <FaSpinner className="animate-spin mr-2"/> Buscando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <FaSearch className="mr-2"/> Buscar Vehículo
-                                        </>
-                                    )}
-                                </button>
-                            </form>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-0.5">
+                                        Gate Pass *
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ej: A1B2"
+                                        value={gatePass}
+                                        onChange={(e) => setGatePass(e.target.value.toUpperCase().slice(0, 5))}
+                                        className="input input-bordered w-full bg-white text-black uppercase border-blue-100 focus:border-blue-400"
+                                        disabled={searching}
+                                        maxLength={5}
+                                    />
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={searching || !lotNumber.trim() || gatePass.length < 4}
+                                className="btn w-full text-white font-bold border-0 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md"
+                            >
+                                {searching ? (
+                                    <>
+                                        <FaSpinner className="animate-spin mr-2"/> Buscando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <FaSearch className="mr-2"/> Buscar Vehículo
+                                    </>
+                                )}
+                            </button>
+                        </form>
 
-                            {/* Indicador de búsqueda */}
-                            {searching && (
-                                <div className="mt-4 relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 border border-blue-100 p-5">
-                                    {/* Halo decorativo de fondo */}
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="w-40 h-40 rounded-full bg-blue-200/40 blur-2xl animate-halo"></div>
+                        {/* Indicador de búsqueda */}
+                        {searching && (
+                            <div className="mt-4 relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-white to-indigo-50 border border-blue-100 p-5">
+                                {/* Halo decorativo de fondo */}
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-40 h-40 rounded-full bg-blue-200/40 blur-2xl animate-halo"></div>
+                                </div>
+
+                                <div className="relative flex flex-col items-center">
+                                    {/* Lupita orbitando */}
+                                    <div className="relative w-24 h-24 flex items-center justify-center mb-3">
+                                        {/* Lupita que orbita (no rota sobre su eje) */}
+                                        <div className="absolute animate-lupita-orbit">
+                                            <FaSearch className="text-blue-600 text-4xl drop-shadow-lg"/>
+                                        </div>
                                     </div>
 
-                                    <div className="relative flex flex-col items-center">
-                                        {/* Lupita orbitando */}
-                                        <div className="relative w-24 h-24 flex items-center justify-center mb-3">
-                                            {/* Lupita que orbita (no rota sobre su eje) */}
-                                            <div className="absolute animate-lupita-orbit">
-                                                <FaSearch className="text-blue-600 text-4xl drop-shadow-lg"/>
-                                            </div>
-                                        </div>
+                                    {/* Etiqueta con fade al cambiar */}
+                                    <p
+                                        key={currentPhaseLabel}
+                                        className="text-sm sm:text-base font-black text-gray-800 text-center uppercase tracking-wide animate-fade-in-up px-2"
+                                    >
+                                        {currentPhaseLabel}
+                                    </p>
 
-                                        {/* Etiqueta con fade al cambiar */}
-                                        <p
-                                            key={currentPhaseLabel}
-                                            className="text-sm sm:text-base font-black text-gray-800 text-center uppercase tracking-wide animate-fade-in-up px-2"
-                                        >
-                                            {currentPhaseLabel}
-                                        </p>
+                                    {/* Porcentaje con gradiente */}
+                                    <span className="text-3xl font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 bg-clip-text text-transparent tabular-nums mt-1 mb-3">
+                                        {searchProgress}%
+                                    </span>
 
-                                        {/* Porcentaje con gradiente */}
-                                        <span className="text-3xl font-black bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 bg-clip-text text-transparent tabular-nums mt-1 mb-3">
-                                            {searchProgress}%
-                                        </span>
-
-                                        {/* Barra segmentada */}
-                                        <div className="flex gap-[3px] w-full">
-                                            {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => {
-                                                const segmentThreshold = ((i + 1) / PROGRESS_SEGMENTS) * 100;
-                                                const filled = searchProgress >= segmentThreshold;
-                                                const partial = !filled && searchProgress > (i / PROGRESS_SEGMENTS) * 100;
-                                                return (
+                                    {/* Barra segmentada */}
+                                    <div className="flex gap-[3px] w-full">
+                                        {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => {
+                                            const segmentThreshold = ((i + 1) / PROGRESS_SEGMENTS) * 100;
+                                            const filled = searchProgress >= segmentThreshold;
+                                            const partial = !filled && searchProgress > (i / PROGRESS_SEGMENTS) * 100;
+                                            return (
+                                                <div
+                                                    key={i}
+                                                    className="relative flex-1 h-3 bg-blue-100/60 rounded-sm overflow-hidden"
+                                                >
                                                     <div
-                                                        key={i}
-                                                        className="relative flex-1 h-3 bg-blue-100/60 rounded-sm overflow-hidden"
-                                                    >
-                                                        <div
-                                                            className={`h-full rounded-sm transition-all duration-200 ease-out ${
-                                                                filled
-                                                                    ? 'bg-gradient-to-b from-blue-500 to-indigo-600 shadow-[0_0_4px_rgba(59,130,246,0.6)]'
-                                                                    : partial
-                                                                        ? 'bg-blue-400'
-                                                                        : ''
-                                                            }`}
-                                                            style={{
-                                                                width: filled
-                                                                    ? '100%'
-                                                                    : partial
-                                                                        ? `${((searchProgress - (i / PROGRESS_SEGMENTS) * 100) / (100 / PROGRESS_SEGMENTS)) * 100}%`
-                                                                        : '0%'
-                                                            }}
-                                                        ></div>
-                                                        {/* Shimmer encima del segmento activo */}
-                                                        {partial && (
-                                                            <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                                        className={`h-full rounded-sm transition-all duration-200 ease-out ${
+                                                            filled
+                                                                ? 'bg-gradient-to-b from-blue-500 to-indigo-600 shadow-[0_0_4px_rgba(59,130,246,0.6)]'
+                                                                : partial
+                                                                    ? 'bg-blue-400'
+                                                                    : ''
+                                                        }`}
+                                                        style={{
+                                                            width: filled
+                                                                ? '100%'
+                                                                : partial
+                                                                    ? `${((searchProgress - (i / PROGRESS_SEGMENTS) * 100) / (100 / PROGRESS_SEGMENTS)) * 100}%`
+                                                                    : '0%'
+                                                        }}
+                                                    ></div>
+                                                    {/* Shimmer encima del segmento activo */}
+                                                    {partial && (
+                                                        <div className="absolute inset-0 animate-shimmer pointer-events-none"></div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
-                            )}
-
-                            {searchError && (
-                                <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                                    {searchError}
-                                </div>
-                            )}
-                        </div>
-
-                    </div>
-
-                    {/* Panel de Solicitudes / Historial */}
-                    <div className="bg-white rounded-xl shadow-sm border border-blue-100 overflow-hidden">
-                        {/* Tabs */}
-                        <div className="flex border-b border-blue-100">
-                            <button
-                                onClick={() => setTabSolicitudes("solicitudes")}
-                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
-                                    tabSolicitudes === "solicitudes"
-                                        ? "text-blue-700 border-b-2 border-blue-600 bg-blue-50/60"
-                                        : "text-gray-400 hover:text-gray-600"
-                                }`}
-                            >
-                                <FaClock className="text-[10px]"/> Solicitudes
-                                {solicitudes.length > 0 && (
-                                    <span className="bg-blue-200 text-blue-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudes.length}</span>
-                                )}
-                            </button>
-                            <button
-                                onClick={() => setTabSolicitudes("historial")}
-                                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-[11px] font-bold uppercase transition-all ${
-                                    tabSolicitudes === "historial"
-                                        ? "text-indigo-700 border-b-2 border-indigo-600 bg-indigo-50/60"
-                                        : "text-gray-400 hover:text-gray-600"
-                                }`}
-                            >
-                                <FaHistory className="text-[10px]"/> Historial
-                                {(solicitudesCompletadas.length + vehiculosEntregados.length) > 0 && (
-                                    <span className="bg-indigo-200 text-indigo-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{solicitudesCompletadas.length + vehiculosEntregados.length}</span>
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="p-3">
-                        {tabSolicitudes === "solicitudes" ? (
-                            /* === Solicitudes activas === */
-                            loadingSolicitudes ? (
-                                <div className="flex justify-center py-8">
-                                    <span className="loading loading-spinner loading-md text-blue-600"></span>
-                                </div>
-                            ) : solicitudes.length === 0 ? (
-                                <div className="text-center py-8">
-                                    <FaCar className="text-4xl text-gray-300 mx-auto mb-3"/>
-                                    <p className="text-sm text-gray-500">No tienes solicitudes aún</p>
-                                    <p className="text-xs text-gray-400">Busca un vehículo para comenzar</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                                    {solicitudes.map((sol) => {
-                                        const badge = getEstadoBadge(sol.estado);
-                                        return (
-                                            <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="border border-blue-100 rounded-lg p-2.5 cursor-pointer hover:bg-blue-50/60 transition-colors">
-                                                <div className="flex gap-2.5 items-start">
-                                                    {sol.imageUrl && (
-                                                        <img
-                                                            src={sol.imageUrl}
-                                                            alt={`${sol.year} ${sol.make}`}
-                                                            className="w-16 h-14 object-cover rounded bg-gray-100 flex-shrink-0"
-                                                        />
-                                                    )}
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
-                                                            {sol.year} {sol.make}
-                                                        </p>
-                                                        <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
-                                                            {sol.model}
-                                                        </p>
-                                                        <p className="text-[10px] text-gray-500 mt-1">
-                                                            Lote: {sol.lotNumber} • {sol.source}
-                                                        </p>
-                                                        <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                                                            <span className="flex items-center gap-0.5 truncate">
-                                                                <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
-                                                            </span>
-                                                            <span className="flex items-center gap-0.5 flex-shrink-0">
-                                                                <FaCalendarAlt/> {sol.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX') || 'N/A'}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-2">
-                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${badge.className}`}>
-                                                                {badge.label}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )
-                        ) : (
-                            /* === Historial === */
-                            (solicitudesCompletadas.length + vehiculosEntregados.length) === 0 ? (
-                                <div className="text-center py-8">
-                                    <FaHistory className="text-4xl text-gray-300 mx-auto mb-3"/>
-                                    <p className="text-sm text-gray-500">No tienes historial aún</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                                    {/* Vehículos entregados */}
-                                    {vehiculosEntregados.map((v) => (
-                                        <div key={v.id} onClick={() => setVehiculoDetalle(v)} className="border border-green-100 rounded-lg p-2.5 bg-green-50/30 cursor-pointer hover:bg-green-50/60 transition-colors">
-                                            <div className="flex gap-2.5 items-start">
-                                                <div className="w-16 h-14 rounded bg-green-100 flex items-center justify-center flex-shrink-0">
-                                                    <FaCheckCircle className="text-green-500 text-xl"/>
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
-                                                        {v.marca}
-                                                    </p>
-                                                    <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
-                                                        {v.modelo}
-                                                    </p>
-                                                    <p className="text-[10px] text-gray-500 mt-1">
-                                                        Lote: {v.binNip} • {v.almacen || '-'}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                                                        <span className="flex items-center gap-0.5 truncate">
-                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {v.ciudad}, {v.estado}
-                                                        </span>
-                                                    </div>
-                                                    <div className="mt-2">
-                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-green-200 text-green-800">
-                                                            Entregado
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {/* Solicitudes completadas */}
-                                    {solicitudesCompletadas.map((sol) => (
-                                        <div key={sol.id} onClick={() => setSolicitudDetalle(sol)} className="border border-blue-100 rounded-lg p-2.5 cursor-pointer hover:bg-blue-50/60 transition-colors">
-                                            <div className="flex gap-2.5 items-start">
-                                                {sol.imageUrl ? (
-                                                    <img
-                                                        src={sol.imageUrl}
-                                                        alt={`${sol.year} ${sol.make}`}
-                                                        className="w-16 h-14 object-cover rounded bg-gray-100 flex-shrink-0"
-                                                    />
-                                                ) : (
-                                                    <div className="w-16 h-14 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                                        <FaCar className="text-gray-300"/>
-                                                    </div>
-                                                )}
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-bold text-xs text-gray-500 uppercase truncate leading-tight">
-                                                        {sol.year} {sol.make}
-                                                    </p>
-                                                    <p className="font-black text-sm text-gray-900 uppercase truncate leading-tight">
-                                                        {sol.model}
-                                                    </p>
-                                                    <p className="text-[10px] text-gray-500 mt-1">
-                                                        Lote: {sol.lotNumber} • {sol.source}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                                                        <span className="flex items-center gap-0.5 truncate">
-                                                            <FaMapMarkerAlt className="flex-shrink-0"/> {sol.location || 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                    {sol.fechaCompletado && (
-                                                        <p className="text-[10px] text-green-600 font-bold mt-1">
-                                                            <FaCheckCircle className="inline mr-0.5 text-[9px]"/>
-                                                            {sol.fechaCompletado.toDate ? sol.fechaCompletado.toDate().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(sol.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                        </p>
-                                                    )}
-                                                    <div className="mt-2">
-                                                        <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-green-100 text-green-800">
-                                                            Completado
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )
+                            </div>
                         )}
-                        </div>
+
+                        {searchError && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                                {searchError}
+                            </div>
+                        )}
                     </div>
+
+                    {/* Nota: la lista de solicitudes y el historial viven en /client */}
+                    <p className="text-center text-[11px] text-gray-400">
+                        Tus solicitudes y su estatus aparecen en{" "}
+                        <Link href="/client"><a className="text-blue-600 font-bold underline">Mis Vehículos</a></Link>.
+                    </p>
                 </div>
             </main>
 
@@ -994,240 +766,6 @@ const SolicitarPage = () => {
                     </div>
                 </div>
             )}
-
-            {/* Modal Detalle Solicitud */}
-            {solicitudDetalle && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex sm:items-center justify-center p-0 sm:p-4 animate-fade-in-up" onClick={() => setSolicitudDetalle(null)}>
-                    <div className="bg-white rounded-none sm:rounded-2xl w-full h-full sm:h-auto sm:max-w-md sm:max-h-[90vh] overflow-y-auto shadow-2xl safe-area-bottom" onClick={(e) => e.stopPropagation()}>
-                        <div className="relative">
-                            {solicitudDetalle.imageUrl ? (
-                                <div className="w-full bg-gradient-to-br from-slate-900 to-slate-800 sm:rounded-t-2xl flex items-center justify-center" style={{ minHeight: '420px' }}>
-                                    <img
-                                        src={solicitudDetalle.imageUrl}
-                                        alt=""
-                                        className="w-full h-auto max-h-[72vh] object-contain"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="w-full h-96 bg-gradient-to-br from-blue-600 to-indigo-800 sm:rounded-t-2xl flex items-center justify-center">
-                                    <FaCar className="text-6xl text-white/60"/>
-                                </div>
-                            )}
-                            <button onClick={() => setSolicitudDetalle(null)} className="absolute right-3 p-2 bg-black/50 hover:bg-black/70 backdrop-blur-sm rounded-full text-white transition-all z-10" style={{ top: 'max(env(safe-area-inset-top), 0.75rem)' }}>
-                                <FaTimes size={14}/>
-                            </button>
-                            <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                                <span className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-xs font-bold px-2.5 py-1 rounded shadow">{solicitudDetalle.source}</span>
-                                {(() => {
-                                    const badge = getEstadoBadge(solicitudDetalle.estado);
-                                    return <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${badge.className}`}>{badge.label}</span>;
-                                })()}
-                            </div>
-                        </div>
-
-                        <div className="p-5 sm:p-6">
-                            <p className="text-base font-bold text-gray-500 uppercase tracking-wide leading-tight">
-                                {solicitudDetalle.year} {solicitudDetalle.make}
-                            </p>
-                            <h4 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-tight">
-                                {solicitudDetalle.model}
-                            </h4>
-
-                            <div className="mt-5 space-y-3.5 text-base text-gray-700">
-                                <div className="flex items-center gap-3">
-                                    <FaBarcode className="text-blue-500 text-sm flex-shrink-0"/>
-                                    <span className="text-gray-500 text-sm font-medium w-24">Lote</span>
-                                    <span className="font-mono font-bold text-gray-900">{solicitudDetalle.lotNumber}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <FaIdCard className="text-blue-500 text-sm flex-shrink-0"/>
-                                    <span className="text-gray-500 text-sm font-medium w-24">Título</span>
-                                    <span className={`font-bold ${solicitudDetalle.titulo === 'SI' ? 'text-emerald-600' : 'text-gray-700'}`}>
-                                        {solicitudDetalle.titulo === 'SI' ? 'Sí, el transportista lo recoge' : 'Título No Solicitado'}
-                                    </span>
-                                </div>
-                                {solicitudDetalle.vin && (
-                                    <div className="flex items-center gap-3">
-                                        <FaKey className="text-blue-500 text-sm flex-shrink-0"/>
-                                        <span className="text-gray-500 text-sm font-medium w-24">VIN</span>
-                                        <span className="font-mono text-gray-900 text-sm">{solicitudDetalle.vin}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3">
-                                    <FaMapMarkerAlt className="text-blue-500 text-sm flex-shrink-0"/>
-                                    <span className="text-gray-500 text-sm font-medium w-24">Ubicación</span>
-                                    <span className="text-gray-900 font-medium">{solicitudDetalle.location || '-'}</span>
-                                </div>
-                                {solicitudDetalle.auctionDate && (
-                                    <div className="flex items-center gap-3">
-                                        <FaCalendarAlt className="text-blue-500 text-sm flex-shrink-0"/>
-                                        <span className="text-gray-500 text-sm font-medium w-24">Comprado</span>
-                                        <span className="text-gray-900 font-medium">{solicitudDetalle.auctionDate}</span>
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-3">
-                                    <FaCalendarAlt className="text-blue-500 text-sm flex-shrink-0"/>
-                                    <span className="text-gray-500 text-sm font-medium w-24">Solicitado</span>
-                                    <span className="text-gray-900 font-medium">
-                                        {solicitudDetalle.fechaSolicitud?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || '-'}
-                                    </span>
-                                </div>
-                                {solicitudDetalle.fechaCompletado && (
-                                    <div className="flex items-center gap-3">
-                                        <FaCheckCircle className="text-emerald-500 text-sm flex-shrink-0"/>
-                                        <span className="text-gray-500 text-sm font-medium w-24">Completado</span>
-                                        <span className="text-emerald-700 font-bold">
-                                            {solicitudDetalle.fechaCompletado?.toDate?.().toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }) || new Date(solicitudDetalle.fechaCompletado).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal Detalle Vehículo (entregado) */}
-            {vehiculoDetalle && (() => {
-                const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
-                const currentIndex = statusOrder.indexOf(vehiculoDetalle.estatus);
-                const InfoCard = ({ icon, label, value, mono }) => (
-                    <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 hover:bg-blue-50/70 transition-colors">
-                        <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-blue-500 text-xs">{icon}</span>
-                            <span className="text-[10px] font-black text-blue-700 uppercase tracking-wide">{label}</span>
-                        </div>
-                        <p className={`text-sm text-gray-800 ${mono ? 'font-mono font-bold' : 'font-semibold'} break-words`}>
-                            {value || '-'}
-                        </p>
-                    </div>
-                );
-                return (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex sm:items-center justify-center p-0 sm:p-4 animate-fade-in-up" onClick={() => setVehiculoDetalle(null)}>
-                        <div className="bg-white rounded-none sm:rounded-3xl w-full h-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] overflow-y-auto shadow-2xl safe-area-bottom" onClick={(e) => e.stopPropagation()}>
-                            <div className="relative bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 sm:rounded-t-3xl px-6 pb-8 overflow-hidden" style={{ paddingTop: 'max(env(safe-area-inset-top), 1.5rem)' }}>
-                                <div className="absolute -top-12 -right-12 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-                                <div className="absolute -bottom-16 -left-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
-
-                                <div className="relative flex items-start justify-between gap-3 mb-3">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-blue-200 text-[10px] font-black uppercase tracking-widest">Vehículo</p>
-                                        <p className="text-blue-100 text-sm sm:text-base font-bold uppercase mt-0.5 leading-tight tracking-wide truncate">
-                                            {vehiculoDetalle.marca}
-                                        </p>
-                                        <h3 className="text-white text-2xl sm:text-3xl font-black uppercase leading-tight tracking-tight truncate">
-                                            {vehiculoDetalle.modelo}
-                                        </h3>
-                                        <div className="inline-flex items-center gap-1.5 mt-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-lg">
-                                            <FaBarcode className="text-blue-200 text-xs"/>
-                                            <span className="text-white font-mono font-bold text-sm">{vehiculoDetalle.binNip}</span>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setVehiculoDetalle(null)} className="p-2 bg-white/15 hover:bg-white/30 rounded-full text-white transition-all flex-shrink-0">
-                                        <FaTimes size={14}/>
-                                    </button>
-                                </div>
-
-                                <div className="relative flex flex-wrap items-center gap-2 mt-4">
-                                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase shadow-sm ${getVStatusColor(vehiculoDetalle.estatus)}`}>
-                                        {getVStatusLabel(vehiculoDetalle.estatus)}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Pipeline */}
-                            <div className="px-5 sm:px-6 py-5 border-b border-blue-100 bg-gradient-to-b from-blue-50/40 to-white">
-                                <p className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-4">Seguimiento</p>
-                                <div className="relative">
-                                    <div className="absolute top-3.5 left-3 right-3 h-0.5 bg-blue-100 rounded-full"></div>
-                                    <div
-                                        className="absolute top-3.5 left-3 h-0.5 bg-gradient-to-r from-emerald-500 to-blue-600 rounded-full transition-all duration-500"
-                                        style={{ width: currentIndex > 0 ? `calc((100% - 1.5rem) * ${currentIndex / (statusOrder.length - 1)})` : '0%' }}
-                                    ></div>
-                                    <div className="relative flex items-start justify-between">
-                                        {statusOrder.map((step, i) => {
-                                            const isActive = i <= currentIndex;
-                                            const isCurrent = step === vehiculoDetalle.estatus;
-                                            const isPast = isActive && !isCurrent;
-                                            return (
-                                                <div key={step} className="flex flex-col items-center gap-1.5 flex-1 max-w-[60px]">
-                                                    <div className={`relative w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-black border-2 transition-all ${
-                                                        isCurrent
-                                                            ? "bg-blue-600 text-white border-blue-300 ring-4 ring-blue-100 scale-110 shadow-md"
-                                                            : isPast
-                                                                ? "bg-emerald-500 text-white border-emerald-300"
-                                                                : "bg-white text-gray-400 border-blue-100"
-                                                    }`}>
-                                                        {isPast ? <FaCheckCircle className="text-[11px]"/> : step}
-                                                    </div>
-                                                    <span className={`text-[8px] sm:text-[9px] font-bold uppercase text-center leading-tight ${
-                                                        isCurrent ? "text-blue-700" : isPast ? "text-emerald-700" : "text-gray-400"
-                                                    }`}>
-                                                        {getVStatusLabel(step)}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Info */}
-                            <div className="p-5 sm:p-6 space-y-5">
-                                <section>
-                                    <div className="flex items-center gap-2 mb-2.5">
-                                        <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
-                                        <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Información del Vehículo</h4>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        <InfoCard icon={<FaBarcode/>} label="Lote" value={vehiculoDetalle.binNip} mono/>
-                                        <InfoCard icon={<FaCar/>} label="Marca / Modelo" value={`${vehiculoDetalle.marca || ''} ${vehiculoDetalle.modelo || ''}`.trim()}/>
-                                    </div>
-                                </section>
-
-                                <section>
-                                    <div className="flex items-center gap-2 mb-2.5">
-                                        <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
-                                        <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Logística</h4>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2.5">
-                                        <InfoCard icon={<FaMapMarkerAlt/>} label="Origen" value={[vehiculoDetalle.ciudad, vehiculoDetalle.estado].filter(Boolean).join(', ')}/>
-                                        <InfoCard icon={<FaWarehouse/>} label="Almacén" value={vehiculoDetalle.almacen}/>
-                                        <InfoCard icon={<FaCalendarAlt/>} label="Fecha de Registro" value={formatVDate(vehiculoDetalle.registro?.timestamp)}/>
-                                        <InfoCard icon={<FaTruck/>} label="Estatus" value={getVStatusLabel(vehiculoDetalle.estatus)}/>
-                                    </div>
-                                </section>
-
-                                {(vehiculoDetalle.cliente || vehiculoDetalle.referencia) && (
-                                    <section>
-                                        <div className="flex items-center gap-2 mb-2.5">
-                                            <div className="h-5 w-1 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
-                                            <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Detalles</h4>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                            {vehiculoDetalle.cliente && (
-                                                <InfoCard icon={<FaUser/>} label="Cliente" value={vehiculoDetalle.cliente}/>
-                                            )}
-                                            {vehiculoDetalle.referencia && (
-                                                <InfoCard icon={<FaIdCard/>} label="Referencia" value={vehiculoDetalle.referencia}/>
-                                            )}
-                                        </div>
-                                    </section>
-                                )}
-
-                                <div className="pt-2">
-                                    <button
-                                        onClick={() => setVehiculoDetalle(null)}
-                                        className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black uppercase text-xs tracking-wide shadow-md transition-all"
-                                    >
-                                        Cerrar
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
 
             {/* Footer */}
             <footer className="mt-6 pb-4 text-center text-[10px] text-gray-400 uppercase">
