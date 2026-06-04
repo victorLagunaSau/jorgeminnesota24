@@ -838,11 +838,11 @@ const SolicitarPage = () => {
                         {/* Imagen */}
                         <div className="relative flex-shrink-0">
                             {vehicleResult.imageUrl ? (
-                                <div className="w-full bg-gradient-to-br from-slate-900 to-slate-800 sm:rounded-t-2xl flex items-center justify-center" style={{ minHeight: '420px' }}>
+                                <div className="w-full bg-slate-900 sm:rounded-t-2xl flex items-center justify-center">
                                     <img
                                         src={vehicleResult.imageUrl}
                                         alt={`${vehicleResult.year} ${vehicleResult.make} ${vehicleResult.model}`}
-                                        className="w-full h-auto max-h-[60vh] object-contain"
+                                        className="w-full h-auto max-h-[55vh] object-contain"
                                     />
                                 </div>
                             ) : (
