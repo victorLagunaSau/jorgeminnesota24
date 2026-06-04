@@ -54,7 +54,7 @@ const SolicitarPage = () => {
     const [vehiculosEntregados, setVehiculosEntregados] = useState([]);
     const [loadingSolicitudes, setLoadingSolicitudes] = useState(true);
     const [guardando, setGuardando] = useState(false);
-    const [solicitudExito, setSolicitudExito] = useState(""); // mensaje de confirmación tras guardar
+    const [pidiendoTitulo, setPidiendoTitulo] = useState(false); // muestra el modal "¿recogerá el título?" antes de postear
     const [tabSolicitudes, setTabSolicitudes] = useState("solicitudes"); // "solicitudes" | "historial"
 
     // Modales de detalle
@@ -179,12 +179,6 @@ const SolicitarPage = () => {
         return () => unsubscribe();
     }, [user?.datosCliente?.cliente]);
 
-    // Auto-ocultar el mensaje de éxito tras unos segundos
-    useEffect(() => {
-        if (!solicitudExito) return;
-        const t = setTimeout(() => setSolicitudExito(""), 4000);
-        return () => clearTimeout(t);
-    }, [solicitudExito]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -233,7 +227,8 @@ const SolicitarPage = () => {
     const limpiarCampo = (valor, maxLen = 100) =>
         (valor === undefined || valor === null ? "" : String(valor)).trim().slice(0, maxLen);
 
-    const handleAgregarSolicitud = async () => {
+    // titulo: "SI" | "NO" — si el transportista debe recoger el título del vehículo
+    const handleAgregarSolicitud = async (titulo) => {
         if (!vehicleResult) {
             alert("No hay vehículo seleccionado");
             return;
@@ -258,6 +253,7 @@ const SolicitarPage = () => {
         if (yaSolicitado) {
             alert(`Ya tienes una solicitud activa para el lote ${lote}.`);
             setVehicleResult(null);
+            setPidiendoTitulo(false);
             return;
         }
 
@@ -272,6 +268,8 @@ const SolicitarPage = () => {
                 // Datos del vehículo (sanitizados)
                 lotNumber: lote,
                 gatePass: limpiarCampo(vehicleResult.gatePass, 20),
+                // ¿El transportista debe recoger el título? — se propaga al campo `titulo` del vehículo
+                titulo: titulo === "SI" ? "SI" : "NO",
                 make: limpiarCampo(vehicleResult.make),
                 model: limpiarCampo(vehicleResult.model),
                 year: limpiarCampo(vehicleResult.year, 10),
@@ -286,11 +284,11 @@ const SolicitarPage = () => {
                 notas: ""
             });
 
-            // Limpiar búsqueda y confirmar al cliente
+            // Limpiar búsqueda
             setVehicleResult(null);
+            setPidiendoTitulo(false);
             setLotNumber("");
             setGatePass("");
-            setSolicitudExito(`Solicitud del lote ${lote} registrada correctamente.`);
 
         } catch (error) {
             console.error("Error guardando solicitud:", error);
@@ -339,7 +337,7 @@ const SolicitarPage = () => {
                     <FaClock className="text-4xl text-indigo-500 mx-auto mb-3"/>
                     <h2 className="text-lg font-black uppercase text-gray-800 mb-2">Cuenta en Revisión</h2>
                     <p className="text-sm text-gray-500 mb-4">Tu cuenta aún no ha sido aprobada. No puedes solicitar vehículos hasta que sea revisada.</p>
-                    <Link href="/clients">
+                    <Link href="/client">
                         <a className="text-sm text-blue-600 font-bold underline">Volver</a>
                     </Link>
                 </div>
@@ -389,7 +387,7 @@ const SolicitarPage = () => {
                         </button>
                     </form>
                     <div className="mt-4 text-center">
-                        <Link href="/clients">
+                        <Link href="/client">
                             <a className="text-sm text-blue-600 hover:underline">← Volver al login</a>
                         </Link>
                     </div>
@@ -405,19 +403,6 @@ const SolicitarPage = () => {
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 pb-10 safe-area-bottom font-sans text-black overflow-x-hidden">
             <Head><title>Solicitar Vehículos | Jorge Minnesota</title></Head>
 
-            {/* Toast de confirmación al agregar solicitud */}
-            {solicitudExito && (
-                <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[80] w-[92%] max-w-md animate-fade-in-up">
-                    <div className="flex items-center gap-3 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-2xl">
-                        <FaCheckCircle className="text-lg flex-shrink-0"/>
-                        <p className="text-sm font-bold leading-tight flex-1">{solicitudExito}</p>
-                        <button onClick={() => setSolicitudExito("")} className="p-1 text-white/80 hover:text-white flex-shrink-0" aria-label="Cerrar">
-                            <FaTimes size={12}/>
-                        </button>
-                    </div>
-                </div>
-            )}
-
             {/* Pull-to-refresh indicator */}
             {refreshing && (
                 <div className="ptr-spinner">
@@ -428,7 +413,7 @@ const SolicitarPage = () => {
             {/* Header */}
             <header className="bg-white/80 backdrop-blur-md p-4 safe-area-top flex justify-between items-center border-b border-blue-100 sticky top-0 z-[60] shadow-sm">
                 <div className="flex items-center gap-4 min-w-0">
-                    <Link href="/clients">
+                    <Link href="/client">
                         <a className="text-blue-600 p-2 flex-shrink-0">
                             <FaArrowLeft className="text-lg"/>
                         </a>
@@ -441,7 +426,7 @@ const SolicitarPage = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <Link href="/clients">
+                    <Link href="/client">
                         <a className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase border border-blue-600 px-3 py-1 rounded-lg hover:bg-blue-50">
                             <FaCar className="text-base md:text-sm"/>
                             <span className="hidden md:inline">Mis Vehículos</span>
@@ -871,7 +856,7 @@ const SolicitarPage = () => {
                             {/* Acciones */}
                             <div className="mt-6 pt-4 border-t border-blue-100 space-y-2">
                                 <button
-                                    onClick={handleAgregarSolicitud}
+                                    onClick={() => setPidiendoTitulo(true)}
                                     disabled={guardando}
                                     className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 text-white font-black uppercase text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2"
                                 >
@@ -890,6 +875,49 @@ const SolicitarPage = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal pregunta de título — aparece sobre el resultado antes de postear */}
+            {vehicleResult && pidiendoTitulo && (
+                <div
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[90] flex items-center justify-center p-4 animate-fade-in-up"
+                    onClick={() => { if (!guardando) setPidiendoTitulo(false); }}
+                >
+                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center safe-area-bottom" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                            <FaIdCard className="text-2xl text-indigo-600"/>
+                        </div>
+                        <h3 className="text-lg font-black uppercase text-gray-800 leading-tight">
+                            ¿El transportista recogerá el título?
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-2 mb-6">
+                            Indícanos si este vehículo lleva título para que el transportista lo recoja.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => handleAgregarSolicitud("SI")}
+                                disabled={guardando}
+                                className="py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-60 text-white font-black uppercase text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                                {guardando ? <FaSpinner className="animate-spin"/> : "Sí"}
+                            </button>
+                            <button
+                                onClick={() => handleAgregarSolicitud("NO")}
+                                disabled={guardando}
+                                className="py-3 rounded-xl bg-gradient-to-r from-gray-400 to-gray-500 hover:from-gray-500 hover:to-gray-600 disabled:opacity-60 text-white font-black uppercase text-sm tracking-wide shadow-lg transition-all flex items-center justify-center gap-2"
+                            >
+                                {guardando ? <FaSpinner className="animate-spin"/> : "No"}
+                            </button>
+                        </div>
+                        <button
+                            onClick={() => setPidiendoTitulo(false)}
+                            disabled={guardando}
+                            className="mt-3 text-xs text-gray-400 font-bold uppercase hover:text-gray-600 disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
                     </div>
                 </div>
             )}
@@ -937,6 +965,13 @@ const SolicitarPage = () => {
                                     <FaBarcode className="text-blue-500 text-sm flex-shrink-0"/>
                                     <span className="text-gray-500 text-sm font-medium w-24">Lote</span>
                                     <span className="font-mono font-bold text-gray-900">{solicitudDetalle.lotNumber}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <FaIdCard className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Título</span>
+                                    <span className={`font-bold ${solicitudDetalle.titulo === 'SI' ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                        {solicitudDetalle.titulo === 'SI' ? 'Sí, el transportista lo recoge' : 'Título No Solicitado'}
+                                    </span>
                                 </div>
                                 {solicitudDetalle.vin && (
                                     <div className="flex items-center gap-3">

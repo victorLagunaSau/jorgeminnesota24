@@ -60,6 +60,20 @@ export const useAuth = () => {
                   .get();
               }
 
+              // Reintento desde servidor: en el WebView móvil una lectura por caché/lag
+              // puede devolver "no existe" para un cliente válido, lo que disparaba el
+              // falso "Esta cuenta no existe o fue eliminada". Forzamos servidor antes de rendirnos.
+              if (!clienteDoc.exists) {
+                try {
+                  clienteDoc = await firestore()
+                    .collection(COLLECTIONS.CLIENTES)
+                    .doc(userData.clienteIdOriginal || firebaseUser.uid)
+                    .get({ source: "server" });
+                } catch (_) {
+                  // Sin red / offline: conservamos el resultado previo
+                }
+              }
+
               if (clienteDoc.exists) {
                 fullUserData.datosCliente = {
                   id: clienteDoc.id,

@@ -75,7 +75,7 @@ All collection names are in `COLLECTIONS` constant. Notable non-obvious ones:
 
 - **Public:** `index` (landing), `login`, `solicitar` (client vehicle request), `rastreo` (tracking)
 - **Admin panel:** `admin` (renders Admin.js module router)
-- **Role-specific portals:** `carriers` + `loads` + `carrier-mapa` (empresa), `misviajes` + `driver` + `driver-mapa` (chofer), `clients` + `solicitar` (cliente)
+- **Role-specific portals:** `carriers` + `loads` + `carrier-mapa` (empresa), `misviajes` + `driver` + `driver-mapa` (chofer), `client` + `solicitar` (cliente)
 - **Other:** `privacy` (privacy policy page)
 - **API routes:** `api/scrape-vehicle` (Puppeteer auction scraper), `api/proxy-storage` (storage proxy), `api/send-whatsapp` (WhatsApp Business API messaging), `api/send-push` (FCM push notifications to clients), `api/send-push-chofer` (FCM push notifications to drivers)
 - **Maintenance scripts:** `scripts/` holds one-off data-fix/audit scripts (e.g. `corregirBinNips.js`, `auditChoferes.js`, `resetFolios.js`) that are written, run once against Firestore, then deleted — so the directory is usually empty. PDF output is generated in-app via `react-to-print`, not by standalone scripts. The `pdf/` directory is likewise scratch space (no tracked source).
@@ -101,7 +101,7 @@ Note: the `/solicitar` page calls the VPS **directly** at `https://jorgeminnesot
 - `admin` — daily operations (cash register if `caja` flag set, vehicles, trips, reports); with `adminMaster` flag: full access
 - `empresa` — carrier portal (`/carriers`, `/loads`)
 - `chofer` — driver view (`/misviajes`)
-- `cliente` — client portal (`/clients`, `/solicitar`)
+- `cliente` — client portal (`/client`, `/solicitar`)
 
 ## Code Conventions
 
@@ -131,7 +131,7 @@ Note: the `/solicitar` page calls the VPS **directly** at `https://jorgeminnesot
 
 ## Mobile App (Capacitor)
 
-The client portal (`/clients`, `/solicitar`) is wrapped as a native iOS/Android app using **Capacitor 8** in the `mobile/` directory.
+The client portal (`/client`, `/solicitar`) is wrapped as a native iOS/Android app using **Capacitor 8** in the `mobile/` directory.
 
 ### Mobile Commands
 
@@ -145,9 +145,9 @@ npx cap open ios        # Open in Xcode
 ### Mobile Architecture
 
 - **Config:** `mobile/capacitor.config.json` — `CapacitorHttp.enabled: false` is critical (enabling it breaks Firestore WebChannel streaming)
-- **Build pipeline:** `mobile/build.sh` runs `npm run export` from root, copies `out/` to `mobile/www/`, replaces `index.html` with a redirect to `/clients.html`, then `cap sync`
+- **Build pipeline:** `mobile/build.sh` runs `npm run export` from root, copies `out/` to `mobile/www/`, replaces `index.html` with a redirect to `/client.html`, then `cap sync`
 - **iOS project:** `mobile/ios/App/App.xcodeproj` (Swift Package Manager, NOT xcworkspace)
-- **Safe areas:** CSS classes `.safe-area-top` / `.safe-area-bottom` in `styles/tailwind.css` for Capacitor WebView notch handling. Applied to headers and page containers in `clients.js` and `solicitar.js`
+- **Safe areas:** CSS classes `.safe-area-top` / `.safe-area-bottom` in `styles/tailwind.css` for Capacitor WebView notch handling. Applied to headers and page containers in `client.js` and `solicitar.js`
 - **Viewport:** `_document.js` has `maximum-scale=1.0, user-scalable=no` to prevent iOS auto-zoom on inputs
 - **iOS auto-zoom fix:** `styles/tailwind.css` forces `font-size: 16px !important` on all inputs/selects/textareas
 
@@ -155,4 +155,4 @@ npx cap open ios        # Open in Xcode
 
 All notification code is implemented. Helper functions `notificarCambioEstatus()`, `notificarViajeAsignado()`, and `notificarCambioSolicitud()` in `utils/index.js` call `/api/send-push` (clients) or `/api/send-push-chofer` (drivers). Notifications fire on vehicle status changes, trip assignments (to drivers via `/api/send-push-chofer`), and solicitud status changes across multiple components. Requires Apple Developer Account + APNs key + Firebase FCM setup to activate — push notifications only work on real devices, not the iOS simulator.
 
-Token flow: client logs in → `clients.js` registers FCM token via Capacitor → saved to `tokensCliente` → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.
+Token flow: client logs in → `client.js` registers FCM token via Capacitor → saved to `tokensCliente` → `/api/send-push` looks up tokens by `clienteNombre` and sends via FCM legacy API.

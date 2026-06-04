@@ -232,7 +232,7 @@ const FormViaje = ({user, onViajeCreado, restaurarDraft, draftId: draftIdProp, s
                 storage: "0", sPeso: "0", gExtra: "0",
                 preciosClienteEditados: false,
                 storageCliente: "0", sPesoCliente: "0", gExtraCliente: "0",
-                titulo: "NO",
+                titulo: sol.titulo === "SI" ? "SI" : "NO",
                 comentarioRegistro: "",
                 yaPagado: false,
                 solicitudId: sol.id
