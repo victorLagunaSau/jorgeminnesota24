@@ -1115,6 +1115,27 @@ const ClientPage = () => {
             {vehiculoDetalle && (() => {
                 const statusOrder = ['PR', 'IN', 'TR', 'EB', 'DS', 'EN'];
                 const currentIndex = statusOrder.indexOf(vehiculoDetalle.estatus);
+
+                // Estado de cuenta del cliente — usa los campos de precio al CLIENTE
+                // (price/storage/sobrePeso/gastosExtra), nunca los costos internos del chofer.
+                const toNum = (x) => { const n = parseFloat(x); return isNaN(n) ? 0 : n; };
+                const v = vehiculoDetalle;
+                const totalCuenta = toNum(v.price) + toNum(v.storage) + toNum(v.sobrePeso) + toNum(v.gastosExtra);
+                let estadoCuenta, saldoCuenta;
+                if (v.estadoPago === 'pagado') {
+                    estadoCuenta = 'pagado'; saldoCuenta = 0;
+                } else if (v.estadoPago === 'fiado') {
+                    estadoCuenta = 'fiado'; saldoCuenta = toNum(v.saldoFiado);
+                } else {
+                    estadoCuenta = 'pendiente'; saldoCuenta = totalCuenta;
+                }
+                const cuentaBadge = {
+                    pagado:    { label: 'Pagado',    className: 'bg-emerald-100 text-emerald-700' },
+                    fiado:     { label: 'Con saldo', className: 'bg-amber-100 text-amber-700' },
+                    pendiente: { label: 'Pendiente', className: 'bg-gray-100 text-gray-600' },
+                }[estadoCuenta];
+                const fmtMoney = (n) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
                 const InfoCard = ({ icon, label, value, mono }) => (
                     <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3 hover:bg-blue-50/70 transition-colors">
                         <div className="flex items-center gap-1.5 mb-1">
@@ -1236,6 +1257,32 @@ const ClientPage = () => {
                                         <InfoCard icon={<FaTruck/>} label="Estatus Actual" value={getStatusLabel(vehiculoDetalle.estatus)}/>
                                     </div>
                                 </section>
+
+                                {/* Estado de cuenta */}
+                                {totalCuenta > 0 && (
+                                    <section>
+                                        <div className="flex items-center gap-2 mb-2.5">
+                                            <div className="h-5 w-1 bg-gradient-to-b from-emerald-500 to-blue-600 rounded-full"></div>
+                                            <h4 className="text-xs font-black text-gray-800 uppercase tracking-wide">Estado de Cuenta</h4>
+                                            <span className={`ml-auto text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${cuentaBadge.className}`}>
+                                                {cuentaBadge.label}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2.5">
+                                            <div className="bg-blue-50/40 border border-blue-100 rounded-xl p-3">
+                                                <span className="text-[10px] font-black text-blue-700 uppercase tracking-wide block mb-1">Total</span>
+                                                <p className="text-lg font-black text-gray-800 tabular-nums">{fmtMoney(totalCuenta)}</p>
+                                            </div>
+                                            <div className={`rounded-xl p-3 border ${saldoCuenta > 0 ? 'bg-amber-50/60 border-amber-100' : 'bg-emerald-50/60 border-emerald-100'}`}>
+                                                <span className={`text-[10px] font-black uppercase tracking-wide block mb-1 ${saldoCuenta > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>Saldo</span>
+                                                <p className={`text-lg font-black tabular-nums ${saldoCuenta > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{fmtMoney(saldoCuenta)}</p>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-2 leading-tight">
+                                            Para dudas sobre tu pago, contacta a la oficina.
+                                        </p>
+                                    </section>
+                                )}
 
                                 {/* Detalles adicionales */}
                                 {(vehiculoDetalle.cliente || vehiculoDetalle.referencia) && (

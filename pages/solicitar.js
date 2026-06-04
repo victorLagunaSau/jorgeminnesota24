@@ -10,6 +10,33 @@ import {
     FaClock, FaArrowLeft, FaCheckCircle, FaHistory, FaTruck, FaWarehouse, FaTimes, FaIdCard
 } from "react-icons/fa";
 
+// Mapa de abreviaturas de estado de EE.UU. (para estimar flete desde la ubicación de la subasta)
+const US_STATES_MAP = {
+    'TX': 'Texas', 'CA': 'California', 'FL': 'Florida', 'AZ': 'Arizona',
+    'NV': 'Nevada', 'GA': 'Georgia', 'NC': 'North Carolina', 'SC': 'South Carolina',
+    'TN': 'Tennessee', 'AL': 'Alabama', 'LA': 'Louisiana', 'MS': 'Mississippi',
+    'OK': 'Oklahoma', 'AR': 'Arkansas', 'NM': 'New Mexico', 'CO': 'Colorado',
+    'IL': 'Illinois', 'OH': 'Ohio', 'PA': 'Pennsylvania', 'NY': 'New York',
+    'NJ': 'New Jersey', 'MI': 'Michigan', 'IN': 'Indiana', 'WI': 'Wisconsin',
+    'MN': 'Minnesota', 'IA': 'Iowa', 'MO': 'Missouri', 'KS': 'Kansas',
+    'NE': 'Nebraska', 'SD': 'South Dakota', 'ND': 'North Dakota', 'MT': 'Montana',
+    'WY': 'Wyoming', 'UT': 'Utah', 'ID': 'Idaho', 'WA': 'Washington',
+    'OR': 'Oregon', 'VA': 'Virginia', 'WV': 'West Virginia', 'KY': 'Kentucky',
+    'MD': 'Maryland', 'DE': 'Delaware', 'CT': 'Connecticut', 'RI': 'Rhode Island',
+    'MA': 'Massachusetts', 'VT': 'Vermont', 'NH': 'New Hampshire', 'ME': 'Maine',
+    'HI': 'Hawaii', 'AK': 'Alaska'
+};
+
+const extraerEstado = (location) => {
+    if (!location) return "";
+    const match = location.match(/\b([A-Z]{2})\b/);
+    if (match && US_STATES_MAP[match[1]]) return US_STATES_MAP[match[1]];
+    for (const [, name] of Object.entries(US_STATES_MAP)) {
+        if (location.toLowerCase().includes(name.toLowerCase())) return name;
+    }
+    return "";
+};
+
 const SolicitarPage = () => {
     const { user, loading, isCliente, signIn, signOut } = useAuthContext();
 
@@ -47,6 +74,9 @@ const SolicitarPage = () => {
 
         return () => clearInterval(interval);
     }, [searching]);
+
+    // Provincias (para estimar el flete al cliente según la ubicación de la subasta)
+    const [provincias, setProvincias] = useState([]);
 
     // Estados para lista de solicitudes
     const [solicitudes, setSolicitudes] = useState([]);
@@ -179,6 +209,30 @@ const SolicitarPage = () => {
         return () => unsubscribe();
     }, [user?.datosCliente?.cliente]);
 
+    // Cargar provincias una vez (para estimar el flete al cliente)
+    useEffect(() => {
+        if (!user) return;
+        firestore()
+            .collection(COLLECTIONS.PROVINCE)
+            .get()
+            .then((snap) => setProvincias(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+            .catch((err) => console.error("Error cargando provincias:", err));
+    }, [user]);
+
+    // Estima el flete (precio al cliente) según la ubicación de la subasta del vehículo escaneado.
+    // Devuelve null si no hay match — en ese caso mostramos "Se confirma al procesar".
+    const calcularFleteEstimado = (location) => {
+        if (!location || provincias.length === 0) return null;
+        const estado = extraerEstado(location);
+        if (!estado) return null;
+        const prov = provincias.find(p => p.state === estado);
+        if (!prov || !prov.regions?.length) return null;
+        const loc = location.toLowerCase();
+        const region = prov.regions.find(r => r.city && loc.includes(r.city.toLowerCase())) || prov.regions[0];
+        const precio = parseFloat(region.precioPagina || region.price || 0);
+        if (!precio) return null;
+        return { estado, ciudad: region.city, precio };
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -804,11 +858,6 @@ const SolicitarPage = () => {
                             >
                                 <FaTimes size={14}/>
                             </button>
-                            <div className="absolute bottom-3 left-3">
-                                <span className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-xs font-bold px-2.5 py-1 rounded shadow">
-                                    {vehicleResult.source}
-                                </span>
-                            </div>
                         </div>
 
                         {/* Info */}
@@ -817,9 +866,16 @@ const SolicitarPage = () => {
                             <p className="text-base font-bold text-gray-500 uppercase tracking-wide leading-tight">
                                 {vehicleResult.year} {vehicleResult.make}
                             </p>
-                            <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-tight">
-                                {vehicleResult.model}
-                            </h3>
+                            <div className="flex items-start justify-between gap-2">
+                                <h3 className="text-3xl font-black text-gray-900 uppercase tracking-tight leading-tight">
+                                    {vehicleResult.model}
+                                </h3>
+                                {vehicleResult.source && (
+                                    <span className="flex-shrink-0 mt-1 bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-base font-black uppercase px-3 py-1.5 rounded-lg shadow">
+                                        {vehicleResult.source}
+                                    </span>
+                                )}
+                            </div>
 
                             <div className="mt-5 space-y-3.5 text-base text-gray-700">
                                 <div className="flex items-center gap-3">
@@ -851,6 +907,23 @@ const SolicitarPage = () => {
                                         <span className="text-gray-900 font-medium">{vehicleResult.auctionDate}</span>
                                     </div>
                                 )}
+                                {/* Costo del flete — campo "Cobro ($)" (precioPagina) de Estados y precios */}
+                                {(() => {
+                                    const est = calcularFleteEstimado(vehicleResult.location);
+                                    return (
+                                        <div className="flex items-center gap-3">
+                                            <FaTruck className="text-emerald-600 text-base flex-shrink-0"/>
+                                            <span className="text-emerald-700 text-sm font-bold w-24">Costo Flete</span>
+                                            {est ? (
+                                                <span className="text-emerald-700 font-black text-xl tabular-nums">
+                                                    ${est.precio.toLocaleString('en-US')}<span className="text-xs font-bold ml-1">USD</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-500 font-medium text-sm">Se confirma al procesar</span>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {/* Acciones */}
