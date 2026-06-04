@@ -17,7 +17,7 @@ import {
     FaUserPlus, FaEye, FaEyeSlash, FaCamera, FaClock, FaTimes, FaBarcode, FaKey
 } from "react-icons/fa";
 
-const ClientsPage = () => {
+const ClientPage = () => {
     const { user, loading, isCliente, signIn, signOut } = useAuthContext();
     const router = useRouter();
     const [vehiculos, setVehiculos] = useState([]);
@@ -1315,6 +1315,13 @@ const ClientsPage = () => {
                                     <span className="text-gray-500 text-sm font-medium w-24">Lote</span>
                                     <span className="font-mono font-bold text-gray-900">{solicitudDetalle.lotNumber}</span>
                                 </div>
+                                <div className="flex items-center gap-3">
+                                    <FaIdCard className="text-blue-500 text-sm flex-shrink-0"/>
+                                    <span className="text-gray-500 text-sm font-medium w-24">Título</span>
+                                    <span className={`font-bold ${solicitudDetalle.titulo === 'SI' ? 'text-emerald-600' : 'text-gray-700'}`}>
+                                        {solicitudDetalle.titulo === 'SI' ? 'Sí, el transportista lo recoge' : 'Título No Solicitado'}
+                                    </span>
+                                </div>
                                 {solicitudDetalle.vin && (
                                     <div className="flex items-center gap-3">
                                         <FaKey className="text-blue-500 text-sm flex-shrink-0"/>
@@ -1355,4 +1362,4 @@ const ClientsPage = () => {
     );
 };
 
-export default ClientsPage;
+export default ClientPage;

@@ -115,10 +115,10 @@ const DriverPage = () => {
         setLoading(false);
     }, []);
 
-    // Si no hay sesión de chofer, redirigir al login unificado en /clients
+    // Si no hay sesión de chofer, redirigir al login unificado en /client
     useEffect(() => {
         if (!loading && !chofer) {
-            router.replace("/clients");
+            router.replace("/client");
         }
     }, [loading, chofer, router]);
 
@@ -275,8 +275,8 @@ const DriverPage = () => {
         setFolio("");
         setClave("");
         setVista("pendientes");
-        // Login unificado vive en /clients
-        router.push("/clients");
+        // Login unificado vive en /client
+        router.push("/client");
     };
 
     // === Marcar levantado ===
@@ -468,7 +468,7 @@ const DriverPage = () => {
         </div>
     );
 
-    // Sin sesión → redirige al login unificado (/clients). Mostrar spinner mientras tanto.
+    // Sin sesión → redirige al login unificado (/client). Mostrar spinner mientras tanto.
     if (!chofer) {
         return (
             <div className="h-screen flex flex-col justify-center items-center bg-white">
@@ -626,6 +626,15 @@ const DriverPage = () => {
                                                 {v.levantado && (
                                                     <span className="bg-green-100 text-green-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
                                                         Levantado
+                                                    </span>
+                                                )}
+                                                {v.titulo === 'SI' ? (
+                                                    <span className="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                                        Recoger título
+                                                    </span>
+                                                ) : (
+                                                    <span className="bg-gray-100 text-gray-500 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+                                                        Título No Solicitado
                                                     </span>
                                                 )}
                                             </div>
